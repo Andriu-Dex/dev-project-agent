@@ -67,7 +67,7 @@ Decisión confirmada por el gestor el 7 de octubre de 2026: distinguir los dos r
 
 | Repositorio | Flujo acordado |
 | --- | --- |
-| utaped-agent, producto que desarrollaremos | Desarrollo en develop; versión final validada pasa a main |
+| dev-project-agent, producto que desarrollaremos | Desarrollo en develop; versión final validada pasa a main |
 | utaped, proyecto supervisado | Cada corrección aprobada se prepara en agent/<proposal-id>-v<version>, con PR hacia develop; incorporación a develop y posterior paso a main exclusivamente humanos |
 
 La referencia inicial supervisada de UTAPED será develop. Registrar siempre referencia y commit base exactos. Detectar cambios en develop no autoriza a modificar ni actualizar automáticamente una propuesta existente.

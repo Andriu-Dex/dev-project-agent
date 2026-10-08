@@ -2,6 +2,8 @@
 
 ## Actualización de preparación
 
+Actualización posterior: el usuario autorizó implementación el 7 de octubre. El repositorio remoto dev-project-agent ya contiene el commit documental inicial en main y develop. La primera base técnica y sus límites se describen en [estado de implementación](implementation-status.md). Los textos siguientes que hablan de planificación sin desarrollo corresponden a la fase anterior.
+
 Los seis hitos quedaron corregidos y revalidados en la cuarta exportación del 7 de octubre; no requieren ajustes adicionales. Repositorio inicializado por el usuario y preparado con exclusiones Git, convenciones de texto e instrucciones del proyecto, sin commits ni desarrollo. Siguiente trabajo: concretar contratos de datos, estados de propuestas y decisiones de operación. El flujo de ramas está confirmado en docs/reports-and-operations.md.
 
 ## Condiciones

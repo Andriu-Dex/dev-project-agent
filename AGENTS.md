@@ -1,8 +1,8 @@
-# UTAPED Agent: repository instructions
+# Dev Project Agent: repository instructions
 
 ## Current scope
 
-Planning and repository documentation only. Do not start development, install dependencies, configure connections, create SQL, or perform external changes until the user authorizes implementation. Commits, staging, pushes, and pull requests require user authorization. Authorization already granted in the conversation takes precedence over this default.
+Implementation was authorized by the user on October 7, 2026. Start with environment/provider validation and the minimum application foundation on develop, then follow the documented implementation order. Dependency installation, local services, and necessary migrations are authorized within this scope. External changes in the supervised project still require specific approval. Commits, staging, pushes, and pull requests require user authorization. Authorization already granted in the conversation takes precedence over this default.
 
 ## Language policy
 
@@ -36,4 +36,4 @@ Do not introduce AI authorship, co-authorship, credits, signatures, trailers, or
 
 ## Verification
 
-For documentation and Git configuration, check content, local links, and exclusion rules. Do not install tools or test a nonexistent application. Report only checks actually performed. Follow applicable parent AGENTS.md instructions, with the user's explicit language policy taking precedence.
+Run checks appropriate to implemented changes: type checking, builds, focused tests, database checks, and UI inspection where applicable. Also check documentation links and exclusion rules. Report only checks actually performed. Follow applicable parent AGENTS.md instructions, with the user's explicit language policy taking precedence.

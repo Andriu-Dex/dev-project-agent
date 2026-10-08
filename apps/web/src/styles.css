@@ -1,0 +1,213 @@
+:root {
+  --color-bg-base: #f3f6f8;
+  --color-bg-surface: #ffffff;
+  --color-text-base: #172b3b;
+  --color-text-muted: #526575;
+  --color-accent: #166565;
+  --color-border: #dce4e9;
+  --color-badge-bg: #eaf1f6;
+  --color-success: #176342;
+  --color-error: #9b342b;
+  --color-btn-bg: #174f64;
+  --color-btn-text: #ffffff;
+  --color-btn-hover: #123d4e;
+  --color-focus: #b06413;
+  --color-shadow: rgba(0, 0, 0, 0.05);
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-synthesis: none;
+  line-height: 1.6;
+}
+
+:root[data-theme="dark"] {
+  --color-bg-base: #0f172a;
+  --color-bg-surface: #1e293b;
+  --color-text-base: #f8fafc;
+  --color-text-muted: #94a3b8;
+  --color-accent: #4fd1c5;
+  --color-border: #334155;
+  --color-badge-bg: #334155;
+  --color-success: #34d399;
+  --color-error: #f87171;
+  --color-btn-bg: #38bdf8;
+  --color-btn-text: #0f172a;
+  --color-btn-hover: #7dd3fc;
+  --color-focus: #fb923c;
+  --color-shadow: rgba(0, 0, 0, 0.2);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--color-bg-base);
+  color: var(--color-text-base);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+main { max-width: 940px; margin: 0 auto; padding: 64px 24px; }
+header { margin-bottom: 36px; }
+
+.eyebrow {
+  color: var(--color-accent);
+  font-weight: 650;
+  letter-spacing: .05em;
+  font-size: .85rem;
+  text-transform: uppercase;
+}
+
+h1 { font-size: clamp(2rem, 5vw, 3rem); line-height: 1.15; margin: 12px 0; letter-spacing: -.04em; }
+h2 { font-size: 1.15rem; margin: 0 0 12px; }
+
+.intro { max-width: 660px; font-size: 1.1rem; color: var(--color-text-muted); }
+
+section {
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  padding: 26px;
+  margin-bottom: 20px;
+  box-shadow: 0 4px 6px -1px var(--color-shadow);
+  transition: background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.section-heading { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: baseline; }
+
+.badge {
+  background: var(--color-badge-bg);
+  padding: 4px 12px;
+  border-radius: 30px;
+  font-size: .8rem;
+  color: var(--color-text-base);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.connection { font-weight: 650; }
+.available { color: var(--color-success); }
+.database_unavailable, .service_unavailable { color: var(--color-error); }
+
+.muted, footer { color: var(--color-text-muted); font-size: .9rem; }
+
+button {
+  background: var(--color-btn-bg);
+  color: var(--color-btn-text);
+  border: none;
+  border-radius: 8px;
+  padding: 12px 18px;
+  font: inherit;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background-color 0.2s ease, transform 0.1s ease, outline 0.2s ease;
+}
+
+button:hover {
+  background: var(--color-btn-hover);
+  transform: translateY(-1px);
+}
+
+button:active {
+  transform: translateY(1px);
+}
+
+button:disabled {
+  opacity: .6;
+  cursor: wait;
+  transform: none;
+}
+
+button:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 4px;
+}
+
+footer { margin-top: 28px; }
+
+/* Theme Toggle Button */
+.theme-toggle {
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 50%;
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-base);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px var(--color-shadow), 0 1px 3px var(--color-shadow);
+  cursor: pointer;
+  z-index: 50;
+  padding: 0;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.theme-toggle:hover {
+  transform: translateY(-4px) scale(1.05);
+  box-shadow: 0 10px 25px var(--color-shadow);
+  background: var(--color-badge-bg);
+}
+
+.theme-toggle:active {
+  transform: translateY(0) scale(0.95);
+}
+
+.theme-toggle svg {
+  width: 1.5rem;
+  height: 1.5rem;
+  transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.theme-toggle:hover svg {
+  transform: rotate(15deg);
+}
+
+/* Tooltip */
+.theme-toggle::before {
+  content: attr(data-tooltip);
+  position: absolute;
+  right: calc(100% + 16px);
+  top: 50%;
+  transform: translateY(-50%) translateX(10px);
+  background: var(--color-text-base);
+  color: var(--color-bg-base);
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  box-shadow: 0 4px 6px -1px var(--color-shadow);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.theme-toggle:hover::before {
+  opacity: 1;
+  transform: translateY(-50%) translateX(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+@media (max-width: 560px) {
+  main { padding: 32px 16px; }
+  section { padding: 20px; }
+  .theme-toggle {
+    bottom: 1.5rem;
+    right: 1.5rem;
+    width: 3rem;
+    height: 3rem;
+  }
+  .theme-toggle svg {
+    width: 1.25rem;
+    height: 1.25rem;
+  }
+  .theme-toggle::before {
+    display: none; /* Hide tooltip on small screens */
+  }
+}

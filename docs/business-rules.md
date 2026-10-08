@@ -17,7 +17,7 @@ La cuarta exportación del 7 de octubre confirma inicio nativo ausente y vencimi
 | Otros integrantes | Acceso de consulta inicialmente |
 | Código | Rama y propuesta para revisión; incorporación a la rama destino por una persona |
 | Ramas de UTAPED | agent/<proposal-id>-v<version> con PR a develop; incorporación a develop y main humana |
-| Ramas de utaped-agent | Desarrollo en develop; versión final validada pasa a main |
+| Ramas de dev-project-agent | Desarrollo en develop; versión final validada pasa a main |
 | Planificación original | Trello, según confirmación del usuario |
 | Gestor autorizado | Steven Eduardo Paredes Medina, usuario que confirmó su identidad y autoridad en esta conversación |
 | Cuenta del gestor en Trello | andrew uzumaki (`andrewuzumaki`), ID `6a9570f1c1b641a5863de7d9` |

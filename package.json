@@ -1,0 +1,34 @@
+{
+  "name": "dev-project-agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24.19.0 <25",
+    "npm": ">=11 <12"
+  },
+  "packageManager": "npm@11.17.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "setup": "node scripts/setup-local.mjs",
+    "db:up": "docker compose up -d --wait postgres",
+    "db:stop": "docker compose stop postgres",
+    "db:migrate": "node --env-file=.env scripts/migrate.mjs",
+    "dev": "npm run build --workspace @dev-project-agent/contracts && node scripts/dev.mjs",
+    "build": "npm run build --workspace @dev-project-agent/contracts && npm run build --workspace @dev-project-agent/server && npm run build --workspace @dev-project-agent/web",
+    "typecheck": "npm run build --workspace @dev-project-agent/contracts && npm run typecheck --workspaces --if-present",
+    "test": "vitest run",
+    "test:db": "node --env-file=.env scripts/check-database.mjs",
+    "start": "node --env-file=.env apps/server/dist/index.js"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.1",
+    "node-pg-migrate": "9.0.0",
+    "typescript": "6.0.3",
+    "tsx": "4.23.15",
+    "vitest": "5.0.3"
+  }
+}
