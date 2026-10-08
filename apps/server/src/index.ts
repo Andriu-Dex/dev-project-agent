@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import fastifyStatic from '@fastify/static';
 import pg from 'pg';
 import { buildApp } from './app.js';
+import { authConfigFromEnvironment } from './modules/auth/config.js';
 
 const connectionString = process.env.APP_DATABASE_URL;
 if (!connectionString) throw new Error('APP_DATABASE_URL is required. Run npm run setup first.');
@@ -20,6 +21,7 @@ const pool = new pg.Pool({
 const app = buildApp({
   checkDatabase: async () => { await pool.query('SELECT 1'); },
   logger: true,
+  auth: { ...authConfigFromEnvironment(process.env), database: pool },
 });
 pool.on('error', () => { app.log.error('Idle database connection failed.'); });
 app.addHook('onClose', async () => { await pool.end(); });

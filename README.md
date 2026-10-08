@@ -4,7 +4,7 @@ Assistant for the UTAPED project manager: planning supervision, Trello integrati
 
 ## Status
 
-Implementation started on October 7, 2026. Academic deadline: November 4, 2026. Four team members. The first foundation includes a React dashboard, Fastify service, shared contracts, and a separate local PostgreSQL database. Authentication, source connections, agents, proposals, and reports are not implemented yet. See [implementation status](docs/implementation-status.md) for scope and verification.
+Implementation started on October 7, 2026. Academic deadline: November 4, 2026. Four team members. The application includes a React dashboard with light/dark themes, Fastify service, shared contracts, local PostgreSQL, password authentication, persistent sessions, and project permissions. Source connections, agents, proposals, and reports are not implemented yet. See [implementation status](docs/implementation-status.md) for scope and verification.
 
 Repository: https://github.com/Andriu-Dex/dev-project-agent
 
@@ -56,7 +56,7 @@ Standards, report format, frequencies, priority, and blocking defaults are docum
 
 ## Repository preparation
 
-The initial commit contains planning and Git configuration only. Implementation continues on develop. No additional commit or push is included in this work.
+The initial commit contains planning and Git configuration. Commit 9a764ff adds the application foundation and theme support. Implementation continues on develop; commits are kept local unless a push is requested.
 
 .editorconfig, .gitattributes, .gitignore, and AGENTS.md define repository conventions. The private docs/utaped-trello.json export remains local and ignored because it contains profiles, history, and links. package-lock.json records dependencies. Local credentials are generated in an ignored .env file and never printed by setup.
 
@@ -69,15 +69,24 @@ npm ci
 npm run setup
 npm run db:up
 npm run db:migrate
+npm run user:create
 npm run dev
 ```
 
 Dashboard: http://127.0.0.1:5174. Service: http://127.0.0.1:3100/api/v1/health. PostgreSQL uses loopback port 15434 and its own named volume. Existing UTAPED services are not reused or modified.
 
-setup does not overwrite an existing .env. If credentials change after database initialization, they must be rotated in PostgreSQL too; changing .env does not update existing roles. Do not remove the volume to repair credentials or reset data without reviewing what would be lost.
+setup preserves existing .env values and appends missing session settings. If credentials change after database initialization, they must be rotated in PostgreSQL too; changing .env does not update existing roles. Do not remove the volume to repair credentials or reset data without reviewing what would be lost. Restart the service after changing environment settings.
 
-Checks: npm run typecheck, npm test, npm run test:db, and npm run build. The database check uses rollback to avoid persisting test records. Build and run the dashboard/service together with npm run build followed by npm start at http://127.0.0.1:3100.
+Checks: npm run typecheck, npm test, npm run test:db, npm run test:auth-db, and npm run build. Database checks use rollback to avoid persisting test records. Authentication integration tests require the local migrated database and are skipped by the regular unit-test command. Build and run the dashboard/service together with npm run build followed by npm start at http://127.0.0.1:3100.
 
-Stop local development with Ctrl+C; stop this database with npm run db:stop. All interfaces are local only. Do not expose this foundation to a network before authentication and access controls are implemented.
+Stop local development with Ctrl+C; stop this database with npm run db:stop. All interfaces are local only. Remote deployment, HTTPS termination, and distributed rate limiting remain outside this local milestone.
+
+## Local accounts
+
+Run npm run user:create in an interactive terminal to create an account and its project membership. The first account defaults to manager; subsequent accounts default to viewer. Choose Steven's manager account explicitly. Password entry is masked, confirmation is required, and passwords must contain 15–128 characters. No default credentials or public registration endpoint exist. Administrative commands use the migration database role and must remain local.
+
+Run npm run user:reset to change a password and revoke existing sessions. Password hashes use Argon2id. Sessions remain in PostgreSQL across service restarts, expire after 30 minutes of inactivity or eight hours from login, and use HttpOnly/SameSite cookies. Explicit loopback HTTP settings support local development; HTTPS configuration uses Secure cookies. Mutation endpoints require an allowed Origin and session CSRF token. Login is limited to ten attempts per minute per IP in this single-process version.
+
+The manager can read project membership; viewers cannot. Permissions and account activity are checked against PostgreSQL on each protected request. Audit records include successful/denied logins, logout, account creation, password changes, and denied membership reads. The full proposal approval workflow is still pending. See [authentication operations](docs/authentication.md).
 
 The first version runs locally. Scheduled jobs require the computer and service to be active. No additional API or hosting budget is available.

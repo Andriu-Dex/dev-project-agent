@@ -12,7 +12,7 @@ Fecha: 7 de octubre de 2026. El usuario autorizó iniciar implementación. El pr
 - Configuración local generada sin imprimir credenciales y excluida de Git. Procedimiento idempotente que no reemplaza .env existente.
 - Primera migración: projects y audit_events. Rol de ejecución sin privilegios de superusuario o creación de esquema; auditoría con SELECT/INSERT, sin UPDATE/DELETE.
 
-No están implementados todavía: usuarios/sesiones, autorización por proyecto, conectores reales, tres agentes, propuestas, ejecución externa ni reportes. No se exponen datos de proyecto sin autenticación; solo la comprobación mínima de disponibilidad.
+Ya se incorporaron usuarios/sesiones y autorización por proyecto; véase [acceso local](authentication.md). No están implementados todavía: conectores reales, tres agentes, propuestas, ejecución externa ni reportes. No se exponen datos de proyecto sin autenticación; solo la comprobación mínima de disponibilidad.
 
 ## Entorno y versiones seleccionadas
 
@@ -46,6 +46,8 @@ Estado: ruta documental validada; integración, consentimiento de esta cuenta, c
 
 Verificaciones realizadas: instalación con auditoría npm sin vulnerabilidades reportadas; comprobación TypeScript; compilación de los tres workspaces; tres pruebas del servicio; migración aplicada y repetida sin duplicación; comprobación real del rol de ejecución y de permisos de auditoría con rollback. El panel se abrió en el navegador y mostró disponibilidad real, caída de PostgreSQL y recuperación tras reiniciarlo. Las comprobaciones del navegador usaron su árbol de accesibilidad; la captura de pantalla no estuvo disponible.
 
-No se realizaron consultas de IA, pruebas de cuota, lectura en línea de Trello ni cambios en UTAPED. No se crearon commits ni se hizo push durante esta primera implementación.
+No se realizaron consultas de IA, pruebas de cuota, lectura en línea de Trello ni cambios en UTAPED. Por autorización del usuario, la primera base y sus cambios de estilos/temas se guardaron en el commit 9a764ff (`feat(core): initialize application foundation with theme support`). No se hizo push.
 
-A continuación: acceso del gestor, sesiones y permisos por proyecto, con su auditoría; después conectar lectura de Trello. Preparar por separado la conexión oficial de IA y solicitar al usuario el inicio de sesión cuando exista un flujo concreto y revisable.
+Segunda implementación: acceso local del gestor y lectores, sesiones PostgreSQL, permisos por proyecto, auditoría, comandos administrativos y pantalla de acceso compatible con ambos temas. Se verifican 11 escenarios de integración de autenticación con PostgreSQL real y rollback, además de las pruebas de configuración y disponibilidad. No se han creado cuentas reales: el gestor elige su contraseña mediante `npm run user:create`.
+
+A continuación: conectar lectura de Trello y registrar la procedencia y fecha de sincronización de los datos. Preparar por separado la conexión oficial de IA y solicitar al usuario el inicio de sesión cuando exista un flujo concreto y revisable.

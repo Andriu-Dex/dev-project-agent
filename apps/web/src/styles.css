@@ -121,6 +121,109 @@ button:focus-visible {
 
 footer { margin-top: 28px; }
 
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 420px;
+  margin-top: 20px;
+}
+
+.input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.login-form label {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--color-text-base);
+}
+
+.login-form input {
+  width: 100%;
+  font: inherit;
+  padding: 12px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-base);
+  background: var(--color-bg-base);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+.login-form input:hover {
+  border-color: var(--color-text-muted);
+}
+
+.login-form input:focus {
+  outline: none;
+  border-color: var(--color-focus);
+  box-shadow: 0 0 0 3px rgba(176, 100, 19, 0.15); /* var(--color-focus) but with opacity */
+  background: var(--color-bg-surface);
+}
+
+.login-form input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.password-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.password-wrapper input {
+  padding-right: 48px; /* space for the eye icon */
+}
+
+.icon-button {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  padding: 8px;
+  color: var(--color-text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: color 0.2s ease, background-color 0.2s ease;
+}
+
+.icon-button:hover {
+  background: var(--color-bg-base);
+  color: var(--color-text-base);
+  transform: translateY(-50%); /* prevent global button hover transform */
+}
+
+.icon-button:active {
+  transform: translateY(-50%); /* prevent global button active transform */
+}
+
+.icon-button:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: -2px;
+}
+
+.login-form button[type="submit"] {
+  margin-top: 12px;
+  width: 100%;
+  padding: 14px;
+  font-size: 1rem;
+}
+
+.form-error {
+  color: var(--color-error);
+  font-weight: 500;
+  margin-bottom: 12px;
+}
+h3 { font-size: 1rem; }
+
 /* Theme Toggle Button */
 .theme-toggle {
   position: fixed;

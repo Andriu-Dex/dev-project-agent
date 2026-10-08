@@ -22,13 +22,17 @@
     "typecheck": "npm run build --workspace @dev-project-agent/contracts && npm run typecheck --workspaces --if-present",
     "test": "vitest run",
     "test:db": "node --env-file=.env scripts/check-database.mjs",
-    "start": "node --env-file=.env apps/server/dist/index.js"
+    "start": "node --env-file=.env apps/server/dist/index.js",
+    "user:create": "node --env-file=.env --import tsx scripts/manage-user.ts create",
+    "user:reset": "node --env-file=.env --import tsx scripts/manage-user.ts reset",
+    "test:auth-db": "node --env-file=.env scripts/test-auth.mjs"
   },
   "devDependencies": {
+    "@inquirer/prompts": "8.7.3",
     "@types/node": "24.19.1",
     "node-pg-migrate": "9.0.0",
-    "typescript": "6.0.3",
     "tsx": "4.23.15",
+    "typescript": "6.0.3",
     "vitest": "5.0.3"
   }
 }

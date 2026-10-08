@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { HealthResponse } from '@dev-project-agent/contracts';
 import { ThemeToggle } from './components/ThemeToggle';
+import { SessionPanel } from './components/SessionPanel';
 
 type ConnectionState = 'loading' | 'available' | 'database_unavailable' | 'service_unavailable';
 
@@ -44,6 +45,7 @@ export function App() {
           <h1>Dev Project Agent</h1>
           <p className="intro">Un espacio para revisar el avance, comprender los riesgos y decidir los cambios de tu proyecto.</p>
         </header>
+        <SessionPanel />
         <section aria-labelledby="status-title">
           <div className="section-heading"><h2 id="status-title">Estado de conexión</h2><span className="badge">Configuración inicial</span></div>
           <p role="status" className={'connection ' + connection}>{labels[connection]}</p>
@@ -52,7 +54,7 @@ export function App() {
         </section>
         <section aria-labelledby="next-title">
           <h2 id="next-title">El seguimiento aún no está conectado</h2>
-          <p>Primero configuraremos el acceso del gestor y las conexiones de UTAPED. Las actividades, los análisis y los reportes aparecerán cuando existan datos reales.</p>
+          <p>Las actividades, los análisis y los reportes aparecerán cuando conectemos las fuentes del proyecto y existan datos reales.</p>
           <ul><li>Trello: sin conectar</li><li>GitHub: sin conectar</li><li>Proveedor de IA: pendiente de validación</li></ul>
         </section>
         <footer>Los cambios de Trello y código requerirán revisión y aprobación del gestor.</footer>
