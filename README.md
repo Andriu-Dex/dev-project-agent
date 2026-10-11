@@ -36,6 +36,7 @@ Local supervised checkout: C:\Documentos\D-Proyectos\Git\utaped.
 - [Tracking rules and implementation limits](docs/tracking-rules.md)
 - [Source supervision, baseline and history](docs/supervision.md)
 - [AI provider validation](docs/provider-validation.md)
+- [Code review and simulated publication](docs/code-review.md)
 - [Git conventions](docs/git-conventions.md)
 - [Standards and quality criteria](docs/standards-and-quality.md)
 - [Reports and operations](docs/reports-and-operations.md)
@@ -110,3 +111,11 @@ The first version runs locally. Scheduled jobs require the computer and service 
 The proposal panel runs Executor, Reviewer, and Approver sequentially through the connected ChatGPT account. The initial scope is one proposed Trello due-date change. Each version freezes its source context, validated content, SHA-256 fingerprint, stage messages, model/effort, usage, and human decision. Review and policy checks must succeed before manager approval. Adjustments create a new version and repeat all stages; rejection is terminal. Source, baseline, or tracking policy changes invalidate the candidate. Approval records authorization only; no Trello write endpoint exists. See [implemented workflow](docs/agent-workflow.md).
 
 Use `npm run db:migrate` after updating. Run `npm run test:proposals-db` for rollback-based PostgreSQL workflow checks and `npm run test:ui` for the synthetic browser journey. Explicit reasoning levels are currently verified only for `gpt-6.1-sol`: low, medium, high, xhigh, max. Other models use the provider default until their supported levels are verified. The UI records the requested setting, not measured internal reasoning.
+
+## Code review and correction milestone
+
+The dashboard now reads bounded source files from exact GitHub commits, runs isolated syntax and pattern checks, and optionally requests evidence-grounded analysis through the existing ChatGPT connection. Sending code requires separate explicit consent. The sequential Executor, Reviewer and Approver prepare a bounded diff and immutable versions; the manager decides on its exact content hash. Failed or interrupted workflows resume only on explicit request, preserving completed stages.
+
+GitHub publication is simulation-only. Approval records a demonstration, and the simulation records the planned `agent/<proposal-id>-v<version>` branch and PR destination without creating a remote commit, branch or PR. No merge capability or GitHub write adapter is implemented. Existing Trello write gates remain disabled locally; demonstrations cannot enable them. UTAPED builds and tests are not executed by this milestone. See [scope, API and evidence](docs/code-review.md).
+
+Additional checks: `npm run test:code-db` runs rollback-based PostgreSQL integration tests; `npm run test:ui` exercises both workflows using synthetic external services. `npm run code:inspect` lists eligible files; append selected repository-relative paths to read and statically check them without saving analysis or invoking AI.

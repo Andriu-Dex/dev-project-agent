@@ -1,3 +1,5 @@
+> Estado histórico de planificación. El desarrollo fue autorizado el 7 de octubre; el avance comprobado y los siguientes pasos vigentes están en [estado de implementación](implementation-status.md) y [revisión de código](code-review.md). Las declaraciones de «sin implementación» de este documento describen la planificación inicial.
+
 # Plan de trabajo
 
 ## Actualización de preparación

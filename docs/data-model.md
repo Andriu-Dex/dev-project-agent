@@ -145,3 +145,8 @@ El rol de ejecución puede actualizar únicamente `latest_version`, estado de ve
 ## Persistencia implementada de ejecuciones
 
 La octava tanda agrega `proposals.purpose` inmutable para el servicio (demostración por defecto), `proposal_decisions.actor_auth_version`, `execution_jobs`, `execution_events` y `audit_events.details`. Los intentos referencian la versión y aprobación mediante relaciones compuestas por proyecto; la restricción parcial impide otra ejecución durante una reconciliación pendiente. Solo se actualizan campos de ciclo de vida; aprobación, contenido, intención y evidencia se conservan. Los nuevos estados de propuesta son `executing`, `executed`, `execution_failed` y `reconciliation_required`. Véase [semántica y límites](trello-execution.md).
+
+
+## Modelo implementado de revisión de código
+
+La migración `1791795600000_code-review.cjs` concreta el módulo separado de revisión/corrección de código. `code_analyses` mantiene solicitudes y estados; `code_sources` congela commit, árbol y archivos; `code_results` conserva hallazgos/comprobaciones; `code_proposals` identifica correcciones demostrativas; `code_versions` conserva objetivos, selección y estados; `code_candidates` guarda diff/contenido/huella; `code_jobs` y `code_messages` registran las tres etapas; `code_decisions` registra gestor, versión de autoridad, decisión y motivo; `code_publications` almacena exclusivamente simulaciones. Claves compuestas y permisos por columna protegen proyecto y evidencia. Este módulo no cambia las propuestas de Trello ni añade tablas para integración automática. Véase [modelo, controles y API](code-review.md#persistencia-y-api).
