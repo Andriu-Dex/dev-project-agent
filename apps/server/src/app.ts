@@ -10,6 +10,7 @@ interface AppOptions {
 
 export function buildApp({ checkDatabase, logger = false, auth }: AppOptions) {
   const app = Fastify({
+    ajv: { customOptions: { removeAdditional: false } },
     logger: logger ? { redact: ['req.headers.authorization', 'req.headers.cookie', 'res.headers.set-cookie'] } : false,
     logController: new LogController({ disableRequestLogging: true }),
     requestTimeout: 10_000,

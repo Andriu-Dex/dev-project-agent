@@ -10,6 +10,7 @@ import { startSupervisionWorker } from './modules/supervision/worker.js';
 import { ChatGPTService } from './providers/chatgpt/service.js';
 import {ExecutionService} from './modules/proposals/execution.js';
 import {executionConfiguration,trelloExecutionRemote} from './integrations/trello/execution-client.js';
+import {CodeReviewService} from './modules/code-review/service.js';
 import { ProposalService } from './modules/proposals/service.js';
 
 const connectionString = process.env.APP_DATABASE_URL;
@@ -30,14 +31,15 @@ const chatgpt=new ChatGPTService({database:pool,callbackOrigin:`http://127.0.0.1
 const proposals=new ProposalService(pool,chatgpt,()=>app.log.error('Agent workflow could not publish its result.'));
 const writeConfig=executionConfiguration(process.env);
 const executions=new ExecutionService(pool,{enabled:writeConfig.enabled,remote:writeConfig.credentials?trelloExecutionRemote(writeConfig.credentials):null,onFailure:()=>app.log.error('Execution result could not be persisted. Reconciliation is required before any further write.')});
+const codeReview=new CodeReviewService(pool,chatgpt,supervision.githubToken,fetch,()=>app.log.error('Code review could not persist its result.'));
 const app = buildApp({
   checkDatabase: async () => { await pool.query('SELECT 1'); },
   logger: true,
-  auth: { ...authConfigFromEnvironment(process.env), database: pool, trello: { database: pool, credentials: supervision.trelloCredentials },supervision,chatgpt,proposals,executions },
+  auth: { ...authConfigFromEnvironment(process.env), database: pool, trello: { database: pool, credentials: supervision.trelloCredentials },supervision,chatgpt,proposals,executions,codeReview },
 });
 pool.on('error', () => { app.log.error('Idle database connection failed.'); });
 let worker:ReturnType<typeof startSupervisionWorker>|undefined;
-app.addHook('onClose', async () => { await chatgpt.close();await proposals.close();await executions.close();await worker?.close();await pool.end(); });
+app.addHook('onClose', async () => { await chatgpt.close();await proposals.close();await executions.close();await codeReview.close();await worker?.close();await pool.end(); });
 
 const webRoot = fileURLToPath(new URL('../../web/dist/', import.meta.url));
 if (existsSync(webRoot)) {
@@ -53,6 +55,7 @@ try {
   await chatgpt.initialize();
   await proposals.initialize();
   await executions.initialize();
+  await codeReview.initialize();
   await app.listen({ host: '127.0.0.1', port });
   worker=startSupervisionWorker(supervision,()=>app.log.error('Supervision worker could not access storage.'));
 } catch {
