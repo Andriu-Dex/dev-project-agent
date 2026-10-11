@@ -41,7 +41,7 @@ export function registerChatGPTRoutes(app:FastifyInstance,service:ChatGPTService
   });
   app.post<{Params:{projectId:string}}>('/projects/:projectId/chatgpt/disconnect',{schema:{params},onRequest:[app.csrfProtection]},async(request,reply)=>{
     const context=await access(request,reply,true);if(!context)return;
-    try{await service.disconnect(context.binding);return reply.code(204).send();}catch(error){return failure(error,reply);}
+    try{const result=await service.disconnect(context.binding);reply.header('X-Remote-Revocation-Confirmed',String(result.remoteRevocationConfirmed));return reply.code(204).send();}catch(error){return failure(error,reply);}
   });
   app.post<{Params:{projectId:string};Body:{model:string;requestKey:string;reasoningEffort?:ReasoningEffort}}>('/projects/:projectId/chatgpt/evaluations',{
     schema:{params,body:{type:'object',additionalProperties:false,required:['model','requestKey'],properties:{model:{type:'string',minLength:1,maxLength:100,pattern:'^[a-zA-Z0-9_.:-]+$'},requestKey:{type:'string',format:'uuid'},reasoningEffort:{type:'string',enum:['low','medium','high','xhigh','max']}}}},

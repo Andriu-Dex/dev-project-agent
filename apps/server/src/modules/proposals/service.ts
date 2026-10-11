@@ -65,6 +65,7 @@ export class ProposalService {
     const task=this.pipeline(binding,actor,job).catch(()=>this.onFailure());this.tasks.add(task);void task.then(()=>this.tasks.delete(task));
   }
   async prepare(binding:ConnectionBinding,actor:AuthUser,request:ProposalRequest) {
+    await assertManager(this.database,binding.projectId,actor);await this.provider.ensureConnection(binding);
     const effort=request.reasoningEffort??null,due=new Date(request.requestedDue);
     if(this.closed||!Number.isFinite(due.getTime())||due.getTime()<=Date.now())throw new ProposalError('INVALID_TARGET_DATE');
     safeText(request.goal);if(!request.goal.trim())throw new ProposalError('INVALID_REQUEST');
@@ -94,6 +95,7 @@ export class ProposalService {
     if(created)this.launch(binding,actor,job);return jobView(job);
   }
   async resume(binding:ConnectionBinding,actor:AuthUser,proposalId:string,version:number,model:string,effort:ReasoningEffort|null,requestKey:string) {
+    await assertManager(this.database,binding.projectId,actor);await this.provider.ensureConnection(binding);
     const hash=fingerprint({proposalId,version,model,effort,resume:true});let created=false;
     const job=await this.transaction(async client=>{
       await assertManager(client,binding.projectId,actor);await client.query('SELECT pg_advisory_xact_lock(hashtext($1))',['agent:'+binding.projectId]);

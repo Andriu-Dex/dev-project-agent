@@ -63,6 +63,7 @@ export class CodeReviewService {
   }
   async analyze(binding:ConnectionBinding,actor:AuthUser,request:AnalysisRequest) {
     await assertManager(this.database,binding.projectId,actor);if(this.closed)throw new CodeError('SERVICE_CLOSED');
+    if(request.withAi&&request.consent)await this.provider.ensureConnection(binding);
     const {requestKey:ignored,...payload}=request,hash=fingerprint(payload),effort=request.reasoningEffort??null;
     const previous=(await this.database.query<AnalysisRow>('SELECT * FROM code_analyses WHERE project_id=$1 AND requested_by=$2 AND request_key=$3',[binding.projectId,actor.id,request.requestKey])).rows[0];
     if(previous){if(previous.request_hash!==hash)throw new CodeError('CONFLICT');return {id:previous.id};}
@@ -103,6 +104,7 @@ export class CodeReviewService {
     return {id,version,latestVersion:row.latest_version,purpose:'demonstration',state:row.state,analysisId:row.analysis_id,goal:row.goal,findingIds:row.finding_ids,createdAt:row.created_at.toISOString(),candidate:row.candidate,contentHash:row.content_hash,messages:messages.rows.map(row=>({...row,createdAt:row.createdAt.toISOString()})) as CodeProposalView['messages'],decisions:decisions.rows.map(row=>({...row,createdAt:row.createdAt.toISOString()})) as CodeProposalView['decisions']};
   }
   async prepare(binding:ConnectionBinding,actor:AuthUser,request:CorrectionRequest) {
+    await assertManager(this.database,binding.projectId,actor);if(request.consent)await this.provider.ensureConnection(binding);
     if(this.closed)throw new CodeError('SERVICE_CLOSED');await assertManager(this.database,binding.projectId,actor);safeText(request.goal);if(!request.goal.trim())throw new CodeError('INVALID_REQUEST');
     const effort=request.reasoningEffort??null,{requestKey:ignored,...payload}=request,hash=fingerprint(payload);
     const prior=(await this.database.query<JobRow>('SELECT * FROM code_jobs WHERE project_id=$1 AND requested_by=$2 AND request_key=$3',[binding.projectId,actor.id,request.requestKey])).rows[0];if(prior){if(prior.request_hash!==hash)throw new CodeError('CONFLICT');return {id:prior.id,proposalId:prior.proposal_id,version:prior.version};}
@@ -126,6 +128,7 @@ export class CodeReviewService {
   }
   async resume(binding:ConnectionBinding,actor:AuthUser,id:string,version:number,model:string,effort:ReasoningEffort|null,consent:boolean,key:string) {
     await assertManager(this.database,binding.projectId,actor);if(this.closed)throw new CodeError('SERVICE_CLOSED');
+    if(consent)await this.provider.ensureConnection(binding);
     const hash=fingerprint({resume:true,id,version,model,effort,consent});
     const previous=(await this.database.query<JobRow>('SELECT * FROM code_jobs WHERE project_id=$1 AND requested_by=$2 AND request_key=$3',[binding.projectId,actor.id,key])).rows[0];if(previous){if(previous.request_hash!==hash)throw new CodeError('CONFLICT');return {id:previous.id,proposalId:previous.proposal_id,version:previous.version};}
     this.validateProvider(binding,model,effort,consent);const row=await this.versionRow(this.database,binding.projectId,id,version),analysis=await this.analysis(binding.projectId,row.analysis_id);if(!analysis?.source)throw new CodeError('NO_SOURCE');await this.ensureFresh(binding.projectId,actor,id,version,row);

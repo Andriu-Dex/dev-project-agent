@@ -22,8 +22,10 @@ import {registerExecutionRoutes} from '../proposals/execution-routes.js';
 
 import type {CodeReviewService} from '../code-review/service.js';
 import {registerCodeReviewRoutes} from '../code-review/routes.js';
+import type {ReportService} from '../reports/service.js';
+import {registerReportRoutes} from '../reports/routes.js';
 
-export interface AuthOptions extends AuthConfig { database: AuthDatabase; trello?: TrelloOptions; supervision?:SupervisionOptions; chatgpt?:ChatGPTService; proposals?:ProposalService; executions?:ExecutionService; codeReview?:CodeReviewService }
+export interface AuthOptions extends AuthConfig { database: AuthDatabase; trello?: TrelloOptions; supervision?:SupervisionOptions; chatgpt?:ChatGPTService; proposals?:ProposalService; executions?:ExecutionService; codeReview?:CodeReviewService; reports?:ReportService }
 
 export async function registerAuth(app: FastifyInstance, options: AuthOptions) {
   const repository = new AuthRepository(options.database);
@@ -95,6 +97,7 @@ export async function registerAuth(app: FastifyInstance, options: AuthOptions) {
   if (options.proposals) registerProposalRoutes(app, options.proposals, requireUser, repository);
   if (options.executions) registerExecutionRoutes(app, options.executions, requireUser, repository);
   if (options.codeReview) registerCodeReviewRoutes(app, options.codeReview, requireUser, repository);
+  if (options.reports) registerReportRoutes(app, options.reports, requireUser, repository);
 
   const loginSchema = {
     body: {

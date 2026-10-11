@@ -7,7 +7,8 @@ const evaluationStatuses={running:'En ejecución',passed:'Comprobaciones superad
 const checks:Record<string,string>={schema:'Formato',case_binding:'Caso correcto',classification:'Clasificación',evidence:'Evidencia',human_approval:'Aprobación humana',uncertainty:'Datos desconocidos'};
 const classifications={overdue:'Vencida',completed:'Completada declarada',on_schedule:'Vencimiento futuro',insufficient_data:'Datos insuficientes'};
 const errors:Record<string,string>={USAGE_LIMIT:'ChatGPT alcanzó un límite de uso. Espera antes de volver a evaluar.',AUTHORIZATION_EXPIRED:'La conexión venció. Vuelve a conectar ChatGPT.',SERVICE_RESTARTED:'El servicio se reinició. La evaluación no se repite automáticamente.',CONNECTION_REQUIRED:'Conecta ChatGPT antes de evaluar.',FORBIDDEN:'Los permisos del gestor cambiaron.',INVALID_MODEL_OUTPUT:'La respuesta no cumple el formato requerido.',PLAN_PERMISSION_MISSING:'La autorización no incluye el uso del plan.',AUTHORIZATION_DENIED:'Se canceló la autorización.',IDENTITY_MISMATCH:'La cuenta seleccionada no coincide con la vinculada.',AUTHORIZATION_CANCELLED:'Se cambió o canceló la conexión durante la prueba.'};
-const explain=(code:string)=>errors[code]??'No se pudo completar la prueba. Revisa la conexión y vuelve a intentar.';
+const renewalErrors:Record<string,string>={REFRESH_UNCERTAIN:'Una renovación quedó sin confirmación. Conecta ChatGPT otra vez para recuperar el acceso.',REFRESH_REAUTHORIZATION_REQUIRED:'ChatGPT revocó o venció el acceso renovable. Vuelve a conectar.',REFRESH_UNAVAILABLE:'La renovación está temporalmente indisponible; se conserva el acceso y se reintentará con espera.',REFRESH_IN_PROGRESS:'Se está renovando el acceso. Espera unos instantes.',CREDENTIAL_STORAGE_UNAVAILABLE:'No se pudo abrir el acceso protegido. Revisa la configuración local antes de reconectar.',INVALID_CLIENT:'La vinculación de la aplicación requiere revisión antes de reconectar.'};
+const explain=(code:string)=>errors[code]??renewalErrors[code]??'No se pudo completar la prueba. Revisa la conexión y vuelve a intentar.';
 const date=(value:string)=>new Date(value).toLocaleString('es-EC',{timeZone:'America/Guayaquil'});
 
 export function ProviderPanel({project,csrfToken}:{project:ProjectAccess;csrfToken:string}) {
@@ -39,7 +40,7 @@ export function ProviderPanel({project,csrfToken}:{project:ProjectAccess;csrfTok
     if(kind==='evaluations'&&requestKey.current?.selection!==selection)requestKey.current={selection,key:crypto.randomUUID()};
     try{
       const response=await fetch(prefix+'/'+kind,{method:'POST',headers:{'x-csrf-token':csrfToken,...(kind==='evaluations'?{'Content-Type':'application/json'}:{})},...(kind==='evaluations'?{body:JSON.stringify({model,...(effort?{reasoningEffort:effort}:{}),requestKey:requestKey.current!.key})}:{})});
-      if(response.status===204){setAuthorization(null);setConsent(false);}
+      if(response.status===204){setAuthorization(null);setConsent(false);if(response.headers.get('X-Remote-Revocation-Confirmed')!=='true')setError('Se eliminó el acceso local. No se pudo confirmar la revocación remota; puedes desconectar la aplicación desde la configuración de ChatGPT.');}
       else{
         const body=await response.json();if(!response.ok){setError(body.message??'No se pudo completar la operación.');return;}
         if(kind==='authorization'){
@@ -59,7 +60,9 @@ export function ProviderPanel({project,csrfToken}:{project:ProjectAccess;csrfTok
       {project.canManageProject?<>
         <p role="status">Estado: <strong>{statuses[data.connection.status]}</strong>{data.connection.status==='connected'&&data.connection.expiresAt&&` · Disponible hasta ${date(data.connection.expiresAt)}`}</p>
         {data.connection.errorCode&&<p className="form-error">{explain(data.connection.errorCode)}</p>}
-        <p className="muted">La conexión es propia de tu sesión. Se pierde al cerrar sesión, desconectar o reiniciar el servicio, y dura como máximo treinta minutos. Desconectar aquí elimina las credenciales locales; puedes revocar el acceso de la aplicación desde la configuración de ChatGPT.</p>
+        <p className="muted">{data.connection.renewable?'Renovación automática activa. Las credenciales se conservan cifradas y sobreviven al cierre de sesión del panel y al reinicio del servicio.':'La conexión actual no tiene acceso renovable guardado. Conecta ChatGPT para habilitar la renovación automática.'} Desconectar ChatGPT elimina el acceso guardado e intenta revocarlo en el proveedor. Los cambios externos conservan sus requisitos de aprobación.</p>
+        {data.connection.lastRefreshedAt&&<p className="muted">Última renovación: {date(data.connection.lastRefreshedAt)}.</p>}
+        {data.connection.retryAt&&<p className="muted">Próximo intento de renovación: {date(data.connection.retryAt)}. Un fallo temporal conserva el acceso guardado.</p>}
         <div className="supervision-actions">
           <button onClick={()=>void action('authorization')} disabled={busy||running||data.connection.status==='pending'}>{data.connection.status==='connected'?'Volver a conectar ChatGPT':'Conectar con ChatGPT'}</button>
           {['pending','connected'].includes(data.connection.status)&&<button onClick={()=>void action('disconnect')} disabled={busy}>Desconectar ChatGPT</button>}

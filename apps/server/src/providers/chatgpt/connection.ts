@@ -4,6 +4,7 @@ import {newAttempt,ProviderValidationError,type SignInAttempt} from './validatio
 
 export interface ConnectionBinding {projectId:string;userId:string;authVersion:number;sessionId:string}
 interface ConnectionEntry {
+  account:string;
   sessionHash:string;
   attempt:SignInAttempt|null;status:ProviderConnection['status'];expiresAt:number;
   token:string|null;models:ProviderConnection['models'];errorCode:string|null;controller:AbortController;
@@ -26,7 +27,7 @@ export class ChatGPTConnections {
     this.sweep();this.disconnect(binding);
     if(this.entries.size>=100)throw new ProviderValidationError('CONNECTION_CAPACITY');
     const attempt=newAttempt(redirectUri,clientId,subject);
-    this.entries.set(this.key(binding),{sessionHash:createHash('sha256').update(binding.sessionId).digest('hex'),attempt,status:'pending',expiresAt:this.now()+5*60_000,token:null,models:[],errorCode:null,controller:new AbortController()});
+    this.entries.set(this.key(binding),{account:binding.projectId+':'+binding.userId,sessionHash:createHash('sha256').update(binding.sessionId).digest('hex'),attempt,status:'pending',expiresAt:this.now()+5*60_000,token:null,models:[],errorCode:null,controller:new AbortController()});
     return attempt;
   }
   consume(binding:ConnectionBinding) {
@@ -40,7 +41,7 @@ export class ChatGPTConnections {
   complete(binding:ConnectionBinding,previous:ConnectionEntry,token:string,expiresIn:number,models:ProviderConnection['models']) {
     const entry=this.get(binding);if(entry!==previous||entry.status!=='pending'||entry.controller.signal.aborted)throw new ProviderValidationError('AUTHORIZATION_CANCELLED');
     if(!Number.isFinite(expiresIn)||expiresIn<=0)throw new ProviderValidationError('INVALID_TOKEN_LIFETIME');
-    entry.status='connected';entry.expiresAt=this.now()+Math.min(expiresIn*1000,30*60_000);entry.token=token;entry.models=models;entry.errorCode=null;
+    entry.status='connected';entry.expiresAt=this.now()+expiresIn*1000;entry.token=token;entry.models=models;entry.errorCode=null;
   }
   fail(binding:ConnectionBinding,previous:ConnectionEntry,code:string) {
     const entry=this.entries.get(this.key(binding));if(entry!==previous)return;
@@ -54,6 +55,16 @@ export class ChatGPTConnections {
   view(binding:ConnectionBinding):ProviderConnection {
     const entry=this.get(binding);
     return entry?{status:entry.status,expiresAt:new Date(entry.expiresAt).toISOString(),models:entry.models,errorCode:entry.errorCode}:{status:'disconnected',expiresAt:null,models:[],errorCode:null};
+  }
+  restore(binding:ConnectionBinding,token:string,expiresAt:number,models:ProviderConnection['models']) {
+    const key=this.key(binding),existing=this.entries.get(key);
+    if(existing?.status==='pending')return;
+    if(existing?.status==='connected'&&!existing.controller.signal.aborted){existing.token=token;existing.expiresAt=expiresAt;existing.models=models;return;}
+    this.entries.set(key,{account:binding.projectId+':'+binding.userId,sessionHash:createHash('sha256').update(binding.sessionId).digest('hex'),attempt:null,status:'connected',expiresAt,token,models,errorCode:null,controller:new AbortController()});
+  }
+  disconnectAccount(binding:ConnectionBinding) {
+    // Keys retain browser isolation, while account disconnect cancels every session cache.
+    for(const [key,entry] of this.entries)if(entry.account===binding.projectId+':'+binding.userId){entry.controller.abort();this.entries.delete(key);}
   }
   disconnect(binding:ConnectionBinding) {const key=this.key(binding);this.entries.get(key)?.controller.abort();this.entries.delete(key);}
   disconnectSession(sessionId:string) {const hash=createHash('sha256').update(sessionId).digest('hex');for(const [key,entry] of this.entries)if(entry.sessionHash===hash){entry.controller.abort();this.entries.delete(key);}}

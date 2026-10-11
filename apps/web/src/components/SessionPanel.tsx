@@ -4,6 +4,7 @@ import { TrelloPanel } from './TrelloPanel';
 import { SupervisionPanel } from './SupervisionPanel';
 import { ProviderPanel } from './ProviderPanel';
 import {CodeReviewPanel} from './CodeReviewPanel';
+import {ReportsPanel} from './ReportsPanel';
 import { ProposalPanel } from './ProposalPanel';
 
 interface Member { id: string; displayName: string; role: ProjectRole }
@@ -141,6 +142,7 @@ export function SessionPanel() {
       <SupervisionPanel key={session.project.id} project={session.project} csrfToken={session.csrfToken} onCompleted={()=>setSourceRevision(value=>value+1)}/>
       <ProposalPanel key={'proposals:'+session.project.id} project={session.project} csrfToken={session.csrfToken} sourceRevision={sourceRevision}/>
       <CodeReviewPanel key={'code:'+session.project.id} project={session.project} csrfToken={session.csrfToken}/>
+      <ReportsPanel key={'reports:'+session.project.id} project={session.project} csrfToken={session.csrfToken}/>
       <TrelloPanel key={`${session.project.id}:${sourceRevision}`} project={session.project} csrfToken={session.csrfToken} />
     </>}
   </>;

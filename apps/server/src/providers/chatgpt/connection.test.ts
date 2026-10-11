@@ -15,10 +15,10 @@ describe('ChatGPT connection isolation',()=>{
     expect(store.credentials(binding,'test-model').token).toBe('synthetic-secret');expect(JSON.stringify(store.view(binding))).not.toContain('synthetic-secret');
     expect(()=>store.credentials(binding,'not-in-catalog')).toThrow();
   });
-  it('expires credentials, cancels outstanding requests and caps connection lifetime',()=>{
+  it('uses the provider token lifetime and cancels requests on expiry',()=>{
     let now=1000;const store=new ChatGPTConnections(()=>now);store.begin(binding,'http://127.0.0.1/callback',null,null);
     const consumed=store.consume(binding);store.complete(binding,consumed.entry,'secret',3600,models);const credentials=store.credentials(binding,'test-model');
-    now+=30*60_000;expect(store.view(binding).status).toBe('expired');expect(credentials.signal.aborted).toBe(true);expect(()=>store.credentials(binding,'test-model')).toThrow();
+    now+=30*60_000;expect(store.view(binding).status).toBe('connected');now+=30*60_000;expect(store.view(binding).status).toBe('expired');expect(credentials.signal.aborted).toBe(true);expect(()=>store.credentials(binding,'test-model')).toThrow();
   });
   it('prevents delayed callbacks from restoring a disconnected or replaced connection',()=>{
     const store=new ChatGPTConnections();store.begin(binding,'http://127.0.0.1/callback',null,null);const consumed=store.consume(binding);

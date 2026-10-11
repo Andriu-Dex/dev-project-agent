@@ -11,6 +11,7 @@ const content = [
   'APP_DATABASE_URL=postgresql://dev_project_agent_app:' + appPassword + '@' + connection,
   'PORT=3100',
   'SESSION_SECRET=' + randomBytes(48).toString('hex'),
+  'CHATGPT_CREDENTIAL_KEY=' + randomBytes(32).toString('hex'),
   'APP_ORIGINS=http://127.0.0.1:5174,http://127.0.0.1:3100',
   'ALLOW_INSECURE_LOCAL_HTTP=true',
   'TRELLO_API_KEY=',
@@ -29,6 +30,7 @@ try {
     const additions = [];
     for (const [key, value] of [
       ['SESSION_SECRET', randomBytes(48).toString('hex')],
+      ['CHATGPT_CREDENTIAL_KEY', randomBytes(32).toString('hex')],
       ['APP_ORIGINS', 'http://127.0.0.1:5174,http://127.0.0.1:3100'],
       ['ALLOW_INSECURE_LOCAL_HTTP', 'true'],
       ['TRELLO_API_KEY', ''],

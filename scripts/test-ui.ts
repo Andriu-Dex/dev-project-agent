@@ -18,6 +18,7 @@ import {trelloExecutionRemote} from '../apps/server/src/integrations/trello/exec
 import {CodeReviewService} from '../apps/server/src/modules/code-review/service.js';
 import {codeSourceFetcher,syntheticCorrection,syntheticCodeVerdict} from '../apps/server/src/modules/code-review/fixtures.js';
 import {ProposalService} from '../apps/server/src/modules/proposals/service.js';
+import {ReportService} from '../apps/server/src/modules/reports/service.js';
 import {syntheticContent,syntheticVerdict} from '../apps/server/src/modules/proposals/fixtures.js';
 import {evaluationCases} from '../apps/server/src/providers/chatgpt/evaluation.js';
 const pool=new pg.Pool({connectionString:process.env.DATABASE_URL,max:1}),client=await pool.connect();
@@ -55,7 +56,7 @@ const options:SupervisionOptions={database,trelloCredentials:{key:'k'.repeat(32)
 const pair=await generateKeyPair('RS256');let providerNonce='';
 const providerFetcher:typeof fetch=async(input,request)=>{
   const url=new URL(String(input));
-  if(url.hostname==='auth.openai.com')return Response.json({id_token:await new SignJWT({nonce:providerNonce}).setProtectedHeader({alg:'RS256',kid:'test'}).setIssuer('https://auth.openai.com').setAudience('oaiapp_ui').setSubject('ui-account').setIssuedAt().setExpirationTime('2 minutes').sign(pair.privateKey),access_token:'ui-secret',expires_in:3600,scope:'resource.invoke chatgpt.tokens.use.direct'});
+  if(url.hostname==='auth.openai.com')return Response.json({id_token:await new SignJWT({nonce:providerNonce}).setProtectedHeader({alg:'RS256',kid:'test'}).setIssuer('https://auth.openai.com').setAudience('oaiapp_ui').setSubject('ui-account').setIssuedAt().setExpirationTime('2 minutes').sign(pair.privateKey),access_token:'ui-secret',refresh_token:'ui-refresh-secret',expires_in:3600,scope:'offline_access resource.invoke chatgpt.tokens.use.direct'});
   if(url.pathname==='/v1/models')return Response.json({models:[{slug:'gpt-6.1-sol',display_name:'Modelo sintético de prueba',visibility:'list'}]});
   const body=JSON.parse(String(request!.body));const data=JSON.parse(body.input[0].content);
   if(data.recipient){expect(body.reasoning).toEqual({effort:'high'});const output=data.source?(data.recipient==='executor'?syntheticCorrection(data.source,data.findings):syntheticCodeVerdict(data.recipient,data.contentHash)):(data.recipient==='executor'?syntheticContent(data):syntheticVerdict(data.recipient,data.contentHash));return new Response('data: '+JSON.stringify({type:'response.output_text.delta',delta:JSON.stringify(output)})+'\n\ndata: '+JSON.stringify({type:'response.completed',response:{usage:{input_tokens:50,output_tokens:30,total_tokens:80}}})+'\n\n');}
@@ -63,18 +64,19 @@ const providerFetcher:typeof fetch=async(input,request)=>{
   const output={caseId:test.id,classification:test.classification,evidenceIds:test.evidence.map(value=>value.id),requiresHumanApproval:true,recommendation:'Revisar la evidencia con el gestor.',unknowns:['Causa y aceptación no informadas.']};
   return new Response('data: '+JSON.stringify({type:'response.output_text.delta',delta:JSON.stringify(output)})+'\n\ndata: '+JSON.stringify({type:'response.completed',response:{usage:{input_tokens:50,output_tokens:30,total_tokens:80}}})+'\n\n');
 };
-const chatgpt=new ChatGPTService({database,callbackOrigin:'http://127.0.0.1:3133',fetcher:providerFetcher,identityKey:createLocalJWKSet({keys:[{...await exportJWK(pair.publicKey),kid:'test',alg:'RS256'}]})});
+const chatgpt=new ChatGPTService({database,credentialKey:randomBytes(32),callbackOrigin:'http://127.0.0.1:3133',fetcher:providerFetcher,identityKey:createLocalJWKSet({keys:[{...await exportJWK(pair.publicKey),kid:'test',alg:'RS256'}]})});
+const reports=new ReportService(database);
 const proposals=new ProposalService(database,chatgpt);
 const codeReview=new CodeReviewService(database,chatgpt,null,codeSourceFetcher);
 let writeCalls=0;
 const executionFetcher:typeof fetch=async(input,request)=>{const url=new URL(String(input));expect(url.hostname).toBe('api.trello.com');if(request?.method==='PUT'){writeCalls++;expect(url.pathname).toBe('/1/cards/'+source.cards[0]!.id);const body=JSON.parse(String(request.body));expect(Object.keys(body)).toEqual(['due']);source.cards[0]!.due=body.due;return Response.json({id:source.cards[0]!.id,due:body.due});}if(url.pathname==='/1/members/me')return Response.json({id:source.members[0]!.id});if(url.pathname.endsWith('/memberships'))return Response.json([{idMember:source.members[0]!.id,memberType:'normal'}]);if(url.searchParams.get('fields')==='id,closed')return Response.json({id:boardId,closed:false});return fetcher(input,request);};
 const executions=new ExecutionService(database,{enabled:true,remote:trelloExecutionRemote(options.trelloCredentials!,executionFetcher)});
 await enqueueJob(database,projectId,manager!,'full',randomUUID());await executeJob(options,(await claimJob(database,projectId))!);
-const app=buildApp({checkDatabase:async()=>{},auth:{database,sessionSecret:randomBytes(48).toString('hex'),allowedOrigins:['http://127.0.0.1:3133'],secureCookies:false,trello:{database,credentials:options.trelloCredentials,fetcher},supervision:options,chatgpt,proposals,executions,codeReview}});
+const app=buildApp({checkDatabase:async()=>{},auth:{database,sessionSecret:randomBytes(48).toString('hex'),allowedOrigins:['http://127.0.0.1:3133'],secureCookies:false,trello:{database,credentials:options.trelloCredentials,fetcher},supervision:options,chatgpt,proposals,executions,codeReview,reports}});
 await app.register(fastifyStatic,{root:fileURLToPath(new URL('../apps/web/dist/',import.meta.url))});
 await app.listen({host:'127.0.0.1',port:3133});
 const browser=await chromium.launch({headless:true});let pending:Promise<void>|null=null;
-const timer=setInterval(()=>{if(pending)return;pending=(async()=>{const job=await claimJob(database,projectId);if(job)await executeJob(options,job);})().finally(()=>{pending=null;});},500);
+const timer=setInterval(()=>{if(pending)return;pending=(async()=>{const job=await claimJob(database,projectId);if(job)await executeJob(options,job);else{await reports.enqueueScheduled();await reports.processNext();}})().finally(()=>{pending=null;});},500);
 try{
   const context=await browser.newContext({viewport:{width:1280,height:900}}),page=await context.newPage();const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));
   await page.goto('http://127.0.0.1:3133');await page.getByLabel('Usuario',{exact:true}).fill(login+'-manager');await page.getByLabel('Contraseña',{exact:true}).fill(password);await page.getByRole('button',{name:'Ingresar',exact:true}).click();
@@ -175,19 +177,31 @@ try{
   await codePanel.getByLabel('Motivo de la decisión sobre código',{exact:true}).fill('Demostración terminada.');await codePanel.getByRole('button',{name:'Retirar corrección',exact:true}).click();
   await expect(codePanel.getByRole('button',{name:'Simular publicación en GitHub',exact:true})).toHaveCount(0);
   const output=process.env.UI_ARTIFACT_DIR??fileURLToPath(new URL('../work/ui/',import.meta.url));await mkdir(output,{recursive:true});
+  const reportPanel=page.locator('.reports-panel');await reportPanel.getByText('Configurar programación semanal',{exact:true}).click();
+  await reportPanel.getByRole('checkbox',{name:'Activar generación semanal en este equipo',exact:true}).check();await reportPanel.getByRole('button',{name:'Guardar programación',exact:true}).click();
+  await expect(reportPanel.getByText('Programación guardada. El servicio recuperará los cortes pendientes cuando esté encendido.',{exact:true})).toBeVisible();
+  await reportPanel.getByRole('button',{name:'Generar reporte ahora',exact:true}).click();await expect(reportPanel.getByText('Publicado · validación automática',{exact:true}).last()).toBeVisible({timeout:15000});
+  const printedPromise=context.waitForEvent('page');await reportPanel.getByRole('link',{name:'Abrir versión imprimible / guardar como PDF',exact:true}).click();const printed=await printedPromise;await printed.waitForLoadState();
+  await expect(printed.getByRole('heading',{name:'Reporte semanal de seguimiento',exact:true})).toBeVisible();await expect(printed.getByRole('heading',{name:'10. Anexo de trazabilidad y revisión',exact:true})).toBeVisible();
+  expect(await printed.locator('body').innerText()).not.toMatch(/ui-secret|ui-refresh-secret/);await printed.screenshot({path:output+'/report-print.png',fullPage:true});await printed.pdf({path:output+'/weekly-report-test.pdf',preferCSSPageSize:true,printBackground:true});await printed.close();
+  await reportPanel.getByRole('button',{name:'Preparar nueva versión del mismo periodo',exact:true}).click();await expect(reportPanel.getByRole('heading',{name:'Detalle del reporte · Versión 2',exact:true})).toBeVisible({timeout:15000});await expect(reportPanel.getByText('Publicado · validación automática',{exact:true}).last()).toBeVisible({timeout:15000});
+  await reportPanel.screenshot({path:output+'/reports-light.png'});
   await page.getByText('Ver casos y respuestas',{exact:true}).click();
   await codePanel.screenshot({path:output+'/code-review-light.png'});await page.screenshot({path:output+'/supervision-light.png',fullPage:true});await page.getByRole('button',{name:'Cambiar a modo oscuro',exact:true}).click();await page.screenshot({path:output+'/supervision-dark.png',fullPage:true});
   await page.setViewportSize({width:390,height:844});await page.screenshot({path:output+'/supervision-mobile.png',fullPage:true});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
   await page.locator('.provider-panel').screenshot({path:output+'/provider-mobile.png'});
+  await reportPanel.screenshot({path:output+'/reports-mobile.png'});
   await proposalPanel.screenshot({path:output+'/proposals-mobile.png'});await codePanel.screenshot({path:output+'/code-review-mobile.png'});
-  await page.setViewportSize({width:1280,height:900});await proposalPanel.screenshot({path:output+'/proposals-dark.png'});await codePanel.screenshot({path:output+'/code-review-dark.png'});
+  await page.setViewportSize({width:1280,height:900});await proposalPanel.screenshot({path:output+'/proposals-dark.png'});await codePanel.screenshot({path:output+'/code-review-dark.png'});await reportPanel.screenshot({path:output+'/reports-dark.png'});
   await page.getByRole('button',{name:'Cerrar sesión',exact:true}).click();await page.getByLabel('Usuario',{exact:true}).fill(login+'-viewer');await page.getByLabel('Contraseña',{exact:true}).fill(password);await page.getByRole('button',{name:'Ingresar',exact:true}).click();
   await expect(page.getByRole('heading',{name:'Supervisión e historial',exact:true})).toBeVisible();await expect(page.getByRole('button',{name:'Actualizar fuentes y analizar',exact:true})).toHaveCount(0);await expect(page.getByRole('button',{name:'Confirmar nueva versión de línea base',exact:true})).toHaveCount(0);
   await expect(page.getByRole('button',{name:'Conectar con ChatGPT',exact:true})).toHaveCount(0);await expect(page.getByText('6 de 6',{exact:true})).toBeVisible();
+  await expect(page.locator('.reports-panel').getByRole('button',{name:'Generar reporte ahora',exact:true})).toHaveCount(0);await expect(page.locator('.reports-panel').getByRole('button',{name:'Abrir reporte',exact:true}).first()).toBeVisible();
   await page.getByText('Configuración del seguimiento',{exact:true}).click();await expect(page.getByText(/Solo el gestor puede modificar estos valores/)).toBeVisible();await expect(page.getByRole('button',{name:'Solicitar ejecución real',exact:true})).toHaveCount(0);await expect(page.getByRole('button',{name:'Retirar autorización',exact:true})).toHaveCount(0);await expect(page.locator('.code-review-panel').getByRole('button',{name:'Leer catálogo de GitHub',exact:true})).toHaveCount(0);await expect(page.locator('.code-review-panel').getByRole('heading',{name:'Simulación · Versión 2',exact:true})).toBeVisible();expect(errors).toEqual([]);
-  console.log('UI verified: pinned code analysis, evidence, bounded diff, three-agent code correction, version history, manager decisions, withdrawal, simulated GitHub publication without external writes, synthetic ChatGPT connection, model and reasoning selection, consent, evaluation history, three-agent proposals, adjustments, version history, manager authorization, immutable demonstrations, withdrawal, controlled synthetic execution and verified history, manager supervision, policy save, baseline, light/dark themes, mobile layout, viewer restrictions and no browser errors.');
+  await page.getByRole('button',{name:'Cerrar sesión',exact:true}).click();await page.getByLabel('Usuario',{exact:true}).fill(login+'-manager');await page.getByLabel('Contraseña',{exact:true}).fill(password);await page.getByRole('button',{name:'Ingresar',exact:true}).click();await expect(page.getByLabel('Modelo de tu cuenta',{exact:true})).toBeVisible();await expect(page.getByText(/Renovación automática activa/)).toBeVisible();expect(errors).toEqual([]);
+  console.log('UI verified: weekly schedule, frozen report versions, printable A4/PDF, renewed provider access after dashboard logout, code review and proposal workflows, controlled synthetic execution, viewer restrictions, light/dark themes, mobile layout and no browser errors.');
 }catch(error){
-  const page=browser.contexts()[0]?.pages()[0]; if(page)console.log((await page.locator('body').innerText()).slice(0,4000)); throw error;
+  const page=browser.contexts()[0]?.pages()[0]; if(page)console.log((await page.locator('.reports-panel').innerText()).slice(0,4000)); throw error;
 }finally{
   clearInterval(timer);await pending;await browser.close();await chatgpt.close();await proposals.close();await executions.close();await codeReview.close();await app.close();await query('ROLLBACK');client.release();await pool.end();
 }

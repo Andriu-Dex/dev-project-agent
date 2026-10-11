@@ -55,7 +55,7 @@ export function App() {
         <section aria-labelledby="next-title">
           <h2 id="next-title">Fuentes del seguimiento</h2>
           <p>Inicia sesión para consultar Trello, GitHub y el historial de supervisión de tu proyecto.</p>
-          <ul><li>Seguimiento: reglas de fechas, dependencias y comparación con la línea base.</li><li>ChatGPT: conexión, selección de razonamiento y evaluación con casos sintéticos.</li><li>Agentes: propuestas de vencimiento, revisión, control de aprobación y decisiones del gestor.</li><li>Trello: ejecución controlada con autorización específica y verificación posterior.</li><li>Código: revisión acotada, correcciones versionadas y simulación de publicación en GitHub.</li><li>Reportes semanales: pendientes de implementación.</li></ul>
+          <ul><li>Seguimiento: reglas de fechas, dependencias y comparación con la línea base.</li><li>ChatGPT: conexión renovable, selección de razonamiento y evaluación con casos sintéticos.</li><li>Agentes: propuestas de vencimiento, revisión, control de aprobación y decisiones del gestor.</li><li>Trello: ejecución controlada con autorización específica y verificación posterior.</li><li>Código: revisión acotada, correcciones versionadas y simulación de publicación en GitHub.</li><li>Reportes: programación semanal, historial, revisión y versión imprimible.</li></ul>
         </section>
         <footer>Los cambios de Trello y código requerirán revisión y aprobación del gestor.</footer>
       </main>

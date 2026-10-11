@@ -36,7 +36,9 @@
     "sources:read": "node --env-file=.env --import tsx scripts/read-sources.ts",
     "test:ui": "npm run build && node --env-file=.env --import tsx scripts/test-ui.ts",
     "test:code-db": "node --env-file=.env scripts/test-code-review.mjs",
-    "code:inspect": "node --env-file=.env --import tsx scripts/inspect-code.ts"
+    "code:inspect": "node --env-file=.env --import tsx scripts/inspect-code.ts",
+    "test:renewal-db": "node --env-file=.env scripts/test-renewal.mjs",
+    "test:reports-db": "node --env-file=.env scripts/test-reports.mjs"
   },
   "devDependencies": {
     "@inquirer/prompts": "8.7.3",

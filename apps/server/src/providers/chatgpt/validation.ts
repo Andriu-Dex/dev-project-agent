@@ -1,5 +1,6 @@
 import {createHash,randomBytes,timingSafeEqual} from 'node:crypto';
 import {createRemoteJWKSet,jwtVerify,type JWTVerifyGetKey} from 'jose';
+import {setTimeout as delay} from 'node:timers/promises';
 import type {ReasoningEffort} from '@dev-project-agent/contracts';
 
 // Model-specific support verified against the official GPT-6.1 Sol model documentation.
@@ -50,7 +51,40 @@ export async function exchangeSignIn(attempt:SignInAttempt,credentials:{clientId
   const scope=new Set(data.scope.split(' '));
   if(!scope.has('chatgpt.tokens.use.direct')||!scope.has('resource.invoke'))throw new ProviderValidationError('PLAN_PERMISSION_MISSING');
   const expiresIn=typeof data.expires_in==='number'&&Number.isFinite(data.expires_in)&&data.expires_in>0?data.expires_in:null;
-  return {subject,accessToken:data.access_token,expiresIn};
+  return {subject,accessToken:data.access_token,expiresIn,refreshToken:typeof data.refresh_token==='string'&&data.refresh_token.length<=64_000?data.refresh_token:null,earliestRefreshAt:refreshTime(data.earliest_refresh_at)};
+}
+function refreshTime(value:unknown) {
+  if(value===undefined||value===null)return 0;
+  const time=typeof value==='number'?value*1000:typeof value==='string'?Date.parse(value):NaN;
+  if(!Number.isFinite(time)||time<0)throw new ProviderValidationError('INVALID_RESPONSE');return time;
+}
+export async function refreshAccess(clientId:string,refreshToken:string,fetcher:typeof fetch=fetch) {
+  let response:Response;
+  try{response=await fetcher('https://auth.openai.com/api/accounts/oauth/token',{method:'POST',redirect:'error',signal:AbortSignal.timeout(20_000),headers:{'Content-Type':'application/x-www-form-urlencoded',Accept:'application/json'},body:new URLSearchParams({grant_type:'refresh_token',client_id:clientId,refresh_token:refreshToken,resource:'https://api.openai.com/v1'})});}
+  catch{throw new ProviderValidationError('REFRESH_UNCERTAIN');}
+  if(!response.ok){
+    if(response.status>=500||response.status===429)throw new ProviderValidationError('REFRESH_UNAVAILABLE');
+    let code:unknown;try{const body=await readJson(new Response(response.body,{status:200}));code=typeof body.error==='string'?body.error:(body.error as Record<string,unknown>|undefined)?.code;}catch{}
+    if(['invalid_grant','invalid_refresh_token','token_expired','refresh_token_expired','refresh_token_invalidated','refresh_token_reused'].includes(String(code)))throw new ProviderValidationError('REFRESH_REAUTHORIZATION_REQUIRED');
+    throw new ProviderValidationError(code==='invalid_client'?'INVALID_CLIENT':'REFRESH_REAUTHORIZATION_REQUIRED');
+  }
+  let data:Record<string,unknown>;try{data=await readJson(response);}catch{throw new ProviderValidationError('REFRESH_UNCERTAIN');}
+  if(typeof data.access_token!=='string'||!data.access_token||data.access_token.length>64_000||typeof data.refresh_token!=='string'||!data.refresh_token||data.refresh_token.length>64_000||typeof data.expires_in!=='number'||!Number.isFinite(data.expires_in)||data.expires_in<=0)throw new ProviderValidationError('REFRESH_UNCERTAIN');
+  if(data.scope!==undefined&&(typeof data.scope!=='string'||!['resource.invoke','chatgpt.tokens.use.direct'].every(scope=>String(data.scope).split(' ').includes(scope))))throw new ProviderValidationError('PLAN_PERMISSION_MISSING');
+  return {accessToken:data.access_token,refreshToken:data.refresh_token,expiresIn:data.expires_in,earliestRefreshAt:refreshTime(data.earliest_refresh_at)};
+}
+export async function revokeAccess(clientId:string,refreshToken:string,fetcher:typeof fetch=fetch) {
+  const discovery=await readJson(await fetcher('https://auth.openai.com/.well-known/openid-configuration',{redirect:'error',signal:AbortSignal.timeout(10_000)}));
+  const endpoint=typeof discovery.revocation_endpoint==='string'?new URL(discovery.revocation_endpoint):null;
+  if(!endpoint||endpoint.origin!=='https://auth.openai.com'||endpoint.username||endpoint.password||endpoint.search||endpoint.hash)throw new ProviderValidationError('INVALID_RESPONSE');
+  for(let attempt=0;attempt<3;attempt++){
+    let response:Response|null=null;
+    try{response=await fetcher(endpoint,{method:'POST',redirect:'error',signal:AbortSignal.timeout(10_000),headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({token:refreshToken,token_type_hint:'refresh_token',client_id:clientId})});}catch{}
+    if(response?.status===200)return;
+    if(response&&response.status<500)break;
+    if(attempt<2)await delay(200*2**attempt);
+  }
+  throw new ProviderValidationError('PROVIDER_UNAVAILABLE');
 }
 export async function listModels(accessToken:string,fetcher:typeof fetch=fetch) {
   const catalog=await readJson(await fetcher('https://api.openai.com/v1/models',{method:'GET',redirect:'error',signal:AbortSignal.timeout(15_000),headers:{Authorization:`Bearer ${accessToken}`}}));

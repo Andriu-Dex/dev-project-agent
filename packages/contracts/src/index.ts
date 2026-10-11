@@ -164,6 +164,7 @@ export interface SupervisionOverview {
 }
 
 export interface ProviderConnection {
+  renewable?:boolean;retryAt?:string|null;lastRefreshedAt?:string|null;
   status:'disconnected'|'pending'|'connected'|'expired'|'failed';
   expiresAt:string|null; errorCode:string|null;
   models:{slug:string;displayName:string;reasoningEfforts?:ReasoningEffort[]}[];
@@ -236,3 +237,22 @@ export interface CodeMessage {id:string;jobId:string;stage:AgentStage;status:'su
 export interface CodeProposalView {id:string;version:number;latestVersion:number;purpose:'demonstration'|'live';state:ProposalState;analysisId:string;goal:string;findingIds:string[];createdAt:string;candidate:CodeCandidate|null;contentHash:string|null;messages:CodeMessage[];decisions:{id:string;decision:'approved'|'rejected'|'changes_requested';reason:string;createdAt:string}[]}
 export interface CodePublicationView {id:string;proposalId:string;version:number;status:'simulated'|'queued'|'running'|'succeeded'|'blocked'|'failed'|'reconciliation_required';errorCode:string|null;branch:string;commitSha:string|null;pullNumber:number|null;pullUrl:string|null;createdAt:string;finishedAt:string|null;integrationStatus:'not_requested'|'pending_human';plan?:{repository:string;baseBranch:string;baseSha:string;branch:string;contentHash:string;title:string;body:string;files:{path:string;beforeBlob:string;afterBlob:string}[]};events:{stage:string;outcome:string;errorCode:string|null;createdAt:string}[]}
 export interface CodeOverview {analyses:Omit<CodeAnalysisView,'source'|'result'>[];proposals:{id:string;version:number;purpose:'demonstration'|'live';state:ProposalState;goal:string;createdAt:string}[];jobs:{id:string;proposalId:string;version:number;status:'running'|'succeeded'|'failed'|'interrupted';errorCode:string|null}[];publications:CodePublicationView[];writesEnabled:boolean;writeCredentialsConfigured:boolean}
+
+export interface ReportSchedule {version:number;enabled:boolean;weekday:number;hour:number;minute:number;timeZone:'America/Guayaquil';changedAt:string|null;nextCutoff:string|null;errorCode?:string|null}
+export interface ReportSummary {id:string;version:number;kind:'scheduled'|'manual';status:'queued'|'published'|'draft'|'failed';periodStart:string;cutoff:string;createdAt:string;finishedAt:string|null;errorCode:string|null}
+export interface WeeklyReport {
+  schemaVersion:1;project:{id:string;name:string};responsible:{id:string;name:string};periodStart:string;cutoff:string;generatedAt:string;partialPeriod:boolean;late:boolean;
+  policyVersion:number|null;scheduleVersion:number|null;baselineVersion:number|null;
+  executiveSummary:string;tracking:TrackingResponse|null;progressChangePoints:number|null;comparisonNote:string;
+  activities:{id:string;name:string;kind:string;state:string;due:string|null;principal:string|null;responsibles:string[];schedule:ScheduleStatus|null;overdueHours:number|null;blocked:boolean|null}[];
+  dependencies:DependencyFinding[];deviations:BaselineDeviation[];
+  code:{id:string;commit:string;observedAt:string;finishedAt:string;files:string[];result:CodeAnalysisResult}|null;
+  events:{id:string;action:string;outcome:string;actor:string|null;resourceId:string;createdAt:string}[];
+  actions:{id:string;proposalId:string;version:number;purpose:'demonstration'|'live';target:'trello'|'code';action:string;outcome:string;actor:string|null;createdAt:string}[];
+  recommendations:string[];nextWeek:{id:string;name:string;kind:string;due:string}[];
+  sources:{kind:'trello'|'github';id:string;observedAt:string;timing:'before_cutoff'|'after_cutoff';ageMinutes:number|null;commit?:string;branch?:string}[];
+  limitations:string[];activityUniverse:string[];
+  stages:{stage:AgentStage;engine:'deterministic';outcome:'pass'|'fail';checkedAt:string;checks:{code:string;passed:boolean;message:string}[]}[];
+}
+export interface ReportDetail extends ReportSummary {contentHash:string|null;data:WeeklyReport|null}
+export interface ReportsOverview {schedule:ReportSchedule;reports:ReportSummary[]}

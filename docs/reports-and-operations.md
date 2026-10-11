@@ -1,5 +1,7 @@
 # Reportes y decisiones de operación
 
+> La programación, versiones y salida HTML/A4 están implementadas; véase [reportes semanales](weekly-reports.md). El documento siguiente conserva las decisiones de planificación. La publicación inicial usa etapas deterministas identificadas; no solicita inferencias para cada reporte ni activa las otras frecuencias previstas.
+
 Fecha: 7 de octubre de 2026. Propuesta concreta para revisar antes de implementación. El viernes a las 18:00 y la autoridad del gestor ya fueron confirmados; los demás valores se seleccionan ahora como valores iniciales propuestos. No se han activado tareas, conexiones o cambios externos.
 
 ## Reporte de seguimiento semanal
