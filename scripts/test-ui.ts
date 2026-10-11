@@ -13,6 +13,8 @@ import {executeJob,type SupervisionOptions} from '../apps/server/src/modules/sup
 import {chromium,expect} from '@playwright/test';
 import {createLocalJWKSet,exportJWK,generateKeyPair,SignJWT} from 'jose';
 import {ChatGPTService} from '../apps/server/src/providers/chatgpt/service.js';
+import {ExecutionService} from '../apps/server/src/modules/proposals/execution.js';
+import {trelloExecutionRemote} from '../apps/server/src/integrations/trello/execution-client.js';
 import {ProposalService} from '../apps/server/src/modules/proposals/service.js';
 import {syntheticContent,syntheticVerdict} from '../apps/server/src/modules/proposals/fixtures.js';
 import {evaluationCases} from '../apps/server/src/providers/chatgpt/evaluation.js';
@@ -61,8 +63,11 @@ const providerFetcher:typeof fetch=async(input,request)=>{
 };
 const chatgpt=new ChatGPTService({database,callbackOrigin:'http://127.0.0.1:3133',fetcher:providerFetcher,identityKey:createLocalJWKSet({keys:[{...await exportJWK(pair.publicKey),kid:'test',alg:'RS256'}]})});
 const proposals=new ProposalService(database,chatgpt);
+let writeCalls=0;
+const executionFetcher:typeof fetch=async(input,request)=>{const url=new URL(String(input));expect(url.hostname).toBe('api.trello.com');if(request?.method==='PUT'){writeCalls++;expect(url.pathname).toBe('/1/cards/'+source.cards[0]!.id);const body=JSON.parse(String(request.body));expect(Object.keys(body)).toEqual(['due']);source.cards[0]!.due=body.due;return Response.json({id:source.cards[0]!.id,due:body.due});}if(url.pathname==='/1/members/me')return Response.json({id:source.members[0]!.id});if(url.pathname.endsWith('/memberships'))return Response.json([{idMember:source.members[0]!.id,memberType:'normal'}]);if(url.searchParams.get('fields')==='id,closed')return Response.json({id:boardId,closed:false});return fetcher(input,request);};
+const executions=new ExecutionService(database,{enabled:true,remote:trelloExecutionRemote(options.trelloCredentials!,executionFetcher)});
 await enqueueJob(database,projectId,manager!,'full',randomUUID());await executeJob(options,(await claimJob(database,projectId))!);
-const app=buildApp({checkDatabase:async()=>{},auth:{database,sessionSecret:randomBytes(48).toString('hex'),allowedOrigins:['http://127.0.0.1:3133'],secureCookies:false,trello:{database,credentials:options.trelloCredentials,fetcher},supervision:options,chatgpt,proposals}});
+const app=buildApp({checkDatabase:async()=>{},auth:{database,sessionSecret:randomBytes(48).toString('hex'),allowedOrigins:['http://127.0.0.1:3133'],secureCookies:false,trello:{database,credentials:options.trelloCredentials,fetcher},supervision:options,chatgpt,proposals,executions}});
 await app.register(fastifyStatic,{root:fileURLToPath(new URL('../apps/web/dist/',import.meta.url))});
 await app.listen({host:'127.0.0.1',port:3133});
 const browser=await chromium.launch({headless:true});let pending:Promise<void>|null=null;
@@ -112,13 +117,27 @@ try{
   await proposalPanel.getByRole('checkbox',{name:/Quiero enviar a ChatGPT el objetivo/}).check();
   await proposalPanel.getByRole('button',{name:'Preparar nueva versión',exact:true}).click();
   await expect(proposalPanel.getByRole('heading',{name:'Decisión del gestor sobre la versión 2',exact:true})).toBeVisible({timeout:15000});
-  await proposalPanel.getByRole('checkbox',{name:/He revisado esta versión y autorizo/}).check();
+  await proposalPanel.getByRole('checkbox',{name:/He revisado esta versión y registro una aprobación de demostración/}).check();
   await proposalPanel.getByRole('button',{name:'Aprobar esta versión',exact:true}).click();
   await expect(proposalPanel.getByText('El gestor autorizó esta versión. Ninguna acción se ha ejecutado en Trello.',{exact:true})).toBeVisible();
   await proposalPanel.getByLabel('Versión conservada',{exact:true}).selectOption('1');
   await expect(proposalPanel.getByRole('heading',{name:'Detalle de propuesta · Versión 1',exact:true})).toBeVisible();
   await expect(proposalPanel.getByRole('button',{name:'Aprobar esta versión',exact:true})).toHaveCount(0);
   await proposalPanel.getByLabel('Versión conservada',{exact:true}).selectOption('2');
+  await expect(proposalPanel.getByText('Demostración: esta propuesta nunca puede modificar Trello.',{exact:true})).toBeVisible();
+  await expect(proposalPanel.getByRole('button',{name:'Solicitar ejecución real',exact:true})).toHaveCount(0);expect(writeCalls).toBe(0);
+  await proposalPanel.getByLabel('Motivo para retirar la autorización',{exact:true}).fill('Solo demostración.');await proposalPanel.getByRole('button',{name:'Retirar autorización',exact:true}).click();
+  await expect(proposalPanel.locator('.proposal-detail').getByText('Invalidada o autorización retirada',{exact:true})).toBeVisible();
+  await proposalPanel.getByLabel('Propósito de la propuesta',{exact:true}).selectOption('live');
+  await proposalPanel.getByLabel('Objetivo y ajuste solicitado',{exact:true}).fill('Validar un cambio real en el tablero simulado.');
+  await proposalPanel.getByRole('checkbox',{name:/Quiero enviar a ChatGPT el objetivo/}).check();await proposalPanel.getByRole('button',{name:'Iniciar los tres agentes',exact:true}).click();
+  await expect(proposalPanel.getByRole('heading',{name:'Decisión del gestor sobre la versión 1',exact:true})).toBeVisible({timeout:15000});
+  await proposalPanel.getByRole('checkbox',{name:/He revisado esta versión y autorizo/}).check();await proposalPanel.getByRole('button',{name:'Aprobar esta versión',exact:true}).click();
+  await expect(proposalPanel.getByRole('button',{name:'Solicitar ejecución real',exact:true})).toBeDisabled();
+  await proposalPanel.getByRole('checkbox',{name:/Confirmo que quiero aplicar en Trello/}).check();await proposalPanel.getByRole('button',{name:'Solicitar ejecución real',exact:true}).click();
+  await expect(proposalPanel.getByText('Resultado verificado',{exact:true})).toBeVisible({timeout:15000});await expect(proposalPanel.locator('.proposal-detail').getByText('Cambio verificado',{exact:true})).toBeVisible({timeout:15000});expect(writeCalls).toBe(1);
+  await proposalPanel.getByText('Comprobaciones y evidencia de ejecución',{exact:true}).click();
+  await expect(proposalPanel.getByText(/Verificación posterior · Superada/)).toBeVisible();
   const output=process.env.UI_ARTIFACT_DIR??fileURLToPath(new URL('../work/ui/',import.meta.url));await mkdir(output,{recursive:true});
   await page.getByText('Ver casos y respuestas',{exact:true}).click();
   await page.screenshot({path:output+'/supervision-light.png',fullPage:true});await page.getByRole('button',{name:'Cambiar a modo oscuro',exact:true}).click();await page.screenshot({path:output+'/supervision-dark.png',fullPage:true});
@@ -129,10 +148,10 @@ try{
   await page.getByRole('button',{name:'Cerrar sesión',exact:true}).click();await page.getByLabel('Usuario',{exact:true}).fill(login+'-viewer');await page.getByLabel('Contraseña',{exact:true}).fill(password);await page.getByRole('button',{name:'Ingresar',exact:true}).click();
   await expect(page.getByRole('heading',{name:'Supervisión e historial',exact:true})).toBeVisible();await expect(page.getByRole('button',{name:'Actualizar fuentes y analizar',exact:true})).toHaveCount(0);await expect(page.getByRole('button',{name:'Confirmar nueva versión de línea base',exact:true})).toHaveCount(0);
   await expect(page.getByRole('button',{name:'Conectar con ChatGPT',exact:true})).toHaveCount(0);await expect(page.getByText('6 de 6',{exact:true})).toBeVisible();
-  await page.getByText('Configuración del seguimiento',{exact:true}).click();await expect(page.getByText(/Solo el gestor puede modificar estos valores/)).toBeVisible();expect(errors).toEqual([]);
-  console.log('UI verified: synthetic ChatGPT connection, model and reasoning selection, consent, evaluation history, three-agent proposals, adjustments, version history, manager authorization, manager supervision, policy save, baseline, light/dark themes, mobile layout, viewer restrictions and no browser errors.');
+  await page.getByText('Configuración del seguimiento',{exact:true}).click();await expect(page.getByText(/Solo el gestor puede modificar estos valores/)).toBeVisible();await expect(page.getByRole('button',{name:'Solicitar ejecución real',exact:true})).toHaveCount(0);await expect(page.getByRole('button',{name:'Retirar autorización',exact:true})).toHaveCount(0);expect(errors).toEqual([]);
+  console.log('UI verified: synthetic ChatGPT connection, model and reasoning selection, consent, evaluation history, three-agent proposals, adjustments, version history, manager authorization, immutable demonstrations, withdrawal, controlled synthetic execution and verified history, manager supervision, policy save, baseline, light/dark themes, mobile layout, viewer restrictions and no browser errors.');
 }catch(error){
   const page=browser.contexts()[0]?.pages()[0]; if(page)console.log((await page.locator('body').innerText()).slice(0,4000)); throw error;
 }finally{
-  clearInterval(timer);await pending;await browser.close();await chatgpt.close();await proposals.close();await app.close();await query('ROLLBACK');client.release();await pool.end();
+  clearInterval(timer);await pending;await browser.close();await chatgpt.close();await proposals.close();await executions.close();await app.close();await query('ROLLBACK');client.release();await pool.end();
 }

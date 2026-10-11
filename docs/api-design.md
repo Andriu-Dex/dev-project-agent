@@ -55,7 +55,7 @@ La decisión incluye expectedContentHash, expectedState, decision y motivo oblig
 
 Cabecera Idempotency-Key en decisiones y solicitudes de trabajos: misma clave, usuario, proyecto, operación y cuerpo devuelve el resultado previamente registrado; reutilizar clave con otro cuerpo produce conflicto. No confundir esta deduplicación HTTP con la idempotencia de ejecución externa, que tiene registro propio.
 
-La aprobación registra decisión, autorización y trabajo de ejecución en la misma transacción local. Devuelve la decisión y referencia al trabajo pendiente; la escritura externa ocurre después. Si se rechaza o pide ajustar, no se agenda modificación externa. Un intento concurrente o versión obsoleta devuelve 409 y exige refrescar el detalle, sin reaplicar la decisión a otra versión.
+Decisión confirmada para la implementación: la aprobación registra decisión y autorización en la misma transacción local, sin crear un trabajo de ejecución. El gestor solicita la ejecución por separado con confirmación explícita; esa solicitud persiste la intención antes de cualquier escritura externa. Si se rechaza o pide ajustar, no se agenda modificación externa. Un intento concurrente o versión obsoleta devuelve 409 y exige refrescar el detalle, sin reaplicar la decisión a otra versión.
 
 No hay endpoint genérico para cambiar state, ejecutar herramientas arbitrarias, escribir directo a Trello, modificar diferencias selladas o integrar ramas.
 
@@ -112,3 +112,8 @@ Todos requieren sesión y pertenencia al proyecto; las mutaciones requieren gest
 Preparación: `sourceRunId`, `cardId`, `requestedDue` ISO, `goal` (1000 caracteres), `model`, `requestKey` UUID y `reasoningEffort` opcional. Para una corrección: `proposalId` y `expectedVersion` obligatorios juntos; solo última versión en `changes_requested` o `invalidated`. Continuación: `model`, `requestKey`, `reasoningEffort` opcional. Decisión: `contentHash`, `decision` (`approved`, `rejected`, `changes_requested`), `reason` y `requestKey`. Motivo obligatorio para rechazo/ajuste. La misma clave devuelve el resultado original; si cambia el contenido, 409. Nunca reutilizar una clave para otra operación.
 
 `SOURCE_CHANGED` exige nueva lectura/supervisión; `CONFLICT` exige actualizar el estado. Una decisión contra fuente desactualizada devuelve `invalidated=true` sin guardar aprobación. Fallos de IA ocurridos tras aceptar el trabajo se consultan en su historial, con códigos saneados y sin reintento automático. No existe endpoint para ejecutar Trello ni para generar, integrar o publicar código.
+
+
+## API implementada de ejecución
+
+La octava tanda concreta las rutas y cuerpos de solicitudes, retirada y reconciliación en [ejecución controlada](trello-execution.md#persistencia-y-api). Usa `requestKey` en el cuerpo para deduplicación; los nombres conceptuales de la tabla inicial y su cabecera `Idempotency-Key` siguen siendo diseño histórico, no endpoints implementados. Aprobar una demostración nunca habilita escritura, incluso si luego se cambia la configuración del entorno.

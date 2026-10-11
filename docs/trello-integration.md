@@ -57,3 +57,8 @@ Descripciones, WBS, dependencias, checklists y confirmación de línea base est�
 Se verificó el panel mediante una cuenta temporal no confirmada en PostgreSQL y un servidor de prueba separado. El árbol de accesibilidad mostró los 31 elementos y sus fechas/asignaciones. La captura de pantalla no estuvo disponible. No se utilizó ni cambió la contraseña real del gestor.
 
 Referencias: [Trello Boards REST](https://developer.atlassian.com/cloud/trello/rest/api-group-boards/) y [autorización oficial](https://developer.atlassian.com/cloud/trello/guides/rest-api/authorization/).
+
+
+## Escrituras controladas incorporadas posteriormente
+
+La sincronización descrita aquí sigue utilizando exclusivamente GET y una credencial de lectura. La octava tanda incorpora un adaptador independiente de [ejecución controlada](trello-execution.md), desactivado en el entorno real y bloqueado para demostraciones. Sus pruebas de PUT son simuladas; no modificaron el tablero de UTAPED.

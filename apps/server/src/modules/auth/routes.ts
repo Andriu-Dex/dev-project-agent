@@ -17,7 +17,10 @@ import { registerChatGPTRoutes } from '../../providers/chatgpt/routes.js';
 import type { ProposalService } from '../proposals/service.js';
 import { registerProposalRoutes } from '../proposals/routes.js';
 
-export interface AuthOptions extends AuthConfig { database: AuthDatabase; trello?: TrelloOptions; supervision?:SupervisionOptions; chatgpt?:ChatGPTService; proposals?:ProposalService }
+import type {ExecutionService} from '../proposals/execution.js';
+import {registerExecutionRoutes} from '../proposals/execution-routes.js';
+
+export interface AuthOptions extends AuthConfig { database: AuthDatabase; trello?: TrelloOptions; supervision?:SupervisionOptions; chatgpt?:ChatGPTService; proposals?:ProposalService; executions?:ExecutionService }
 
 export async function registerAuth(app: FastifyInstance, options: AuthOptions) {
   const repository = new AuthRepository(options.database);
@@ -87,6 +90,7 @@ export async function registerAuth(app: FastifyInstance, options: AuthOptions) {
   if (options.supervision) registerSupervisionRoutes(app, options.supervision, requireUser, repository);
   if (options.chatgpt) registerChatGPTRoutes(app, options.chatgpt, requireUser, repository);
   if (options.proposals) registerProposalRoutes(app, options.proposals, requireUser, repository);
+  if (options.executions) registerExecutionRoutes(app, options.executions, requireUser, repository);
 
   const loginSchema = {
     body: {

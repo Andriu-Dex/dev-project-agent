@@ -65,3 +65,8 @@ La versión 2 de la misma propuesta completó las tres etapas con `gpt-6.1-sol` 
 | Aprobador | 9834 | 2374 | 323 | 2697 |
 
 Duración total del trabajo: 47 936 ms; suma de inferencias: 47 838 ms. Uso comunicado: 5755 tokens de entrada, 1565 de salida, 7320 totales. Se consultaron los registros reales y los dictámenes normalizados: la separación entre preparación, decisión del gestor y futura ejecución funcionó en este caso; también se revisó el cálculo del desplazamiento y la existencia de verificación posterior y tratamiento de discrepancias. Un caso satisfactorio no demuestra calidad universal, resistencia completa a entradas adversarias ni cuota futura. Sigue pendiente ampliar la evaluación representativa y desarrollar los controles de ejecución externa.
+
+
+## Retirada de la demostración y ejecución posterior
+
+El usuario aprobó la versión 2 únicamente como demostración y pidió explícitamente que no modificara Trello. Se retiró su habilitación local con auditoría y pasó a `invalidated`, conservando decisión, contenido y dictámenes. La octava tanda fija todas las propuestas anteriores como demostraciones inmutables: sus futuras versiones tampoco pueden ejecutarse. El mecanismo de [ejecución controlada](trello-execution.md) requiere otra propuesta `live`, una autorización vigente y una solicitud explícita; sus escrituras reales permanecen desactivadas.

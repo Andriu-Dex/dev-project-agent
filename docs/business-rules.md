@@ -47,7 +47,7 @@ El detalle del intercambio está en [contratos de datos](data-contracts.md) y la
 
 Toda propuesta debe incluir recurso afectado, estado anterior, cambio solicitado, justificación, evidencia, impacto, riesgos y versión. Se conserva la revisión del Revisor y la decisión del Aprobador.
 
-El gestor puede aceptar, rechazar o pedir ajustes. El rechazo impide ejecución. Un ajuste crea una nueva versión que repite revisión y aprobación. La aprobación autoriza únicamente la versión y alcance mostrados.
+El gestor puede aceptar, rechazar o pedir ajustes. El rechazo impide ejecución. Un ajuste crea una nueva versión que repite revisión y aprobación. La aprobación autoriza únicamente la versión y alcance mostrados. La ejecución se solicita por separado con confirmación explícita. Una propuesta de demostración conserva ese propósito en todas sus versiones y nunca puede modificar servicios externos.
 
 Antes de escribir, comprobar permisos y que el estado del recurso coincida con el revisado. Si difiere, detener y revaluar. Registrar intento, resultado y verificación. No marcar como ejecutado un cambio fallido o incierto.
 

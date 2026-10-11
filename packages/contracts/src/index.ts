@@ -185,7 +185,7 @@ export interface ProviderEvaluation {
 }
 export interface ProviderOverview {connection:ProviderConnection;evaluations:ProviderEvaluation[]}
 
-export type ProposalState='draft'|'pending_review'|'in_review'|'pending_policy_check'|'in_policy_check'|'pending_human_approval'|'authorized'|'changes_requested'|'rejected'|'invalidated';
+export type ProposalState='draft'|'pending_review'|'in_review'|'pending_policy_check'|'in_policy_check'|'pending_human_approval'|'authorized'|'changes_requested'|'rejected'|'invalidated'|'executing'|'executed'|'execution_failed'|'reconciliation_required';
 export type AgentStage='executor'|'reviewer'|'approver';
 export interface ProposalContent {
   objective:string;justification:string;alternatives:string[];impact:string;risks:string[];verificationPlan:string;recoveryPlan:string;unresolvedQuestions:string[];evidenceIds:string[];
@@ -197,14 +197,14 @@ export interface AgentVerdict {
   checks:{code:string;status:'pass'|'fail'|'not_checked';reason:string}[];
 }
 export interface ProposalVersionView {
-  proposalId:string;version:number;state:ProposalState;createdAt:string;goal:string;requestedDue:string;sourceRunId:string;
+  proposalId:string;version:number;purpose:'demonstration'|'live';state:ProposalState;createdAt:string;goal:string;requestedDue:string;sourceRunId:string;
   context:{schemaVersion:1;card:{id:string;name:string;state:string;due:string|null;start:string|null;wbs:string|null};[key:string]:unknown};
   content:ProposalContent|null;contentHash:string|null;
   messages:{id:string;jobId:string;stage:AgentStage;status:'succeeded'|'failed';input:unknown;output:unknown;errorCode:string|null;durationMs:number|null;usage:Record<string,number>|null;createdAt:string}[];
   decisions:{id:string;actorId:string;decision:'approved'|'rejected'|'changes_requested';reason:string;createdAt:string}[];
 }
 export interface AgentJobView {id:string;proposalId:string;version:number;model:string;reasoningEffort:ReasoningEffort|null;status:'running'|'succeeded'|'failed'|'interrupted';errorCode:string|null;createdAt:string}
-export interface ProposalOverview {proposals:{id:string;version:number;state:ProposalState;goal:string;cardName:string;createdAt:string}[];jobs:AgentJobView[]}
+export interface ProposalOverview {proposals:{id:string;version:number;purpose:'demonstration'|'live';state:ProposalState;goal:string;cardName:string;createdAt:string}[];jobs:AgentJobView[]}
 
 export type SessionResponse =
   | { authenticated: false; csrfToken: string }
@@ -214,3 +214,8 @@ export type SessionResponse =
     user: { id: string; login: string; displayName: string };
     project: ProjectAccess | null;
   };
+
+export type ExecutionStatus='queued'|'running'|'succeeded'|'blocked'|'failed'|'reconciliation_required';
+export interface ExecutionJobView {id:string;proposalId:string;version:number;contentHash:string;status:ExecutionStatus;errorCode:string|null;createdAt:string;writeStartedAt:string|null;finishedAt:string|null}
+export interface ExecutionEventView {id:string;stage:'request'|'preflight'|'write'|'verification'|'reconciliation'|'recovery';outcome:'requested'|'started'|'succeeded'|'failed'|'uncertain';errorCode:string|null;evidence:{cardId:string;boardId:string;due:string|null;observedAt:string;fingerprint:string}|null;createdAt:string}
+export interface ExecutionOverview {writesEnabled:boolean;credentialsConfigured:boolean;jobs:ExecutionJobView[]}

@@ -31,7 +31,7 @@ export function registerProposalRoutes(app:FastifyInstance,service:ProposalServi
   app.get<{Params:VersionParams}>(path,{schema:{params:versionParams}},async(request,reply)=>{
     const context=await access(request,reply);if(!context)return;const view=await service.version(context.binding.projectId,request.params.proposalId,request.params.version);return view??reply.code(404).send({code:'NOT_FOUND',message:'No se encontró la versión.'});
   });
-  app.post<{Params:{projectId:string};Body:ProposalRequest}>('/projects/:projectId/proposals',{...mutation,schema:{params,body:{type:'object',additionalProperties:false,required:['sourceRunId','cardId','requestedDue','goal','model','requestKey'],dependencies:{proposalId:['expectedVersion'],expectedVersion:['proposalId']},properties:{sourceRunId:uuid,cardId:{type:'string',minLength:1,maxLength:100},requestedDue:{type:'string',format:'date-time'},goal:{type:'string',minLength:1,maxLength:1000},model,reasoningEffort:effort,requestKey:uuid,proposalId:uuid,expectedVersion:{type:'integer',minimum:1,maximum:9999}}}}},async(request,reply)=>{
+  app.post<{Params:{projectId:string};Body:ProposalRequest}>('/projects/:projectId/proposals',{...mutation,schema:{params,body:{type:'object',additionalProperties:false,required:['sourceRunId','cardId','requestedDue','goal','model','requestKey'],dependencies:{proposalId:['expectedVersion'],expectedVersion:['proposalId']},properties:{purpose:{type:'string',enum:['demonstration','live']},sourceRunId:uuid,cardId:{type:'string',minLength:1,maxLength:100},requestedDue:{type:'string',format:'date-time'},goal:{type:'string',minLength:1,maxLength:1000},model,reasoningEffort:effort,requestKey:uuid,proposalId:uuid,expectedVersion:{type:'integer',minimum:1,maximum:9999}}}}},async(request,reply)=>{
     const context=await access(request,reply,true);if(!context)return;try{return reply.code(202).send(await service.prepare(context.binding,context.actor,request.body));}catch(error){return failure(error,reply);}
   });
   app.post<{Params:VersionParams;Body:{model:string;reasoningEffort?:ReasoningEffort;requestKey:string}}>(path+'/resume',{...mutation,schema:{params:versionParams,body:{type:'object',additionalProperties:false,required:['model','requestKey'],properties:{model,reasoningEffort:effort,requestKey:uuid}}}},async(request,reply)=>{
@@ -42,4 +42,3 @@ export function registerProposalRoutes(app:FastifyInstance,service:ProposalServi
     const context=await access(request,reply,true);if(!context)return;const body=request.body;try{return await service.decide(context.binding.projectId,context.actor,request.params.proposalId,request.params.version,body.contentHash,body.decision,body.reason,body.requestKey);}catch(error){return failure(error,reply);}
   });
 }
-

@@ -9,13 +9,13 @@ import type {ConnectionBinding} from '../../providers/chatgpt/connection.js';
 import {supportedEfforts} from '../../providers/chatgpt/validation.js';
 import {assertTargetDate,fingerprint,instructions,parseContent,parseVerdict,ProposalError,safeText,type ProposalContext} from './contracts.js';
 
-export interface ProposalRequest {sourceRunId:string;cardId:string;requestedDue:string;goal:string;model:string;reasoningEffort?:ReasoningEffort;requestKey:string;proposalId?:string;expectedVersion?:number}
-interface VersionRow {project_id:string;proposal_id:string;version:number;state:ProposalState;source_run_id:string;context:ProposalContext;goal:string;requested_due:Date;created_at:Date;content:ProposalContent|null;content_hash:string|null}
+export interface ProposalRequest {sourceRunId:string;cardId:string;requestedDue:string;goal:string;model:string;reasoningEffort?:ReasoningEffort;requestKey:string;purpose?:'demonstration'|'live';proposalId?:string;expectedVersion?:number}
+interface VersionRow {project_id:string;proposal_id:string;version:number;purpose:'demonstration'|'live';state:ProposalState;source_run_id:string;context:ProposalContext;goal:string;requested_due:Date;created_at:Date;content:ProposalContent|null;content_hash:string|null}
 interface JobRow {id:string;project_id:string;proposal_id:string;version:number;model:string;reasoning_effort:ReasoningEffort|null;status:AgentJobView['status'];error_code:string|null;created_at:Date;request_hash:string}
-const versionSelect='SELECT v.*,c.content,c.content_hash FROM proposal_versions v LEFT JOIN proposal_contents c USING (project_id,proposal_id,version)';
+const versionSelect='SELECT v.*,p.purpose,c.content,c.content_hash FROM proposal_versions v JOIN proposals p ON p.project_id=v.project_id AND p.id=v.proposal_id LEFT JOIN proposal_contents c ON c.project_id=v.project_id AND c.proposal_id=v.proposal_id AND c.version=v.version';
 const jobView=(row:JobRow):AgentJobView=>({id:row.id,proposalId:row.proposal_id,version:row.version,model:row.model,reasoningEffort:row.reasoning_effort,status:row.status,errorCode:row.error_code,createdAt:row.created_at.toISOString()});
 const sourceCard=(item:TrelloItem)=>({id:item.id,name:safeText(item.name),state:item.state,due:item.due,start:item.start,wbs:item.planning?.wbs??null});
-const cardHash=(item:TrelloItem)=>fingerprint({card:sourceCard(item),dueComplete:item.dueComplete,archived:item.archived,kind:item.kind,memberIds:[...item.memberIds].sort(),dependencies:item.planning?.dependencies??null});
+export const cardHash=(item:TrelloItem)=>fingerprint({card:sourceCard(item),listId:item.listId,dueComplete:item.dueComplete,archived:item.archived,kind:item.kind,memberIds:[...item.memberIds].sort(),dependencies:item.planning?.dependencies??null});
 const code=(error:unknown)=>error instanceof ProposalError?error.code:providerCode(error);
 
 export class ProposalService {
@@ -39,7 +39,8 @@ export class ProposalService {
     const snapshot=(await database.query<{data:TrelloSnapshot;observed_at:Date}>('SELECT data,observed_at FROM trello_snapshots WHERE project_id=$1 AND id=$2',[projectId,run.trello_snapshot_id])).rows[0];
     const item=snapshot?.data.items.find(item=>item.id===cardId&&!item.archived&&item.kind!=='reference');if(!item)throw new ProposalError('NOT_FOUND');
     const card=sourceCard(item);
-    return {schemaVersion:1,projectId,sourceRunId:runId,trelloSnapshotId:run.trello_snapshot_id,policyVersion:run.policy_version,baselineVersion:run.baseline_version,observedAt:snapshot!.observed_at.toISOString(),card,sourceFingerprint:cardHash(item),
+    const destination=(await database.query<{board_id:string;operational_list_ids:string[]}>('SELECT board_id,operational_list_ids FROM trello_connections WHERE project_id=$1',[projectId])).rows[0]!;
+    return {schemaVersion:1,projectId,destination:{boardId:destination.board_id,operationalListIds:destination.operational_list_ids},sourceRunId:runId,trelloSnapshotId:run.trello_snapshot_id,policyVersion:run.policy_version,baselineVersion:run.baseline_version,observedAt:snapshot!.observed_at.toISOString(),card,sourceFingerprint:cardHash(item),
       evidence:Object.entries(card).map(([field,value])=>({id:'card.'+field,field,value})),limitations:['Estado declarado; no acredita aceptación formal.','No se conoce causa del retraso ni duración real restante.','No se han enviado descripciones, perfiles, código ni credenciales.','La fecha solicitada es un objetivo del gestor, no una promesa de finalización.']};
   }
   private async current(database:AuthDatabase,context:ProposalContext):Promise<boolean> {
@@ -50,15 +51,15 @@ export class ProposalService {
     return Boolean(policy&&snapshot&&item&&policy.version===context.policyVersion&&(baseline?.version??null)===context.baselineVersion&&Date.now()-snapshot.observed_at.getTime()<=policy.stale_after_minutes*60_000&&Date.now()>=snapshot.observed_at.getTime()&&cardHash(item)===context.sourceFingerprint);
   }
   async overview(projectId:string) {
-    const rows=await this.database.query<{id:string;version:number;state:ProposalState;goal:string;cardName:string;created_at:Date}>(`SELECT p.id,v.version,v.state,v.goal,v.context->'card'->>'name' AS "cardName",v.created_at FROM proposals p JOIN proposal_versions v ON v.project_id=p.project_id AND v.proposal_id=p.id AND v.version=p.latest_version WHERE p.project_id=$1 ORDER BY p.created_at DESC,p.id DESC LIMIT 30`,[projectId]);
+    const rows=await this.database.query<{id:string;version:number;state:ProposalState;purpose:'demonstration'|'live';goal:string;cardName:string;created_at:Date}>(`SELECT p.id,p.purpose,v.version,v.state,v.goal,v.context->'card'->>'name' AS "cardName",v.created_at FROM proposals p JOIN proposal_versions v ON v.project_id=p.project_id AND v.proposal_id=p.id AND v.version=p.latest_version WHERE p.project_id=$1 ORDER BY p.created_at DESC,p.id DESC LIMIT 30`,[projectId]);
     const jobs=await this.database.query<JobRow>('SELECT * FROM agent_jobs WHERE project_id=$1 ORDER BY created_at DESC,id DESC LIMIT 30',[projectId]);
-    return {proposals:rows.rows.map(row=>({id:row.id,version:row.version,state:row.state,goal:row.goal,cardName:row.cardName,createdAt:row.created_at.toISOString()})),jobs:jobs.rows.map(jobView)};
+    return {proposals:rows.rows.map(row=>({id:row.id,version:row.version,purpose:row.purpose,state:row.state,goal:row.goal,cardName:row.cardName,createdAt:row.created_at.toISOString()})),jobs:jobs.rows.map(jobView)};
   }
   async version(projectId:string,proposalId:string,version:number):Promise<ProposalVersionView|null> {
     const row=(await this.database.query<VersionRow>(versionSelect+' WHERE v.project_id=$1 AND v.proposal_id=$2 AND v.version=$3',[projectId,proposalId,version])).rows[0];if(!row)return null;
     const messages=await this.database.query('SELECT id,job_id AS "jobId",stage,status,input,output,error_code AS "errorCode",duration_ms AS "durationMs",usage,created_at AS "createdAt" FROM agent_messages WHERE project_id=$1 AND proposal_id=$2 AND version=$3 ORDER BY created_at,id',[projectId,proposalId,version]);
     const decisions=await this.database.query('SELECT id,actor_id AS "actorId",decision,reason,created_at AS "createdAt" FROM proposal_decisions WHERE project_id=$1 AND proposal_id=$2 AND version=$3 ORDER BY created_at,id',[projectId,proposalId,version]);
-    return {proposalId,version,state:row.state,createdAt:row.created_at.toISOString(),goal:row.goal,requestedDue:row.requested_due.toISOString(),sourceRunId:row.source_run_id,context:row.context as unknown as ProposalVersionView['context'],content:row.content,contentHash:row.content_hash,messages:messages.rows.map(item=>({...item,createdAt:item.createdAt.toISOString()})) as ProposalVersionView['messages'],decisions:decisions.rows.map(item=>({...item,createdAt:item.createdAt.toISOString()})) as ProposalVersionView['decisions']};
+    return {proposalId,version,purpose:row.purpose,state:row.state,createdAt:row.created_at.toISOString(),goal:row.goal,requestedDue:row.requested_due.toISOString(),sourceRunId:row.source_run_id,context:row.context as unknown as ProposalVersionView['context'],content:row.content,contentHash:row.content_hash,messages:messages.rows.map(item=>({...item,createdAt:item.createdAt.toISOString()})) as ProposalVersionView['messages'],decisions:decisions.rows.map(item=>({...item,createdAt:item.createdAt.toISOString()})) as ProposalVersionView['decisions']};
   }
   private launch(binding:ConnectionBinding,actor:AuthUser,job:JobRow) {
     const task=this.pipeline(binding,actor,job).catch(()=>this.onFailure());this.tasks.add(task);void task.then(()=>this.tasks.delete(task));
@@ -81,10 +82,11 @@ export class ProposalService {
       if(context.card.due===due.toISOString())throw new ProposalError('NO_CHANGE');
       let proposalId=request.proposalId,version=1;
       if(proposalId){
-        const latest=(await client.query<{latest_version:number;state:ProposalState}>('SELECT p.latest_version,v.state FROM proposals p JOIN proposal_versions v ON v.proposal_id=p.id AND v.project_id=p.project_id AND v.version=p.latest_version WHERE p.project_id=$1 AND p.id=$2 FOR UPDATE OF p,v',[binding.projectId,proposalId])).rows[0];
+        const latest=(await client.query<{latest_version:number;purpose:'demonstration'|'live';state:ProposalState}>('SELECT p.latest_version,p.purpose,v.state FROM proposals p JOIN proposal_versions v ON v.proposal_id=p.id AND v.project_id=p.project_id AND v.version=p.latest_version WHERE p.project_id=$1 AND p.id=$2 FOR UPDATE OF p,v',[binding.projectId,proposalId])).rows[0];
         if(!latest)throw new ProposalError('NOT_FOUND');if(latest.latest_version!==request.expectedVersion||!['changes_requested','invalidated'].includes(latest.state))throw new ProposalError('CONFLICT');
+        if(request.purpose&&request.purpose!==latest.purpose)throw new ProposalError('CONFLICT');
         version=latest.latest_version+1;await client.query('UPDATE proposals SET latest_version=$3 WHERE project_id=$1 AND id=$2',[binding.projectId,proposalId,version]);
-      }else proposalId=(await client.query<{id:string}>('INSERT INTO proposals (project_id,created_by) VALUES ($1,$2) RETURNING id',[binding.projectId,actor.id])).rows[0]!.id;
+      }else proposalId=(await client.query<{id:string}>('INSERT INTO proposals (project_id,created_by,purpose) VALUES ($1,$2,$3) RETURNING id',[binding.projectId,actor.id,request.purpose??'demonstration'])).rows[0]!.id;
       await client.query('INSERT INTO proposal_versions (project_id,proposal_id,version,source_run_id,context,goal,requested_due,created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)',[binding.projectId,proposalId,version,request.sourceRunId,JSON.stringify(context),request.goal,due.toISOString(),actor.id]);
       const inserted=(await client.query<JobRow>('INSERT INTO agent_jobs (project_id,proposal_id,version,requested_by,request_key,request_hash,model,reasoning_effort) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *',[binding.projectId,proposalId,version,actor.id,request.requestKey,hash,request.model,effort])).rows[0]!;
       await this.audit(client,binding.projectId,actor.id,'proposal.prepare',proposalId,'requested');created=true;return inserted;
@@ -159,7 +161,7 @@ export class ProposalService {
       await assertManager(client,projectId,actor);await client.query('SELECT pg_advisory_xact_lock(hashtext($1))',['agent:'+projectId]);
       const row=(await client.query<VersionRow>(versionSelect+' WHERE v.project_id=$1 AND v.proposal_id=$2 AND v.version=$3 FOR UPDATE OF v',[projectId,proposalId,version])).rows[0];if(!row)throw new ProposalError('NOT_FOUND');
       if((await client.query("SELECT id FROM agent_jobs WHERE project_id=$1 AND proposal_id=$2 AND version=$3 AND status='running'",[projectId,proposalId,version])).rowCount)throw new ProposalError('CONFLICT');
-      if(['rejected','changes_requested','invalidated'].includes(row.state)||await this.current(client,row.context))return {state:row.state};
+      if(['rejected','changes_requested','invalidated','executing','executed','reconciliation_required'].includes(row.state)||await this.current(client,row.context))return {state:row.state};
       await client.query("UPDATE proposal_versions SET state='invalidated' WHERE project_id=$1 AND proposal_id=$2 AND version=$3",[projectId,proposalId,version]);await this.audit(client,projectId,actor.id,'proposal.invalidate',proposalId,'succeeded');return {state:'invalidated' as const};
     });
   }
@@ -176,7 +178,7 @@ export class ProposalService {
       const messages=(await client.query("SELECT stage,output FROM agent_messages WHERE project_id=$1 AND proposal_id=$2 AND version=$3 AND status='succeeded'",[projectId,proposalId,version])).rows;
       if(!messages.some(message=>message.stage==='reviewer'&&message.output.verdict==='validated')||!messages.some(message=>message.stage==='approver'&&message.output.verdict==='human_required'))throw new ProposalError('MISSING_REVIEW');
       const state=decision==='approved'?'authorized':decision;
-      const inserted=(await client.query<{id:string}>('INSERT INTO proposal_decisions (project_id,proposal_id,version,actor_id,content_hash,request_key,decision,reason) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id',[projectId,proposalId,version,actor.id,hash,requestKey,decision,reason])).rows[0]!;
+      const inserted=(await client.query<{id:string}>('INSERT INTO proposal_decisions (project_id,proposal_id,version,actor_id,content_hash,request_key,decision,reason,actor_auth_version) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id',[projectId,proposalId,version,actor.id,hash,requestKey,decision,reason,actor.auth_version])).rows[0]!;
       await client.query('UPDATE proposal_versions SET state=$4 WHERE project_id=$1 AND proposal_id=$2 AND version=$3',[projectId,proposalId,version,state]);await this.audit(client,projectId,actor.id,'proposal.'+decision,proposalId,'succeeded');return {state,decisionId:inserted.id,invalidated:false};
     });
   }

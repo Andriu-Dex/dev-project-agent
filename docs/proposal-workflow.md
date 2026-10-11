@@ -106,3 +106,8 @@ Una solicitud a Trello agota el tiempo de espera. No se sabe si se aplicó. Se r
 | Se prepara una rama | No integrar ni declarar incorporado el cambio |
 
 Son criterios documentados, no pruebas ejecutadas. El siguiente diseño técnico deberá precisar persistencia y concurrencia para hacerlos efectivos.
+
+
+## Alcance concreto de la octava tanda
+
+La implementación de [ejecución controlada](trello-execution.md) exige propósito inmutable `live` y una solicitud expresa del gestor posterior a aprobar. `demonstration` nunca llega a escritura. Los reintentos sin efectos pasan de `execution_failed` a `executing` solo mediante una nueva solicitud validada; la reconciliación implementada se mantiene pendiente cuando observa el valor anterior y no habilita una nueva escritura. El cierre forzado de resultados inciertos y las acciones múltiples siguen fuera de este alcance. Retirar una autorización conserva la decisión y registra `invalidated` con auditoría, antes de iniciar o después de un fallo con ausencia de efectos confirmada.

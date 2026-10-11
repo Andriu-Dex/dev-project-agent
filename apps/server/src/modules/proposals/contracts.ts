@@ -23,7 +23,7 @@ export function safeText(value:string,max=1000) {
   if(value.length>max||/(?:sk-[a-zA-Z0-9_-]{16,}|ghp_[a-zA-Z0-9]{16,}|github_pat_[a-zA-Z0-9_]{16,}|-----BEGIN .*PRIVATE KEY|(?:password|token|secret)\s*[:=]\s*\S{12,})/i.test(value))throw new ProposalError('SENSITIVE_CONTEXT');return value;
 }
 export interface ProposalContext {
-  schemaVersion:1;projectId:string;sourceRunId:string;trelloSnapshotId:string;policyVersion:number;baselineVersion:number|null;
+  schemaVersion:1;destination?:{boardId:string;operationalListIds:string[]};projectId:string;sourceRunId:string;trelloSnapshotId:string;policyVersion:number;baselineVersion:number|null;
   observedAt:string;card:{id:string;name:string;state:string;due:string|null;start:string|null;wbs:string|null};
   sourceFingerprint:string;evidence:{id:string;field:string;value:unknown}[];limitations:string[];
 }
