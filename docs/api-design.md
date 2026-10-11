@@ -1,6 +1,6 @@
 # API prevista del panel y servicio
 
-Diseño documental del 7 de octubre de 2026; sin rutas implementadas ni esquemas ejecutables. Complementa [diseño técnico](technical-design.md), [contratos](data-contracts.md) y [pantallas](manager-screens.md).
+Diseño objetivo del 7 de octubre de 2026. Las rutas ya implementadas se documentan en [autenticación](authentication.md), [Trello](trello-integration.md), [reglas de seguimiento y configuración versionada](tracking-rules.md), [supervisión, línea base e historial](supervision.md) y [conexión/evaluación de ChatGPT](provider-validation.md). El resto sigue siendo diseño previsto. Complementa [diseño técnico](technical-design.md), [contratos](data-contracts.md) y [pantallas](manager-screens.md).
 
 ## Convenciones
 
@@ -95,3 +95,20 @@ Errores de proveedores durante trabajo asíncrono quedan en el estado del trabaj
 Consultar estado de trabajos mediante polling acotado mientras la pantalla lo necesite; detener al completar o abandonar. No incorporar WebSockets en esta versión. Solicitudes concurrentes no deben sustituir contenido nuevo por una respuesta vieja.
 
 Antes de implementar: crear esquemas de entrada/salida, validar estados y permisos, probar idempotencia y casos 401/403/404/409, y verificar que ningún JSON de respuesta exponga secretos. El catálogo puede ajustarse al detallar cada módulo, conservando las condiciones y la trazabilidad aquí definidas.
+
+## Endpoints implementados de propuestas
+
+Todos requieren sesión y pertenencia al proyecto; las mutaciones requieren gestor vigente, origen permitido y CSRF. Las rutas se encuentran bajo `/api/v1/projects/:projectId`. No se acepta un prompt libre ni una URL de inferencia elegida por el cliente.
+
+| Método | Ruta relativa | Resultado |
+| --- | --- | --- |
+| GET | `/proposals` | Últimas 30 propuestas y trabajos |
+| GET | `/proposals/:proposalId/versions/:version` | Fuente congelada, contenido, mensajes y decisiones |
+| POST | `/proposals` | Inicia tres etapas; devuelve trabajo (202) |
+| POST | `/proposals/:proposalId/versions/:version/resume` | Continúa etapas pendientes por solicitud explícita (202) |
+| POST | `/proposals/:proposalId/versions/:version/recheck` | Comprueba vigencia local; invalida si cambiaron datos relevantes |
+| POST | `/proposals/:proposalId/versions/:version/decisions` | Registra decisión sobre huella y versión exactas |
+
+Preparación: `sourceRunId`, `cardId`, `requestedDue` ISO, `goal` (1000 caracteres), `model`, `requestKey` UUID y `reasoningEffort` opcional. Para una corrección: `proposalId` y `expectedVersion` obligatorios juntos; solo última versión en `changes_requested` o `invalidated`. Continuación: `model`, `requestKey`, `reasoningEffort` opcional. Decisión: `contentHash`, `decision` (`approved`, `rejected`, `changes_requested`), `reason` y `requestKey`. Motivo obligatorio para rechazo/ajuste. La misma clave devuelve el resultado original; si cambia el contenido, 409. Nunca reutilizar una clave para otra operación.
+
+`SOURCE_CHANGED` exige nueva lectura/supervisión; `CONFLICT` exige actualizar el estado. Una decisión contra fuente desactualizada devuelve `invalidated=true` sin guardar aprobación. Fallos de IA ocurridos tras aceptar el trabajo se consultan en su historial, con códigos saneados y sin reintento automático. No existe endpoint para ejecutar Trello ni para generar, integrar o publicar código.

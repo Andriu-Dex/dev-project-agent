@@ -9,8 +9,15 @@ import type { AuthConfig } from './config.js';
 import { AuthRepository, type AuthDatabase, type AuthUser } from './repository.js';
 import { hashPassword, verifyPassword } from './password.js';
 import { PostgresSessionStore, SESSION_IDLE_MS } from './session-store.js';
+import { registerTrelloRoutes, type TrelloOptions } from '../../integrations/trello/routes.js';
+import { registerSupervisionRoutes } from '../supervision/routes.js';
+import type { SupervisionOptions } from '../supervision/worker.js';
+import type { ChatGPTService } from '../../providers/chatgpt/service.js';
+import { registerChatGPTRoutes } from '../../providers/chatgpt/routes.js';
+import type { ProposalService } from '../proposals/service.js';
+import { registerProposalRoutes } from '../proposals/routes.js';
 
-export interface AuthOptions extends AuthConfig { database: AuthDatabase }
+export interface AuthOptions extends AuthConfig { database: AuthDatabase; trello?: TrelloOptions; supervision?:SupervisionOptions; chatgpt?:ChatGPTService; proposals?:ProposalService }
 
 export async function registerAuth(app: FastifyInstance, options: AuthOptions) {
   const repository = new AuthRepository(options.database);
@@ -47,6 +54,7 @@ export async function registerAuth(app: FastifyInstance, options: AuthOptions) {
     if (!request.session.userId) return null;
     const user = await repository.getUser(request.session.userId);
     if (!user?.active || user.auth_version !== request.session.authVersion) {
+      options.chatgpt?.connections.disconnectSession(request.session.sessionId);
       await request.session.regenerate();
       return null;
     }
@@ -74,6 +82,11 @@ export async function registerAuth(app: FastifyInstance, options: AuthOptions) {
     }
     return user;
   }
+
+  if (options.trello) registerTrelloRoutes(app, options.trello, requireUser, repository);
+  if (options.supervision) registerSupervisionRoutes(app, options.supervision, requireUser, repository);
+  if (options.chatgpt) registerChatGPTRoutes(app, options.chatgpt, requireUser, repository);
+  if (options.proposals) registerProposalRoutes(app, options.proposals, requireUser, repository);
 
   const loginSchema = {
     body: {
@@ -107,6 +120,7 @@ export async function registerAuth(app: FastifyInstance, options: AuthOptions) {
   });
 
   app.post('/session/logout', { onRequest: [app.csrfProtection] }, async (request, reply) => {
+    options.chatgpt?.connections.disconnectSession(request.session.sessionId);
     const user = await currentUser(request);
     if (user) {
       const project = await repository.projectForUser(user.id);

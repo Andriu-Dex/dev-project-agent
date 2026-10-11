@@ -45,6 +45,14 @@ body {
 }
 
 main { max-width: 940px; margin: 0 auto; padding: 64px 24px; }
+.supervision-actions { display:flex; flex-wrap:wrap; gap:10px; margin-block:16px; }
+.history-list { padding-left:24px; }
+.history-list li { margin-block:12px; }
+.supervision-result { border-top:1px solid var(--color-border); padding-top:20px; margin-top:20px; }
+.baseline-consent { display:flex; gap:10px; align-items:flex-start; margin-block:16px; }
+.baseline-consent input { margin-top:7px; flex-shrink:0; }
+.source-description { white-space:pre-wrap; overflow-wrap:anywhere; }
+.work-item, section code, .history-list { overflow-wrap:anywhere; }
 header { margin-bottom: 36px; }
 
 .eyebrow {
@@ -120,6 +128,27 @@ button:focus-visible {
 }
 
 footer { margin-top: 28px; }
+
+.tracking-panel { border-top: 1px solid var(--color-border); margin-top: 24px; padding-top: 20px; }
+.tracking-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-top: 16px; }
+.tracking-metrics p { margin: 0; border: 1px solid var(--color-border); border-radius: 10px; padding: 16px; }
+.tracking-metrics strong { font-size: 1.4rem; }
+.tracking-filter { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.tracking-filter select { font: inherit; padding: 8px; color: var(--color-text-base); background: var(--color-bg-surface); border: 1px solid var(--color-border); border-radius: 8px; }
+.tracking-panel summary { cursor: pointer; }
+.tracking-panel h4 { margin: 0; font-size: 1rem; }
+.tracking-panel dt { font-weight: 600; }
+.tracking-panel dd { margin: 0 0 8px; overflow-wrap: anywhere; }
+.tracking-settings { margin: 16px 0; padding: 16px; border: 1px solid var(--color-border); border-radius: 10px; }
+.tracking-settings-form { display: grid; gap: 12px; max-width: 520px; margin-bottom: 16px; }
+.tracking-settings-form label { display: grid; gap: 6px; }
+.tracking-settings-form input { font: inherit; width: 100%; padding: 10px; border: 1px solid var(--color-border); border-radius: 8px; color: var(--color-text-base); background: var(--color-bg-base); }
+.tracking-settings-form input:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 2px; }
+
+.work-items { display: grid; gap: 14px; margin: 20px 0; }
+.work-item { border: 1px solid var(--color-border); border-radius: 10px; padding: 18px; }
+.work-item h3 { margin: 0; }
+.work-item p { margin: 8px 0; overflow-wrap: anywhere; }
 
 .login-form {
   display: flex;
@@ -289,6 +318,26 @@ h3 { font-size: 1rem; }
   opacity: 1;
   transform: translateY(-50%) translateX(0);
 }
+
+.provider-evaluation-form { display: grid; gap: 16px; margin: 20px 0; }
+.provider-authorization { margin: 20px 0; padding: 16px; border: 1px solid var(--color-border); border-radius: 12px; }
+.provider-case { margin-top: 20px; padding-top: 12px; border-top: 1px solid var(--color-border); }
+.provider-panel select { max-width: 100%; font: inherit; padding: 10px; border: 1px solid var(--color-border); border-radius: 8px; color: var(--color-text-base); background: var(--color-bg-surface); }
+.provider-panel .confirmation { display: flex; align-items: flex-start; gap: 10px; }
+.provider-panel .confirmation input { margin-top: 6px; flex-shrink: 0; }
+.provider-panel .work-item { overflow-wrap: anywhere; }
+
+.proposal-form { margin: 20px 0; }
+.proposal-form[open], .manager-decision { display: grid; gap: 16px; }
+.proposal-form summary { font-weight: 600; cursor: pointer; }
+.proposal-panel select, .proposal-panel textarea, .proposal-panel input[type="datetime-local"] { width: 100%; max-width: 100%; box-sizing: border-box; font: inherit; padding: 10px; border: 1px solid var(--color-border); border-radius: 8px; color: var(--color-text-base); background: var(--color-bg-surface); }
+.proposal-panel textarea { min-height: 100px; resize: vertical; }
+.proposal-panel .confirmation { display: flex; align-items: flex-start; gap: 10px; }
+.proposal-panel .confirmation input { width: auto; margin-top: 6px; flex-shrink: 0; }
+.proposal-panel .work-item, .proposal-detail { overflow-wrap: anywhere; }
+.proposal-detail { margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--color-border); }
+.proposal-change { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,220px),1fr)); gap: 12px; }
+.content-hash { font-family: monospace; font-size: .85rem; }
 
 @media (prefers-reduced-motion: reduce) {
   *, ::before, ::after {

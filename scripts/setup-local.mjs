@@ -13,6 +13,9 @@ const content = [
   'SESSION_SECRET=' + randomBytes(48).toString('hex'),
   'APP_ORIGINS=http://127.0.0.1:5174,http://127.0.0.1:3100',
   'ALLOW_INSECURE_LOCAL_HTTP=true',
+  'TRELLO_API_KEY=',
+  'TRELLO_TOKEN=',
+  'GITHUB_TOKEN=',
   '',
 ].join('\n');
 
@@ -28,6 +31,9 @@ try {
       ['SESSION_SECRET', randomBytes(48).toString('hex')],
       ['APP_ORIGINS', 'http://127.0.0.1:5174,http://127.0.0.1:3100'],
       ['ALLOW_INSECURE_LOCAL_HTTP', 'true'],
+      ['TRELLO_API_KEY', ''],
+      ['TRELLO_TOKEN', ''],
+      ['GITHUB_TOKEN', ''],
     ]) {
       if (!new RegExp('^' + key + '=', 'm').test(existing)) additions.push(key + '=' + value);
     }

@@ -47,15 +47,15 @@ export function App() {
         </header>
         <SessionPanel />
         <section aria-labelledby="status-title">
-          <div className="section-heading"><h2 id="status-title">Estado de conexión</h2><span className="badge">Configuración inicial</span></div>
+          <div className="section-heading"><h2 id="status-title">Estado de conexión</h2><span className="badge">Servicio local</span></div>
           <p role="status" className={'connection ' + connection}>{labels[connection]}</p>
           {checkedAt && <p className="muted">Última comprobación: {new Date(checkedAt).toLocaleString('es-EC', { timeZone: 'America/Guayaquil' })}</p>}
           <button disabled={connection === 'loading'} onClick={() => setAttempt(value => value + 1)}>Volver a comprobar</button>
         </section>
         <section aria-labelledby="next-title">
-          <h2 id="next-title">El seguimiento aún no está conectado</h2>
-          <p>Las actividades, los análisis y los reportes aparecerán cuando conectemos las fuentes del proyecto y existan datos reales.</p>
-          <ul><li>Trello: sin conectar</li><li>GitHub: sin conectar</li><li>Proveedor de IA: pendiente de validación</li></ul>
+          <h2 id="next-title">Fuentes del seguimiento</h2>
+          <p>Inicia sesión para consultar Trello, GitHub y el historial de supervisión de tu proyecto.</p>
+          <ul><li>Seguimiento: reglas de fechas, dependencias y comparación con la línea base.</li><li>ChatGPT: conexión, selección de razonamiento y evaluación con casos sintéticos.</li><li>Agentes: propuestas de vencimiento, revisión, control de aprobación y decisiones del gestor.</li><li>Ejecución externa, revisión de código y reportes semanales: pendientes de implementación.</li></ul>
         </section>
         <footer>Los cambios de Trello y código requerirán revisión y aprobación del gestor.</footer>
       </main>

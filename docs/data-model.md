@@ -127,6 +127,16 @@ ReportVersion conserva cantidades, fórmula y decisiones a fecha de corte: una a
 
 ## Información derivada y diseño físico pendiente
 
+Conexión/evaluación de proveedor implementadas el 11 de octubre: `chatgpt_registrations` guarda host, cliente e identidad por proyecto/usuario, sin tokens; `provider_evaluations` guarda estado, modelo, versión de batería y clave de idempotencia; `provider_evaluation_results` conserva el resultado validado y sus métricas. Una restricción parcial limita a una evaluación activa por proyecto y la relación compuesta impide cruzar resultados entre proyectos. El rol de ejecución solo puede anexar/consultar resultados. Los tokens se mantienen en memoria y no pertenecen al esquema. Véase [proveedor](provider-validation.md).
+
+Actualización del 11 de octubre: las migraciones ya implementadas concretan proyectos, auditoría, cuentas/sesiones/membresías, instantáneas e intentos Trello/GitHub, políticas de seguimiento versionadas, `baseline_versions`, `supervision_jobs`, `supervision_job_events` y `supervision_runs`. Planificación/checklists/dependencias se conservan en el JSON normalizado de cada lectura; una línea base referencia una instantánea inmutable y un resultado guarda sus fuentes, reglas y referencia exactas. Véase [supervisión](supervision.md). Las entidades de agentes y propuestas del primer alcance se incorporaron posteriormente, como se describe a continuación. Ejecuciones externas y reportes siguen pendientes; esta actualización no acredita todo el modelo objetivo.
+
 No crear tablas independientes solo para cada porcentaje o cada texto del panel. Calcular resumen y filtros a partir de observaciones válidas; congelar indicadores en reportes y ejecuciones para reproducibilidad. Estados de flujo y revisiones normalizados; estructuras variables validadas con versión de contrato.
 
 Después de revisar el modelo se elegirá acceso a datos y migraciones, se decidirán índices según consultas reales y se detallarán tablas de vínculo y sesiones. No fijar particiones, microservicios, aislamiento entre organizaciones ni infraestructura de producción en esta entrega.
+
+## Primera persistencia del flujo de agentes
+
+Migración `1791781200000_agent-proposals`: `proposals` identifica la propuesta y su última versión; `proposal_versions` conserva fuente, contexto mínimo, objetivo, fecha solicitada y estado; `proposal_contents` sella contenido validado y huella por versión. `agent_jobs` registra solicitud idempotente, modelo, esfuerzo y estado operativo, con una sola tarea activa por proyecto. `agent_messages` anexa entradas, salidas válidas, errores saneados y métricas por etapa. `proposal_decisions` anexa una decisión del gestor ligada a versión y huella. Referencias compuestas impiden cruzar versiones, supervisiones y mensajes entre proyectos.
+
+El rol de ejecución puede actualizar únicamente `latest_version`, estado de versión y campos de finalización del trabajo; no contexto, contenido, mensajes ni decisiones. Esto protege el historial frente al servicio ordinario; un administrador de PostgreSQL conserva privilegios de administración. La misma migración agrega `provider_evaluations.reasoning_effort`: los registros anteriores quedan en null, que significa predeterminado.

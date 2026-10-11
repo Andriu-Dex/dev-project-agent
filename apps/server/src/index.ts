@@ -4,6 +4,11 @@ import fastifyStatic from '@fastify/static';
 import pg from 'pg';
 import { buildApp } from './app.js';
 import { authConfigFromEnvironment } from './modules/auth/config.js';
+import { credentialsFromEnvironment } from './integrations/trello/client.js';
+import { githubToken } from './integrations/github/client.js';
+import { startSupervisionWorker } from './modules/supervision/worker.js';
+import { ChatGPTService } from './providers/chatgpt/service.js';
+import { ProposalService } from './modules/proposals/service.js';
 
 const connectionString = process.env.APP_DATABASE_URL;
 if (!connectionString) throw new Error('APP_DATABASE_URL is required. Run npm run setup first.');
@@ -18,13 +23,17 @@ const pool = new pg.Pool({
   statement_timeout: 3000,
   application_name: 'dev-project-agent',
 });
+const supervision={database:pool,trelloCredentials:credentialsFromEnvironment(process.env),githubToken:githubToken(process.env)};
+const chatgpt=new ChatGPTService({database:pool,callbackOrigin:`http://127.0.0.1:${port}`,onFailure:()=>app.log.error('Provider evaluation could not publish its result.')});
+const proposals=new ProposalService(pool,chatgpt,()=>app.log.error('Agent workflow could not publish its result.'));
 const app = buildApp({
   checkDatabase: async () => { await pool.query('SELECT 1'); },
   logger: true,
-  auth: { ...authConfigFromEnvironment(process.env), database: pool },
+  auth: { ...authConfigFromEnvironment(process.env), database: pool, trello: { database: pool, credentials: supervision.trelloCredentials },supervision,chatgpt,proposals },
 });
 pool.on('error', () => { app.log.error('Idle database connection failed.'); });
-app.addHook('onClose', async () => { await pool.end(); });
+let worker:ReturnType<typeof startSupervisionWorker>|undefined;
+app.addHook('onClose', async () => { await chatgpt.close();await proposals.close();await worker?.close();await pool.end(); });
 
 const webRoot = fileURLToPath(new URL('../../web/dist/', import.meta.url));
 if (existsSync(webRoot)) {
@@ -37,7 +46,10 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   });
 }
 try {
+  await chatgpt.initialize();
+  await proposals.initialize();
   await app.listen({ host: '127.0.0.1', port });
+  worker=startSupervisionWorker(supervision,()=>app.log.error('Supervision worker could not access storage.'));
 } catch {
   app.log.error('Server startup failed.');
   await app.close();

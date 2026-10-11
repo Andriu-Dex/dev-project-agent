@@ -25,10 +25,19 @@
     "start": "node --env-file=.env apps/server/dist/index.js",
     "user:create": "node --env-file=.env --import tsx scripts/manage-user.ts create",
     "user:reset": "node --env-file=.env --import tsx scripts/manage-user.ts reset",
-    "test:auth-db": "node --env-file=.env scripts/test-auth.mjs"
+    "test:auth-db": "node --env-file=.env scripts/test-auth.mjs",
+    "trello:import": "node --env-file=.env --import tsx scripts/import-trello.ts",
+    "test:trello-db": "node --env-file=.env scripts/test-trello.mjs",
+    "test:supervision-db": "node --env-file=.env scripts/test-supervision.mjs",
+    "test:provider-db": "node --env-file=.env scripts/test-provider.mjs",
+    "test:proposals-db": "node --env-file=.env scripts/test-proposals.mjs",
+    "ai:validate": "node --import tsx scripts/validate-chatgpt.ts",
+    "sources:read": "node --env-file=.env --import tsx scripts/read-sources.ts",
+    "test:ui": "npm run build && node --env-file=.env --import tsx scripts/test-ui.ts"
   },
   "devDependencies": {
     "@inquirer/prompts": "8.7.3",
+    "@playwright/test": "1.63.0",
     "@types/node": "24.19.1",
     "node-pg-migrate": "9.0.0",
     "tsx": "4.23.15",

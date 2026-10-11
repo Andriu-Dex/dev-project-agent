@@ -1,5 +1,9 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import type { SessionResponse, ProjectRole } from '@dev-project-agent/contracts';
+import { TrelloPanel } from './TrelloPanel';
+import { SupervisionPanel } from './SupervisionPanel';
+import { ProviderPanel } from './ProviderPanel';
+import { ProposalPanel } from './ProposalPanel';
 
 interface Member { id: string; displayName: string; role: ProjectRole }
 
@@ -19,6 +23,7 @@ export function SessionPanel() {
   const [attempt, setAttempt] = useState(0);
   const [members, setMembers] = useState<Member[] | null>(null);
   const [memberError, setMemberError] = useState('');
+  const [sourceRevision,setSourceRevision]=useState(0);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -54,7 +59,7 @@ export function SessionPanel() {
     try {
       const response = await fetch(`/api/v1/session/${session.authenticated ? 'logout' : 'login'}`, {
         method: 'POST', credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json', 'x-csrf-token': session.csrfToken },
+        headers: { ...(!session.authenticated ? { 'Content-Type': 'application/json' } : {}), 'x-csrf-token': session.csrfToken },
         ...(session.authenticated ? {} : { body: JSON.stringify({ login: login.trim(), password }) }),
       });
       if (response.status === 204) { setSession(null); setAttempt(value => value + 1); }
@@ -70,7 +75,7 @@ export function SessionPanel() {
     }
   }
 
-  return <section aria-labelledby="session-title">
+  return <><section aria-labelledby="session-title">
     <h2 id="session-title">{session?.authenticated ? 'Tu proyecto' : 'Iniciar sesión'}</h2>
     {error && <p role="alert" className="form-error">{error}</p>}
     {!session && (error
@@ -119,7 +124,7 @@ export function SessionPanel() {
       <p>Hola, <strong>{session.user.displayName}</strong>.</p>
       {session.project ? <>
         <p><strong>{session.project.name}</strong> <span className="badge">{session.project.role === 'manager' ? 'Gestor' : 'Consulta'}</span></p>
-        <p className="muted">{canManage ? 'Tienes permisos de gestor. Las propuestas estarán disponibles cuando conectemos el seguimiento.' : 'Tu acceso permite consultar el proyecto.'}</p>
+        <p className="muted">{canManage ? 'Puedes solicitar supervisiones y administrar la configuración del proyecto.' : 'Tu acceso permite consultar el proyecto.'}</p>
         {canManage && <div aria-labelledby="team-title">
           <h3 id="team-title">Equipo con acceso</h3>
           {memberError && <p role="alert" className="form-error">{memberError}</p>}
@@ -129,5 +134,12 @@ export function SessionPanel() {
       </> : <p role="alert">Tu cuenta no tiene acceso activo a un proyecto. Contacta al gestor.</p>}
       <button disabled={busy} onClick={() => void submit()}>{busy ? 'Cerrando sesión…' : 'Cerrar sesión'}</button>
     </>}
-  </section>;
+  </section>
+    {session?.authenticated && session.project && <>
+      <ProviderPanel key={'provider:'+session.project.id} project={session.project} csrfToken={session.csrfToken}/>
+      <SupervisionPanel key={session.project.id} project={session.project} csrfToken={session.csrfToken} onCompleted={()=>setSourceRevision(value=>value+1)}/>
+      <ProposalPanel key={'proposals:'+session.project.id} project={session.project} csrfToken={session.csrfToken} sourceRevision={sourceRevision}/>
+      <TrelloPanel key={`${session.project.id}:${sourceRevision}`} project={session.project} csrfToken={session.csrfToken} />
+    </>}
+  </>;
 }

@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const children = [
-  spawn(process.execPath, ['--env-file=.env', 'node_modules/tsx/dist/cli.mjs', 'watch', 'apps/server/src/index.ts'], { cwd: root, stdio: 'inherit' }),
+  spawn(process.execPath, ['--env-file=.env', 'node_modules/tsx/dist/cli.mjs', 'watch', '--exclude', 'packages/contracts/dist/**', 'apps/server/src/index.ts'], { cwd: root, stdio: 'inherit' }),
   spawn(process.execPath, ['node_modules/vite/bin/vite.js', '--config', 'apps/web/vite.config.ts'], { cwd: root, stdio: 'inherit' }),
 ];
 let stopping = false;

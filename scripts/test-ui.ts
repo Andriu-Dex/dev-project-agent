@@ -1,0 +1,138 @@
+import pg from 'pg';
+import {randomBytes,randomUUID} from 'node:crypto';
+import {mkdir} from 'node:fs/promises';
+import fastifyStatic from '@fastify/static';
+import {fileURLToPath} from 'node:url';
+import {buildApp} from '../apps/server/src/app.js';
+import {hashPassword} from '../apps/server/src/modules/auth/password.js';
+import type {AuthUser} from '../apps/server/src/modules/auth/repository.js';
+import type {TrelloDatabase} from '../apps/server/src/integrations/trello/service.js';
+import {boardFixture,boardId,listId} from '../apps/server/src/integrations/trello/fixtures.js';
+import {claimJob,enqueueJob} from '../apps/server/src/modules/supervision/jobs.js';
+import {executeJob,type SupervisionOptions} from '../apps/server/src/modules/supervision/worker.js';
+import {chromium,expect} from '@playwright/test';
+import {createLocalJWKSet,exportJWK,generateKeyPair,SignJWT} from 'jose';
+import {ChatGPTService} from '../apps/server/src/providers/chatgpt/service.js';
+import {ProposalService} from '../apps/server/src/modules/proposals/service.js';
+import {syntheticContent,syntheticVerdict} from '../apps/server/src/modules/proposals/fixtures.js';
+import {evaluationCases} from '../apps/server/src/providers/chatgpt/evaluation.js';
+const pool=new pg.Pool({connectionString:process.env.DATABASE_URL,max:1}),client=await pool.connect();
+let queryQueue: Promise<void> = Promise.resolve();
+function query<Row extends pg.QueryResultRow = pg.QueryResultRow>(sql: string, parameters?: unknown[]): Promise<pg.QueryResult<Row>> {
+  const result = queryQueue.then(() => client.query<Row>(sql, parameters));
+  queryQueue = result.then(() => {}, () => {});
+  return result;
+}
+await query('BEGIN');
+const database={query:query.bind(client),connect:async()=>({query:async(sql:string,parameters?:unknown[])=>{
+  if(sql.startsWith('BEGIN'))return query('SAVEPOINT ui_operation');
+  if(sql==='COMMIT')return query('RELEASE SAVEPOINT ui_operation');
+  if(sql==='ROLLBACK'){await query('ROLLBACK TO SAVEPOINT ui_operation');return query('RELEASE SAVEPOINT ui_operation');}
+  return query(sql,parameters);
+},release:()=>{}})} as unknown as TrelloDatabase;
+const board=boardFixture(),head='a'.repeat(40);
+const source={...board,cards:board.cards.map(card=>({...card,start:new Date(Date.now()+2*86400_000).toISOString(),due:new Date(Date.now()+4*86400_000).toISOString(),name:'Actividad de prueba de supervisión',desc:'CÓDIGO WBS: 1.1\nPREDECESORAS WBS: Ninguna',idChecklists:[]}))};
+const fetcher:typeof fetch=async input=>{
+  const url=new URL(String(input));
+  if(url.hostname==='api.trello.com')return Response.json(url.pathname.endsWith('/lists')?source.lists:url.pathname.endsWith('/members')?source.members:url.pathname.endsWith('/cards')?source.cards:url.pathname.endsWith('/checklists')?[]:source);
+  return Response.json(url.pathname.endsWith('/branches')?[{name:'develop',commit:{sha:head}}]:url.pathname.endsWith('/commits')?[{sha:head,commit:{message:'Synthetic change',author:{name:'Test member'},committer:{date:'2026-10-11T10:00:00Z'}}}]:url.pathname.includes('/commits/')?{files:[]}:{full_name:'example/project',default_branch:'main'});
+};
+const projectId=(await query<{id:string}>("INSERT INTO projects (name) VALUES ('Proyecto de prueba visual') RETURNING id")).rows[0]!.id;
+await query('INSERT INTO trello_connections (project_id,board_id,operational_list_ids) VALUES ($1,$2,$3)',[projectId,boardId,JSON.stringify([listId])]);
+await query("INSERT INTO github_connections (project_id,owner,repository,branch) VALUES ($1,'example','project','develop')",[projectId]);
+await query('INSERT INTO tracking_policy_versions (project_id,version,due_soon_hours,stale_after_minutes,confirmed) VALUES ($1,1,72,60,false)',[projectId]);
+const login='ui-'+randomBytes(8).toString('hex'),password=randomBytes(24).toString('hex'),passwordHash=await hashPassword(password);
+let manager:AuthUser;
+for(const role of ['manager','viewer']){
+  const user=(await query<AuthUser>('INSERT INTO users (login,display_name,password_hash) VALUES ($1,$2,$3) RETURNING *',[login+'-'+role,role==='manager'?'Gestor de prueba':'Consulta de prueba',passwordHash])).rows[0]!;
+  await query('INSERT INTO project_memberships (project_id,user_id,role) VALUES ($1,$2,$3)',[projectId,user.id,role]);if(role==='manager')manager=user;
+}
+const options:SupervisionOptions={database,trelloCredentials:{key:'k'.repeat(32),token:'t'.repeat(64)},githubToken:null,fetcher};
+const pair=await generateKeyPair('RS256');let providerNonce='';
+const providerFetcher:typeof fetch=async(input,request)=>{
+  const url=new URL(String(input));
+  if(url.hostname==='auth.openai.com')return Response.json({id_token:await new SignJWT({nonce:providerNonce}).setProtectedHeader({alg:'RS256',kid:'test'}).setIssuer('https://auth.openai.com').setAudience('oaiapp_ui').setSubject('ui-account').setIssuedAt().setExpirationTime('2 minutes').sign(pair.privateKey),access_token:'ui-secret',expires_in:3600,scope:'resource.invoke chatgpt.tokens.use.direct'});
+  if(url.pathname==='/v1/models')return Response.json({models:[{slug:'gpt-6.1-sol',display_name:'Modelo sintético de prueba',visibility:'list'}]});
+  const body=JSON.parse(String(request!.body));const data=JSON.parse(body.input[0].content);
+  if(data.recipient){expect(body.reasoning).toEqual({effort:'high'});const output=data.recipient==='executor'?syntheticContent(data):syntheticVerdict(data.recipient,data.contentHash);return new Response('data: '+JSON.stringify({type:'response.output_text.delta',delta:JSON.stringify(output)})+'\n\ndata: '+JSON.stringify({type:'response.completed',response:{usage:{input_tokens:50,output_tokens:30,total_tokens:80}}})+'\n\n');}
+  expect(body.reasoning).toEqual({effort:'xhigh'});const test=evaluationCases.find(value=>value.id===data.caseId)!;
+  const output={caseId:test.id,classification:test.classification,evidenceIds:test.evidence.map(value=>value.id),requiresHumanApproval:true,recommendation:'Revisar la evidencia con el gestor.',unknowns:['Causa y aceptación no informadas.']};
+  return new Response('data: '+JSON.stringify({type:'response.output_text.delta',delta:JSON.stringify(output)})+'\n\ndata: '+JSON.stringify({type:'response.completed',response:{usage:{input_tokens:50,output_tokens:30,total_tokens:80}}})+'\n\n');
+};
+const chatgpt=new ChatGPTService({database,callbackOrigin:'http://127.0.0.1:3133',fetcher:providerFetcher,identityKey:createLocalJWKSet({keys:[{...await exportJWK(pair.publicKey),kid:'test',alg:'RS256'}]})});
+const proposals=new ProposalService(database,chatgpt);
+await enqueueJob(database,projectId,manager!,'full',randomUUID());await executeJob(options,(await claimJob(database,projectId))!);
+const app=buildApp({checkDatabase:async()=>{},auth:{database,sessionSecret:randomBytes(48).toString('hex'),allowedOrigins:['http://127.0.0.1:3133'],secureCookies:false,trello:{database,credentials:options.trelloCredentials,fetcher},supervision:options,chatgpt,proposals}});
+await app.register(fastifyStatic,{root:fileURLToPath(new URL('../apps/web/dist/',import.meta.url))});
+await app.listen({host:'127.0.0.1',port:3133});
+const browser=await chromium.launch({headless:true});let pending:Promise<void>|null=null;
+const timer=setInterval(()=>{if(pending)return;pending=(async()=>{const job=await claimJob(database,projectId);if(job)await executeJob(options,job);})().finally(()=>{pending=null;});},500);
+try{
+  const context=await browser.newContext({viewport:{width:1280,height:900}}),page=await context.newPage();const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));
+  await page.goto('http://127.0.0.1:3133');await page.getByLabel('Usuario',{exact:true}).fill(login+'-manager');await page.getByLabel('Contraseña',{exact:true}).fill(password);await page.getByRole('button',{name:'Ingresar',exact:true}).click();
+  await expect(page.getByRole('heading',{name:'Supervisión e historial',exact:true})).toBeVisible();await expect(page.getByRole('heading',{name:'Resultado de supervisión',exact:true})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'ChatGPT y evaluación del proveedor',exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'Conectar con ChatGPT',exact:true}).click();
+  const loginLink=page.getByRole('link',{name:'Continue with ChatGPT',exact:true});await expect(loginLink).toBeVisible();
+  const providerUrl=new URL((await loginLink.getAttribute('href'))!);providerNonce=providerUrl.searchParams.get('nonce')!;
+  const callback=new URL(providerUrl.searchParams.get('redirect_uri')!);callback.search=new URLSearchParams({state:providerUrl.searchParams.get('state')!,code:'ui-code',client_id:'oaiapp_ui'}).toString();
+  await page.goto(callback.toString());await expect(page.getByRole('heading',{name:'ChatGPT conectado',exact:true})).toBeVisible();await page.goto('http://127.0.0.1:3133');
+  await expect(page.getByLabel('Modelo de tu cuenta',{exact:true})).toBeVisible();await expect(page.getByRole('button',{name:'Evaluar proveedor',exact:true})).toBeDisabled();
+  await page.locator('#provider-effort').selectOption('xhigh');
+  await page.getByRole('checkbox',{name:'Quiero enviar los seis casos sintéticos usando mi plan de ChatGPT.',exact:true}).check();await page.getByRole('button',{name:'Evaluar proveedor',exact:true}).click();
+  await expect(page.getByText('6 de 6',{exact:true})).toBeVisible({timeout:15000});await page.getByText('Ver casos y respuestas',{exact:true}).click();await expect(page.getByText('Revisar la evidencia con el gestor.',{exact:true}).first()).toBeVisible();
+  await page.getByText('Configuración del seguimiento',{exact:true}).click();
+  await page.getByLabel('Próximos vencimientos (horas)',{exact:true}).fill('24');await page.getByLabel('Lectura desactualizada después de (minutos)',{exact:true}).fill('120');await page.getByRole('button',{name:'Guardar configuración',exact:true}).click();
+  await expect(page.getByText('Configuración guardada. La evaluación se actualiza con los nuevos valores.',{exact:true})).toBeVisible();
+  await page.getByRole('checkbox',{name:'He revisado esta lectura y quiero conservarla como línea base del agente.',exact:true}).check();await page.getByRole('button',{name:'Confirmar nueva versión de línea base',exact:true}).click();
+  await expect(page.getByText(/Versión 1 confirmada por Gestor de prueba/)).toBeVisible();
+  const action=page.getByRole('button',{name:'Actualizar fuentes y analizar',exact:true});await action.click();
+  await expect.poll(async()=>Number((await query('SELECT count(*) FROM supervision_runs WHERE project_id=$1',[projectId])).rows[0].count),{timeout:15000}).toBe(2);
+  await expect(action).toBeEnabled({timeout:15000});
+  await expect(page.getByText(/Línea base: 1\./)).toBeVisible();
+  await page.getByText('Análisis recientes (2)',{exact:true}).click();await page.getByRole('button',{name:'Abrir análisis',exact:true}).last().click();await expect(page.getByText(/Línea base: Sin confirmar\./)).toBeVisible();
+  await page.getByRole('button',{name:'Mostrar último análisis',exact:true}).click();await expect(page.getByText(/Línea base: 1\./)).toBeVisible();
+  const proposalPanel=page.locator('.proposal-panel');
+  await proposalPanel.getByRole('button',{name:'Actualizar propuestas',exact:true}).click();
+  await proposalPanel.getByLabel('Modelo para los agentes',{exact:true}).selectOption('gpt-6.1-sol');
+  await proposalPanel.getByLabel('Nivel de razonamiento',{exact:true}).selectOption('high');
+  await proposalPanel.getByLabel('Objetivo y ajuste solicitado',{exact:true}).fill('Evaluar una nueva fecha objetivo sin prometer finalización.');
+  await expect(proposalPanel.getByText(/Inicio leído:/)).toBeVisible();
+  await proposalPanel.getByLabel('Nueva fecha objetivo (hora de este dispositivo)',{exact:true}).fill(new Date(Date.now()+86400_000).toISOString().slice(0,16));
+  await expect(proposalPanel.getByText('La nueva fecha no puede ser anterior al inicio registrado.',{exact:true})).toBeVisible();
+  await proposalPanel.getByLabel('Nueva fecha objetivo (hora de este dispositivo)',{exact:true}).fill(new Date(Date.now()+7*86400_000).toISOString().slice(0,16));
+  await proposalPanel.getByRole('checkbox',{name:/Quiero enviar a ChatGPT el objetivo/}).check();
+  await proposalPanel.getByRole('button',{name:'Iniciar los tres agentes',exact:true}).click();
+  await expect(proposalPanel.getByRole('heading',{name:'Decisión del gestor sobre la versión 1',exact:true})).toBeVisible({timeout:15000});
+  await proposalPanel.getByLabel('Motivo de la decisión (obligatorio para rechazo o ajustes)',{exact:true}).fill('Precisar el objetivo antes de autorizar.');
+  await proposalPanel.getByRole('button',{name:'Solicitar ajustes',exact:true}).click();
+  await expect(proposalPanel.getByRole('button',{name:'Usar esta propuesta como base del ajuste',exact:true})).toBeVisible();
+  await proposalPanel.getByRole('button',{name:'Usar esta propuesta como base del ajuste',exact:true}).click();
+  await proposalPanel.getByLabel('Objetivo y ajuste solicitado',{exact:true}).fill('Aclarar la propuesta y conservar la fecha como alternativa.');
+  await proposalPanel.getByRole('checkbox',{name:/Quiero enviar a ChatGPT el objetivo/}).check();
+  await proposalPanel.getByRole('button',{name:'Preparar nueva versión',exact:true}).click();
+  await expect(proposalPanel.getByRole('heading',{name:'Decisión del gestor sobre la versión 2',exact:true})).toBeVisible({timeout:15000});
+  await proposalPanel.getByRole('checkbox',{name:/He revisado esta versión y autorizo/}).check();
+  await proposalPanel.getByRole('button',{name:'Aprobar esta versión',exact:true}).click();
+  await expect(proposalPanel.getByText('El gestor autorizó esta versión. Ninguna acción se ha ejecutado en Trello.',{exact:true})).toBeVisible();
+  await proposalPanel.getByLabel('Versión conservada',{exact:true}).selectOption('1');
+  await expect(proposalPanel.getByRole('heading',{name:'Detalle de propuesta · Versión 1',exact:true})).toBeVisible();
+  await expect(proposalPanel.getByRole('button',{name:'Aprobar esta versión',exact:true})).toHaveCount(0);
+  await proposalPanel.getByLabel('Versión conservada',{exact:true}).selectOption('2');
+  const output=process.env.UI_ARTIFACT_DIR??fileURLToPath(new URL('../work/ui/',import.meta.url));await mkdir(output,{recursive:true});
+  await page.getByText('Ver casos y respuestas',{exact:true}).click();
+  await page.screenshot({path:output+'/supervision-light.png',fullPage:true});await page.getByRole('button',{name:'Cambiar a modo oscuro',exact:true}).click();await page.screenshot({path:output+'/supervision-dark.png',fullPage:true});
+  await page.setViewportSize({width:390,height:844});await page.screenshot({path:output+'/supervision-mobile.png',fullPage:true});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
+  await page.locator('.provider-panel').screenshot({path:output+'/provider-mobile.png'});
+  await proposalPanel.screenshot({path:output+'/proposals-mobile.png'});
+  await page.setViewportSize({width:1280,height:900});await proposalPanel.screenshot({path:output+'/proposals-dark.png'});
+  await page.getByRole('button',{name:'Cerrar sesión',exact:true}).click();await page.getByLabel('Usuario',{exact:true}).fill(login+'-viewer');await page.getByLabel('Contraseña',{exact:true}).fill(password);await page.getByRole('button',{name:'Ingresar',exact:true}).click();
+  await expect(page.getByRole('heading',{name:'Supervisión e historial',exact:true})).toBeVisible();await expect(page.getByRole('button',{name:'Actualizar fuentes y analizar',exact:true})).toHaveCount(0);await expect(page.getByRole('button',{name:'Confirmar nueva versión de línea base',exact:true})).toHaveCount(0);
+  await expect(page.getByRole('button',{name:'Conectar con ChatGPT',exact:true})).toHaveCount(0);await expect(page.getByText('6 de 6',{exact:true})).toBeVisible();
+  await page.getByText('Configuración del seguimiento',{exact:true}).click();await expect(page.getByText(/Solo el gestor puede modificar estos valores/)).toBeVisible();expect(errors).toEqual([]);
+  console.log('UI verified: synthetic ChatGPT connection, model and reasoning selection, consent, evaluation history, three-agent proposals, adjustments, version history, manager authorization, manager supervision, policy save, baseline, light/dark themes, mobile layout, viewer restrictions and no browser errors.');
+}catch(error){
+  const page=browser.contexts()[0]?.pages()[0]; if(page)console.log((await page.locator('body').innerText()).slice(0,4000)); throw error;
+}finally{
+  clearInterval(timer);await pending;await browser.close();await chatgpt.close();await proposals.close();await app.close();await query('ROLLBACK');client.release();await pool.end();
+}
