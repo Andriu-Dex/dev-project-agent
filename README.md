@@ -4,7 +4,7 @@ Assistant for the UTAPED project manager: planning supervision, Trello integrati
 
 ## Status
 
-Implementation started on October 7, 2026. Academic deadline: November 4, 2026. Four team members. The application includes a React dashboard with light/dark themes, Fastify service, shared contracts, local PostgreSQL, password authentication, persistent sessions, project permissions, read-only Trello/GitHub synchronization, deterministic tracking, baseline confirmation, persistent supervision jobs, frozen analysis history, renewable encrypted ChatGPT access, synthetic provider evaluations, model reasoning selection, sequential proposal agents, immutable versions and manager decisions. Bounded code review and simulated GitHub publication are implemented. Weekly reports include configurable scheduling, missed-cutoff recovery, frozen versions, deterministic publication checks and printable A4 output. Controlled Trello execution is tested with synthetic requests; real writes remain disabled. Demonstrations are permanently non-executable. See [implementation status](docs/implementation-status.md) for verified scope and remaining work.
+Implementation started on October 7, 2026. Academic deadline: November 4, 2026. Four team members. The local application now includes an eight-page responsive workspace, light/dark themes, project permissions, read-only Trello/GitHub synchronization, configurable tracking mappings and thresholds, durable source/code schedules, baseline comparisons, persistent alerts with causes and alternatives, and correlated history. Sequential proposal agents support dates, priorities, assignments and declared states with immutable versions and manager decisions. Bounded code review includes a versioned six-category TS/Java criterion catalog and controlled GitHub branch/draft-PR publication with human integration. Weekly reports preserve historical sources, risks, decisions and results, with scheduling, recovery and printable A4 output. ChatGPT access is encrypted and renewable. Real writes and production schedules remain disabled; transport tests are synthetic and demonstrations are permanently non-executable. Final representative academic acceptance is pending. See [implementation status](docs/implementation-status.md) and the [operator guide](docs/first-release-guide.md).
 
 Repository: https://github.com/Andriu-Dex/dev-project-agent
 
@@ -38,7 +38,11 @@ Local supervised checkout: C:\Documentos\D-Proyectos\Git\utaped.
 - [AI provider validation](docs/provider-validation.md)
 - [Renewable ChatGPT access](docs/renewable-access.md)
 - [Weekly reports and printing](docs/weekly-reports.md)
-- [Code review and simulated publication](docs/code-review.md)
+- [Code review and corrections](docs/code-review.md)
+- [Versioned code review criteria](docs/code-standard-catalog.md)
+- [Controlled GitHub publication and recovery](docs/github-publication.md)
+- [Scheduled operations and alerts](docs/project-operations.md)
+- [Installation and operator guide](docs/first-release-guide.md)
 - [Git conventions](docs/git-conventions.md)
 - [Standards and quality criteria](docs/standards-and-quality.md)
 - [Reports and operations](docs/reports-and-operations.md)
@@ -60,7 +64,7 @@ Local supervised checkout: C:\Documentos\D-Proyectos\Git\utaped.
 
 The fourth export was validated: 25 activities and six milestones, with 14 activities declared complete (56%). All six milestones have a due time of 17:00 and no native start, consistent with their descriptions. Steven and the branch workflow are confirmed.
 
-Standards, report format, frequencies, priority, and blocking defaults are documented as proposals in docs/reports-and-operations.md. Review remaining proposed values before implementation. Provider validation and dependency compatibility remain technical checks for implementation.
+Tracking thresholds, label mappings and schedules are configurable and versioned. Complete the 39 academic acceptance criteria with representative UTAPED evidence, observe scheduled runs and real credential renewal, and validate external writes only on specifically authorized resources with fresh approvals. Java compilation and complete project builds/tests are outside the isolated reviewer; record their results separately. No ISO certification, automatic merge, hosted 24/7 operation, or multi-organization SaaS is claimed.
 
 ## Repository preparation
 
@@ -83,9 +87,9 @@ npm run dev
 
 Dashboard: http://127.0.0.1:5174. Service: http://127.0.0.1:3100/api/v1/health. PostgreSQL uses loopback port 15434 and its own named volume. Existing UTAPED services are not reused or modified.
 
-setup preserves existing .env values and appends missing session settings. If credentials change after database initialization, they must be rotated in PostgreSQL too; changing .env does not update existing roles. Do not remove the volume to repair credentials or reset data without reviewing what would be lost. Restart the service after changing environment settings.
+setup preserves existing .env values, appends missing settings with writes disabled, and restricts credential-file permissions to the current user, system and administrators on Windows (mode 600 on other platforms). If credentials change after database initialization, they must be rotated in PostgreSQL too; changing .env does not update existing roles. Do not remove the volume to repair credentials or reset data without reviewing what would be lost. Restart the service after changing environment settings.
 
-Checks: npm run typecheck, npm test, npm run test:db, npm run test:auth-db, and npm run build. Database checks use rollback to avoid persisting test records. Authentication integration tests require the local migrated database and are skipped by the regular unit-test command. Build and run the dashboard/service together with npm run build followed by npm start at http://127.0.0.1:3100.
+Checks: npm run typecheck, npm test, npm run test:db, and npm run build. Run all PostgreSQL suites: test:auth-db, test:trello-db, test:supervision-db, test:provider-db, test:proposals-db, test:executions-db, test:code-db, test:renewal-db, test:reports-db, and test:operations-db. Run npm run test:ui for manager/viewer workflows, synthetic execution/publication, alerts, scheduled settings, report printing and responsive themes. Database checks use rollback to avoid persisting test records. Authentication integration tests require the local migrated database and are skipped by the regular unit-test command. Build and run the dashboard/service together with npm run build followed by npm start at http://127.0.0.1:3100.
 
 Stop local development with Ctrl+C; stop this database with npm run db:stop. All interfaces are local only. Remote deployment, HTTPS termination, and distributed rate limiting remain outside this local milestone.
 

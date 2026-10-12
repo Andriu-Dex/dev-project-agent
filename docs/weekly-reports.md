@@ -1,5 +1,7 @@
 # Reportes semanales implementados
 
+Actualización del 12 de octubre de 2026: el corte usa mapeos de seguimiento históricos y estados declarados coherentes; incorpora causas documentadas/confirmadas, impacto contextual, alternativas y recomendaciones concretas. Conserva eventos de publicación GitHub diferenciados de simulación e integración humana. El formato tiene nueve secciones principales y un anexo de trazabilidad/revisión. Véanse [guía operativa](first-release-guide.md) y [estado de implementación](implementation-status.md) para evidencia y límites.
+
 Fecha: 11 de octubre de 2026. Primera entrega de REQ-06, integrada con seguimiento, revisión de código y auditoría. La plantilla propia sigue las referencias orientativas de [normas y calidad](standards-and-quality.md); no atribuye cláusulas ISO ni declara certificación.
 
 ## Programación y recuperación

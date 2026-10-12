@@ -17,7 +17,7 @@ Huella SHA-256 de F-01: `c1d9af9fcd399c5f9a995d221a78df0c1be1cc184b0e69ff2206fc2
 
 La descomposición contiene **39 puntos**: 37 del detalle de las páginas 1-3, incluida la secuencia general, y dos exigencias adicionales de la matriz de la página 5 (trazabilidad y seguridad). Los otros nueve REQ resumen puntos del detalle y se cruzan al final sin volver a contarlos. Un punto que contiene varios campos o categorías exige comprobarlos todos.
 
-Cada fila tiene un criterio `AC-<número>` con el mismo número que `PDF-<número>`. Todos están **pendientes de aceptación final**. La columna de estado describe cobertura técnica actual:
+Cada fila tiene un criterio `AC-<número>` con el mismo número que `PDF-<número>`. Todos están **pendientes de aceptación final**. La columna de estado conserva el diagnóstico de la base `7880678` anterior al desarrollo; la actualización técnica del 12 de octubre se registra al final:
 
 - **Base**: existe una función y verificación previa pertinente; falta confirmar el criterio completo en la validación final.
 - **Parcial**: existe parte de la función, pero hay una brecha concreta de alcance o integración.
@@ -217,4 +217,26 @@ Las pruebas reales de escritura requieren acordar recurso de prueba, cambio exac
 
 **Condición de terminado:** los 39 AC, las ocho aclaraciones CLASS y las siete condiciones USER tienen evidencia de cierre; los once REQ quedan evaluados sin brechas pendientes; errores bloqueantes resueltos; manual y demostración reproducibles. No se promete ausencia absoluta de defectos ni cobertura de todo código futuro.
 
-En esta revisión solo se leyeron fuentes y archivos y se preparó documentación. El resultado es una matriz de alcance cerrada para planificar, con aceptación todavía pendiente; no una certificación de cumplimiento ni una implementación nueva.
+La revisión inicial del 11 de octubre solo leyó fuentes y preparó esta matriz. El desarrollo posterior autorizado se registra a continuación, manteniendo la aceptación final pendiente.
+
+## Avance de implementación del 12 de octubre de 2026
+
+Se implementan los seis paquetes de cierre mediante navegación nueva, reglas configurables, programación durable, alertas/alternativas, acciones Trello ampliadas, catálogo de código y publicación GitHub controlada, consolidación de reportes e historial y [manual](first-release-guide.md). Esta tabla enlaza el software verificable con todos los AC; no reemplaza la evaluación final ni convierte los resultados sintéticos en aceptación real.
+
+| Criterios | Función y evidencia técnica actual | Comprobación final aún necesaria |
+| --- | --- | --- |
+| AC-1.01 a AC-1.05 | [Planificación](../apps/web/src/components/PlanningPage.tsx), [resumen](../apps/web/src/components/OverviewPage.tsx), política versionada de estados/prioridad/bloqueo y motor de avance/fechas. | Contrastar campos y universo con UTAPED y casos representativos. |
+| AC-2.01 a AC-2.03 | Lectura normalizada, diferencias entre snapshots, comparación de línea base con etiquetas y política común, [alertas](../apps/server/src/modules/operations/alerts.ts). | Confirmar lectura/permisos reales y cambios conocidos sin duplicados. |
+| AC-2.04, AC-2.05 | [Acciones tipadas](../apps/server/src/modules/proposals/actions.ts), tres dictámenes, valores previos/nuevos y [ejecución ampliada](trello-execution.md); 21 escenarios PostgreSQL. | Recursos de prueba y cambios reales específicos autorizados de cada familia. |
+| AC-3.01 | [Operación programada](project-operations.md), cola persistida, cortes/frescura, límites, reintentos y suspensión. | Observar trabajo real sin navegador y recuperación después de pausa. |
+| AC-3.02 a AC-3.04 | [Análisis contextual](../apps/server/src/modules/operations/risks.ts), causa declarada/hipótesis/confirmación humana, sucesoras y alternativas elegibles con navegación al formulario correcto. | Validar explicaciones y alternativas con datos representativos y revisión humana. |
+| AC-3.05, AC-3.06 | Versiones/decisiones inmutables, permisos y adaptadores con verificación y reconciliación. La demostración anterior sigue invalidada. | Reconstruir casos reales aprobados/rechazados y resultado de escritura autorizada. |
+| AC-4.01 a AC-4.05 | Programación semanal, fuentes/política congeladas, clasificaciones, línea base, causas/impacto, acciones GitHub/Trello y recomendaciones en [reportes](weekly-reports.md). | Observar corte automático y revisar contenido imprimible de un periodo representativo. |
+| AC-5.01, AC-5.02 | Lectura por commit/blob, cobertura por contenido entre commits y revisión diaria por lotes con presupuesto conservado y archivos pendientes/excluidos. Siete escenarios de operación. | Observar cambios reales en dos commits y confirmar exclusiones/cobertura. |
+| AC-5.03 a AC-5.05 | [Catálogo `utaped-review-v1`](code-standard-catalog.md), seis categorías con positivos/contraejemplos TS/Java, fuente citada, recomendaciones y revisión de candidatos. | Revisión humana representativa y comprobaciones del proyecto. Java no se compila por el agente; los patrones son señales acotadas. |
+| AC-5.06 | [Publicación controlada](github-publication.md), propósito real inmutable, aprobación/huella vigentes, intención durable, rama/PR exactos y reconciliación sin repetir POST. | Crear rama/PR de prueba autorizados; comprobar que la integración permanece humana. |
+| AC-6.01 a AC-6.04 | Secuencias explícitas de propuestas/código; preparación, revisión y dictamen deterministas del reporte, con procedencia y decisiones separadas. | Evaluar rechazos/ajustes representativos y reconstruir cada secuencia sin saltos. |
+| AC-7.01 a AC-7.06 | Ocho páginas, temas/móvil, alertas persistentes de retraso/bloqueo/desviación/dependencias, dictámenes, decisiones y confirmaciones separadas. | Recorrido del gestor/lector con evidencia real y evaluación de usabilidad. |
+| AC-8.01, AC-8.02 | Historial común y por módulo, auditoría/evidencia inmutables, CSRF/permisos/revocación, credenciales de escritura separadas, protección NTFS automática de `.env` y acceso ChatGPT cifrado. | Revalidar instalación final, secretos, mínimos permisos y renovación real; no se afirma cifrado en reposo de los tokens locales Trello/GitHub. |
+
+La verificación automatizada y visual se registra en [estado de implementación](implementation-status.md). Las fuentes originales y los 39 criterios se conservan; todos los AC/CLASS/USER permanecen pendientes de aceptación final hasta completar el guion con responsables y evidencias. No se realizaron escrituras externas ni se activaron programaciones reales en esta tanda.

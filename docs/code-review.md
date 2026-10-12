@@ -1,5 +1,7 @@
 # Revisión de código y correcciones
 
+Actualización del 12 de octubre de 2026: se incorpora el [catálogo versionado de criterios](code-standard-catalog.md), complejidad como sexta categoría y [publicación controlada GitHub](github-publication.md). El propósito real se elige al crear la corrección y permanece inmutable; las correcciones anteriores se conservan como demostración. La descripción de publicación solo simulada de la novena tanda es histórica. El entorno actual sigue sin habilitar escrituras reales. La [programación diaria](project-operations.md) comparte el servicio de revisión y conserva cobertura por contenido y archivos aplazados/excluidos.
+
 Implementación del 11 de octubre de 2026. Esta tanda añade revisión acotada de código, correcciones con tres agentes, decisiones del gestor y **simulación de publicación**. No hay adaptador de escritura en GitHub, endpoint para publicar realmente, cambios en el checkout de UTAPED ni integración automática. La aprobación de esta etapa autoriza una demostración local; no habilita una publicación futura.
 
 ## Recorrido del gestor

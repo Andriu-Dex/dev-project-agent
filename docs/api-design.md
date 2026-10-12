@@ -122,3 +122,20 @@ La octava tanda concreta las rutas y cuerpos de solicitudes, retirada y reconcil
 ## API implementada de revisión de código
 
 La novena tanda añade rutas bajo `/api/v1/projects/:projectId/code-review` para catálogo, análisis, correcciones versionadas, recuperación explícita, decisión humana, retirada y simulación. Los cuerpos, permisos y estados concretos se describen en [revisión de código](code-review.md#persistencia-y-api). No existe ruta de publicación real ni integración GitHub; aprobar solo habilita registrar una simulación local. Las declaraciones anteriores de funciones pendientes corresponden al estado histórico de cada tanda.
+
+## Ampliación implementada del 12 de octubre
+
+Las limitaciones de las tandas anteriores son históricas. Propuestas acepta **exactamente uno** de `requestedDue` o `requestedChange`. El segundo admite `{family:'dates',start,due}`, `{family:'members',memberIds}` o `{family:'priority'|'state',label}`. El servidor construye los valores previos y el alcance exacto desde fuentes/política verificadas, no desde afirmaciones del modelo. La ejecución usa una acción única y verificación completa. `purpose` de una nueva corrección de código admite `demonstration` o `live` y queda inmutable.
+
+Rutas nuevas relativas a `/api/v1/projects/:projectId`:
+
+| Método | Ruta | Uso |
+| --- | --- | --- |
+| GET / PUT | `/operations` | Consultar/versionar programación. PUT requiere `expectedVersion`, valores, gestor y consentimiento si incluye IA. |
+| GET | `/alerts` | Hasta 200 alertas y 200 eventos conservados. |
+| POST | `/alerts/:id/acknowledge` | Nota y `expectedSourceHash` obligatorios; `confirmedCause` opcional. Una fuente distinta devuelve conflicto; reconocer no aprueba cambios. |
+| GET | `/history` | Últimos 200 eventos de auditoría del proyecto. |
+| POST | `/code-review/proposals/:proposalId/versions/:version/publish` | Confirmación y trabajo de rama/PR aprobados; ver [contrato](github-publication.md#api-y-persistencia). |
+| POST | `/code-review/publications/:id/reconcile` | Solo consulta/verificación, sin repetir escrituras. |
+
+Las lecturas requieren sesión y pertenencia; las mutaciones requieren gestor, origen permitido y CSRF. Programación y publicación revalidan la autoridad persistida. No hay endpoint de merge. Límites y resultados inciertos se consultan en el trabajo conservado.

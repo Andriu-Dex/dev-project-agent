@@ -1,6 +1,6 @@
 # Ejecución controlada en Trello
 
-Implementación del 11 de octubre de 2026. Esta tanda implementa y prueba cambios de vencimiento sobre **una tarjeta**. La configuración del entorno real permanece desactivada; no se realizaron escrituras en UTAPED.
+Implementación inicial del 11 de octubre y ampliación del 12 de octubre de 2026. Se implementan cambios delimitados sobre **una tarjeta**: vencimiento; inicio y vencimiento; asignados; prioridad; estado declarado. La configuración del entorno real permanece desactivada; no se realizaron escrituras en UTAPED.
 
 ## Demostraciones y autorización
 
@@ -23,8 +23,12 @@ No se habilitaron estas opciones durante esta implementación. Una futura valida
 3. Verifica las versiones de política y línea base y el tablero/listas congelados. Mantiene bloqueos locales compartidos con sincronización, línea base y configuración durante la operación; no mantiene una transacción SQL abierta durante las peticiones de red.
 4. Consulta cuenta, tablero abierto y membresía de Trello; solo admite miembro `normal` o `admin`, sin desactivación o confirmación pendiente. El permiso de la membresía no demuestra por sí solo el alcance del token: Trello puede rechazar el PUT.
 5. Lee Trello de nuevo y normaliza la tarjeta. Compara identidad, lista, nombre, estado, fechas, WBS, archivo, clase, miembros, dependencias y `dueComplete` con la huella congelada. La fecha objetivo debe seguir siendo futura y coherente con el inicio. Un cambio en estos valores bloquea la ejecución y exige otra versión.
-6. Persiste `write_started_at` y evidencia previa **antes** de enviar exactamente un `PUT /1/cards/{id}` con cuerpo JSON `{due: <fecha aprobada>}`. El modelo no elige URL, método, credenciales ni otros campos. Las credenciales viajan en Authorization; se rechazan redirecciones y respuestas excesivas.
-7. Lee Trello después del PUT. Solo declara `executed` si observa la fecha aprobada y los demás valores relevantes siguen correspondiendo a la fuente. Un HTTP exitoso, por sí solo, no demuestra ejecución verificada.
+6. Persiste `write_started_at` y evidencia previa **antes** de enviar exactamente un `PUT /1/cards/{id}` con los campos de la familia aprobada. El modelo no elige URL, método, credenciales ni campos adicionales. Las credenciales viajan en Authorization; se rechazan redirecciones y respuestas excesivas.
+7. Lee Trello después del PUT. Solo declara `executed` si observa todos los valores aprobados y los demás valores relevantes siguen correspondiendo a la fuente. Un HTTP exitoso, por sí solo, no demuestra ejecución verificada.
+
+Las nuevas acciones se sellan en el contexto del servidor antes de pedir contenido a los agentes: fechas coherentes; asignados pertenecientes al tablero; etiquetas exactas configuradas para prioridad/estado. Una modificación de etiquetas conserva las ajenas a esa familia; estado incluye `dueComplete` coherente. El adaptador resuelve nombres a IDs sin ambigüedad y verifica nuevamente miembros/etiquetas del tablero. El cambio de asignados no reescribe el responsable principal de la descripción. La huella ahora incluye todas las etiquetas; propuestas antiguas pueden requerir otra versión al no coincidir con la fuente ampliada.
+
+Los cuerpos permitidos son `{due}`, `{start,due}`, `{idMembers}` o `{idLabels,dueComplete}` según acción exacta. La lectura posterior contrasta esos campos y restaura conceptualmente los valores previos para comprobar que el resto de la tarjeta no cambió. Se conservan los controles de resultado incierto y reconciliación sin repetir el PUT.
 
 ## Fallos y reconciliación
 

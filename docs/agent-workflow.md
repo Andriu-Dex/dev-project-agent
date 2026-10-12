@@ -1,5 +1,7 @@
 # Agentes, propuestas y decisiones implementados
 
+Actualización del 12 de octubre de 2026: además de vencimiento, se admiten inicio/fin, prioridad, asignados y estado mediante acciones tipadas y selladas por el servidor. Las alternativas de alertas abren la familia correspondiente; cada versión conserva fuente, acción exacta, tres dictámenes y decisión humana. Véanse [guía operativa](first-release-guide.md) y [ejecución ampliada](trello-execution.md). Las limitaciones de la primera tanda de este documento son históricas.
+
 Primera etapa del 11 de octubre de 2026. Complementa el diseño objetivo de [contratos](data-contracts.md) y [estados](proposal-workflow.md); no acredita todavía todas las operaciones previstas en esos documentos.
 
 ## Alcance disponible

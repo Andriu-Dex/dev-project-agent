@@ -67,4 +67,6 @@ Registrar actor humano o agente, fecha/hora, operación, fuente, versión, decis
 
 ## Información pendiente
 
+Actualización del 12 de octubre de 2026: las reglas de la primera versión ya se concretan en [guía operativa](first-release-guide.md), [operación programada](project-operations.md), [acciones Trello](trello-execution.md) y [publicación GitHub](github-publication.md). Umbrales, mapeos, intervalos y horarios se configuran por versión. Las programaciones reales y escrituras siguen desactivadas; aprobar contenido no ejecuta automáticamente. Los diagnósticos siguientes pertenecen a la planificación original.
+
 Se documentaron listas, etiquetas y dependencias en [la revalidación de Trello](trello-validation.md). Steven y su cuenta de gestor están confirmados; la cuarta exportación resuelve los hitos. El flujo de ramas ya fue confirmado. Normas, frecuencia, formato de reportes, prioridad/bloqueos y ausencia de caducidad temporal automática están concretados como propuestas en reports-and-operations.md y standards-and-quality.md. Los valores propuestos no se consideran aceptados solo por estar documentados. Otros perfiles siguen pendientes de vinculación segura durante implementación.
