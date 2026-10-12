@@ -50,6 +50,7 @@ Local supervised checkout: C:\Documentos\D-Proyectos\Git\utaped.
 - [Agent data contracts](docs/data-contracts.md)
 - [Proposal workflow](docs/proposal-workflow.md)
 - [Requirements and acceptance](docs/requirements.md)
+- [First-release academic acceptance matrix](docs/academic-acceptance-matrix.md)
 - [Architecture](docs/architecture.md)
 - [Business rules](docs/business-rules.md)
 - [Work plan](docs/work-plan.md)
