@@ -2,6 +2,7 @@ import type { SupervisionJob, SupervisionJobKind, SupervisionOverview, Supervisi
 import type { AuthDatabase, AuthUser } from '../auth/repository.js';
 import type { TrelloDatabase } from '../../integrations/trello/service.js';
 import { assertManager, SupervisionError } from './access.js';
+import {persistAlerts} from '../operations/alerts.js';
 interface JobRow {
   id:string;project_id:string;requested_by:string;requested_auth_version:number;request_key:string;kind:SupervisionJobKind;status:SupervisionJob['status'];
   created_at:Date;started_at:Date|null;finished_at:Date|null;attempt:number;error_code:string|null;run_id:string|null;lease_token:string;lease_expires_at:Date;
@@ -52,8 +53,11 @@ export async function finishJob(database:TrelloDatabase,job:ClaimedJob,status:'s
     await client.query('BEGIN');
     const current=await client.query("SELECT id FROM supervision_jobs WHERE id=$1 AND status='running' AND lease_token=$2 AND lease_expires_at>clock_timestamp() FOR UPDATE",[job.id,job.lease_token]);
     if(!current.rows.length) throw new SupervisionError('LEASE_LOST');
-    if(result) await client.query('INSERT INTO supervision_runs (project_id,job_id,status,trello_snapshot_id,github_snapshot_id,policy_version,baseline_version,result) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)',
-      [job.project_id,job.id,status==='succeeded'?'complete':'partial',result.trelloSnapshotId,result.githubSnapshotId,policyVersion,result.baselineVersion,JSON.stringify(result)]);
+    if(result) {
+      const saved=(await client.query<{id:string}>('INSERT INTO supervision_runs (project_id,job_id,status,trello_snapshot_id,github_snapshot_id,policy_version,baseline_version,result) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id',
+        [job.project_id,job.id,status==='succeeded'?'complete':'partial',result.trelloSnapshotId,result.githubSnapshotId,policyVersion,result.baselineVersion,JSON.stringify(result)])).rows[0]!;
+      await persistAlerts(client,job.project_id,saved.id,result,policyVersion);
+    }
     await client.query('UPDATE supervision_jobs SET status=$2,finished_at=clock_timestamp(),error_code=$3,lease_token=NULL,lease_expires_at=NULL WHERE id=$1',[job.id,status,errorCode]);
     await client.query('INSERT INTO audit_events (project_id,actor_type,actor_id,action,resource_type,resource_id,outcome) VALUES ($1,$2,$3,$4,$5,$6,$7)',[job.project_id,'system',null,'supervision.finish','supervision_job',job.id,status==='failed'?'failed':'succeeded']);
     await client.query('COMMIT');

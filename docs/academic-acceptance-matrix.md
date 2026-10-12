@@ -192,7 +192,7 @@ Frecuencias de lectura Trello 30 minutos, GitHub 60 minutos y análisis diario 1
 
 ## Paquetes de cierre y dependencias
 
-Una tanda grande puede implementar estos paquetes en secuencia y conservar commits revisables. La autorización actual cubre esta matriz documental; el inicio del desarrollo sigue suspendido por la instrucción del usuario.
+Una tanda grande puede implementar estos paquetes en secuencia y conservar commits revisables. El usuario autorizó iniciar el desarrollo y la mejora integral del frontend el 11 de octubre de 2026, después de cerrar esta matriz. Las escrituras externas siguen requiriendo una autorización específica.
 
 | Paquete | Trabajo | Criterios principales / dependencia |
 | --- | --- | --- |

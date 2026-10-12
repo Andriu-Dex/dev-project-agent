@@ -3,7 +3,8 @@ import type { SessionResponse, ProjectRole } from '@dev-project-agent/contracts'
 import {Workspace} from './Workspace';
 import {OverviewPage} from './OverviewPage';
 import {PlanningPage} from './PlanningPage';
-import {TrackingPanel} from './TrackingPanel';
+import {AlertsPage} from './AlertsPage';
+import {OperationsSettings} from './OperationsSettings';
 import {TrackingSettings} from './TrackingSettings';
 import { SupervisionPanel } from './SupervisionPanel';
 import { ProviderPanel } from './ProviderPanel';
@@ -85,11 +86,11 @@ export function SessionPanel() {
     const props={project,csrfToken:session.csrfToken};
     if(page==='overview')return <OverviewPage project={project}/>;
     if(page==='planning')return <PlanningPage key={sourceRevision} project={project}/>;
-    if(page==='alerts')return <section><TrackingPanel projectId={project.id} canManage={false} csrfToken={session.csrfToken} showSettings={false}/></section>;
+    if(page==='alerts')return <AlertsPage {...props}/>;
     if(page==='proposals')return <ProposalPanel {...props} sourceRevision={sourceRevision}/>;
     if(page==='code')return <CodeReviewPanel {...props}/>;
     if(page==='reports')return <ReportsPanel {...props}/>;
-    if(page==='operations')return <SupervisionPanel {...props} onCompleted={()=>setSourceRevision(value=>value+1)}/>;
+    if(page==='operations')return <><OperationsSettings {...props}/><SupervisionPanel {...props} onCompleted={()=>setSourceRevision(value=>value+1)}/></>;
     return <><ProviderPanel {...props}/><section><h2>Reglas del proyecto</h2><TrackingSettings projectId={project.id} canManage={project.canManageProject} csrfToken={session.csrfToken} onSaved={()=>setSourceRevision(value=>value+1)}/></section><section><h2>Equipo con acceso</h2>{memberError&&<p role="alert">{memberError}</p>}{members?<div className="member-grid">{members.map(member=><div className="member-card" key={member.id}><span className="profile-avatar">{member.displayName.slice(0,1)}</span><div><strong>{member.displayName}</strong><p className="muted">{member.role==='manager'?'Gestor':'Consulta'}</p></div></div>)}</div>:<p className="muted">{project.canManageProject?'Cargando equipo…':'La administración del equipo corresponde al gestor.'}</p>}</section></>;
   }}/>{error&&<div className="global-notice" role="alert">{error}</div>}</>;
   return <main className="login-layout"><div className="login-story"><a className="workspace-brand" href="#overview"><img src="/brand-logo.jpg" alt=""/><span>Dev Project Agent</span></a><div><p className="eyebrow">CLARIDAD PARA DECIDIR</p><h1>Tu proyecto,<br/>bajo control.</h1><p>Comprende el avance, anticipa los riesgos y revisa cada propuesta con evidencia.</p><div className="login-points"><p>01 <span>Planificación conectada con Trello</span></p><p>02 <span>Revisión de código y recomendaciones</span></p><p>03 <span>Decisiones humanas, trazabilidad completa</span></p></div></div><small>Dev Project Agent · Seguimiento de proyectos de software</small></div><div className="login-content"><section aria-labelledby="session-title">

@@ -11,9 +11,9 @@ interface PolicyRow {
   version: number; due_soon_hours: number; stale_after_minutes: number; confirmed: boolean;
   changed_at: Date; changed_by: string | null; display_name: string | null;
 }
-export async function readTrackingPolicy(database: AuthDatabase, projectId: string): Promise<TrackingPolicyResponse | null> {
+export async function readTrackingPolicy(database: AuthDatabase, projectId: string, version?: number): Promise<TrackingPolicyResponse | null> {
   const result = await database.query<PolicyRow>(
-    'SELECT p.*, u.display_name FROM tracking_policy_versions p LEFT JOIN users u ON u.id = p.changed_by WHERE p.project_id = $1 ORDER BY p.version DESC LIMIT 1', [projectId],
+    'SELECT p.*, u.display_name FROM tracking_policy_versions p LEFT JOIN users u ON u.id = p.changed_by WHERE p.project_id = $1 AND ($2::integer IS NULL OR p.version=$2) ORDER BY p.version DESC LIMIT 1', [projectId,version??null],
   );
   const row = result.rows[0];
   return row ? { priorityLabels: row.priority_labels, blockedLabels: row.blocked_labels, stateLabels: row.state_labels, version: row.version, dueSoonHours: row.due_soon_hours, staleAfterMinutes: row.stale_after_minutes, confirmed: row.confirmed,

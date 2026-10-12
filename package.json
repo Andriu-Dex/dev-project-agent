@@ -38,7 +38,8 @@
     "test:code-db": "node --env-file=.env scripts/test-code-review.mjs",
     "code:inspect": "node --env-file=.env --import tsx scripts/inspect-code.ts",
     "test:renewal-db": "node --env-file=.env scripts/test-renewal.mjs",
-    "test:reports-db": "node --env-file=.env scripts/test-reports.mjs"
+    "test:reports-db": "node --env-file=.env scripts/test-reports.mjs",
+    "test:operations-db": "node --env-file=.env scripts/test-operations.mjs"
   },
   "devDependencies": {
     "@inquirer/prompts": "8.7.3",

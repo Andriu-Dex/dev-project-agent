@@ -19,6 +19,7 @@ import {CodeReviewService} from '../apps/server/src/modules/code-review/service.
 import {codeSourceFetcher,syntheticCorrection,syntheticCodeVerdict} from '../apps/server/src/modules/code-review/fixtures.js';
 import {ProposalService} from '../apps/server/src/modules/proposals/service.js';
 import {ReportService} from '../apps/server/src/modules/reports/service.js';
+import {OperationService} from '../apps/server/src/modules/operations/service.js';
 import {syntheticContent,syntheticVerdict} from '../apps/server/src/modules/proposals/fixtures.js';
 import {evaluationCases} from '../apps/server/src/providers/chatgpt/evaluation.js';
 const pool=new pg.Pool({connectionString:process.env.DATABASE_URL,max:1}),client=await pool.connect();
@@ -72,7 +73,8 @@ let writeCalls=0;
 const executionFetcher:typeof fetch=async(input,request)=>{const url=new URL(String(input));expect(url.hostname).toBe('api.trello.com');if(request?.method==='PUT'){writeCalls++;expect(url.pathname).toBe('/1/cards/'+source.cards[0]!.id);const body=JSON.parse(String(request.body));expect(Object.keys(body)).toEqual(['due']);source.cards[0]!.due=body.due;return Response.json({id:source.cards[0]!.id,due:body.due});}if(url.pathname==='/1/members/me')return Response.json({id:source.members[0]!.id});if(url.pathname.endsWith('/memberships'))return Response.json([{idMember:source.members[0]!.id,memberType:'normal'}]);if(url.searchParams.get('fields')==='id,closed')return Response.json({id:boardId,closed:false});return fetcher(input,request);};
 const executions=new ExecutionService(database,{enabled:true,remote:trelloExecutionRemote(options.trelloCredentials!,executionFetcher)});
 await enqueueJob(database,projectId,manager!,'full',randomUUID());await executeJob(options,(await claimJob(database,projectId))!);
-const app=buildApp({checkDatabase:async()=>{},auth:{database,sessionSecret:randomBytes(48).toString('hex'),allowedOrigins:['http://127.0.0.1:3133'],secureCookies:false,trello:{database,credentials:options.trelloCredentials,fetcher},supervision:options,chatgpt,proposals,executions,codeReview,reports}});
+const operations=new OperationService(database,options,codeReview);
+const app=buildApp({checkDatabase:async()=>{},auth:{database,sessionSecret:randomBytes(48).toString('hex'),allowedOrigins:['http://127.0.0.1:3133'],secureCookies:false,trello:{database,credentials:options.trelloCredentials,fetcher},supervision:options,chatgpt,proposals,executions,codeReview,reports,operations}});
 await app.register(fastifyStatic,{root:fileURLToPath(new URL('../apps/web/dist/',import.meta.url))});
 await app.listen({host:'127.0.0.1',port:3133});
 const browser=await chromium.launch({headless:true});let pending:Promise<void>|null=null;

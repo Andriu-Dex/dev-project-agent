@@ -21,6 +21,7 @@ export function ProposalPanel({project,csrfToken,sourceRevision}:{project:Projec
   const [adjustment,setAdjustment]=useState<{id:string;version:number}|null>(null),[resumeConsent,setResumeConsent]=useState(false);
   const [consent,setConsent]=useState(false),[confirm,setConfirm]=useState(false),[reason,setReason]=useState(''),[revision,setRevision]=useState(0),[busy,setBusy]=useState(false),[error,setError]=useState(''),[loadError,setLoadError]=useState(''),[notice,setNotice]=useState('');
   const request=useRef<{signature:string;key:string}|null>(null);
+  useEffect(()=>{const key='proposal-suggestion:'+project.id,stored=sessionStorage.getItem(key);if(!stored)return;sessionStorage.removeItem(key);try{const value=JSON.parse(stored);if(typeof value.cardId==='string'&&typeof value.goal==='string'){setCardId(value.cardId);setGoal(value.goal.slice(0,4000));}}catch{/* Ignore invalid local drafts. */}},[project.id]);
   const load=useCallback(async(signal:AbortSignal)=>{
     const [next,connection,trello,supervision]=await Promise.all([read<ProposalOverview>(prefix+'/proposals',signal),read<ProviderOverview>(prefix+'/chatgpt',signal),read<TrelloOverview>(prefix+'/trello',signal),read<SupervisionOverview>(prefix+'/supervision',signal)]);
     if(signal.aborted)return;setOverview(next);setProvider(connection);setSources({trello,supervision});setLoadError('');

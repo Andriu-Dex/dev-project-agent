@@ -61,6 +61,10 @@ export class CodeReviewService {
     if(!consent)throw new CodeError('CONSENT_REQUIRED');if(!model)throw new CodeError('INVALID_REQUEST');
     const credentials=this.provider.connections.credentials(binding,model);if(effort&&!supportedEfforts(model).includes(effort))throw new CodeError('UNSUPPORTED_EFFORT');return credentials;
   }
+  async validateScheduledProvider(binding:ConnectionBinding,model:string,effort:ReasoningEffort|null) {
+    await assertManager(this.database,binding.projectId,{id:binding.userId,auth_version:binding.authVersion});
+    await this.provider.ensureConnection(binding);this.validateProvider(binding,model,effort,true);
+  }
   async analyze(binding:ConnectionBinding,actor:AuthUser,request:AnalysisRequest) {
     await assertManager(this.database,binding.projectId,actor);if(this.closed)throw new CodeError('SERVICE_CLOSED');
     if(request.withAi&&request.consent)await this.provider.ensureConnection(binding);
