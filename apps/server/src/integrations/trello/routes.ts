@@ -1,3 +1,4 @@
+import type { TrackingPolicyResponse } from '@dev-project-agent/contracts';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { AuthRepository, AuthUser } from '../../modules/auth/repository.js';
 import { readBoard, type TrelloCredentials } from './client.js';
@@ -43,8 +44,9 @@ export function registerTrelloRoutes(app: FastifyInstance, options: TrelloOption
     if (!context) return;
     return await readTrackingPolicy(options.database, context.project.id) ?? reply.code(404).send({ code: 'POLICY_NOT_CONFIGURED', message: 'Este proyecto no tiene configuración de seguimiento.' });
   });
-  app.put<{ Params: { projectId: string }; Body: { expectedVersion: number; dueSoonHours: number; staleAfterMinutes: number } }>('/projects/:projectId/tracking-policy', {
+  app.put<{ Params: { projectId: string }; Body: { expectedVersion: number; dueSoonHours: number; staleAfterMinutes: number } & Pick<TrackingPolicyResponse, 'priorityLabels' | 'blockedLabels' | 'stateLabels'> }>('/projects/:projectId/tracking-policy', {
     schema: { ...schema, body: { type: 'object', additionalProperties: false, required: ['expectedVersion', 'dueSoonHours', 'staleAfterMinutes'], properties: {
+      priorityLabels: { type: 'object', maxProperties: 50, additionalProperties: { type: 'string', enum: ['high','medium','low'] } }, blockedLabels: { type: 'array', maxItems: 50, uniqueItems: true, items: { type: 'string', minLength: 1, maxLength: 100 } }, stateLabels: { type: 'object', maxProperties: 50, additionalProperties: { type: 'string', enum: ['pending','in_progress','completed'] } },
       expectedVersion: { type: 'integer', minimum: 1 }, dueSoonHours: { type: 'integer', minimum: 1, maximum: 720 }, staleAfterMinutes: { type: 'integer', minimum: 1, maximum: 10080 },
     } } }, onRequest: [app.csrfProtection],
   }, async (request, reply) => {

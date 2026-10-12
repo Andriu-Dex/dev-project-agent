@@ -1,5 +1,5 @@
 import type { BaselineDeviation, DependencyFinding, TrelloSnapshot, TrelloItem, SupervisionResult, TrelloOverview, GitHubOverview, TrackingPolicyResponse } from '@dev-project-agent/contracts';
-import { evaluateTracking } from '../tracking/rules.js';
+import { mappedItem, evaluateTracking } from '../tracking/rules.js';
 import { evaluationPolicy } from '../tracking/policy.js';
 import { isDeepStrictEqual } from 'node:util';
 
@@ -61,7 +61,8 @@ export function baselineDeviations(baseline:TrelloSnapshot,current:TrelloSnapsho
 }
 export function analyzeSources(trello:TrelloOverview|null,github:GitHubOverview,configuration:TrackingPolicyResponse,baseline:{version:number;data:TrelloSnapshot}|null,now:Date):SupervisionResult {
   const tracking=trello?evaluateTracking(trello,now,evaluationPolicy(configuration)):null;
-  const source=trello?.latest;
+  const rawSource=trello?.latest;
+  const source=rawSource?{...rawSource,data:{...rawSource.data,items:rawSource.data.items.map(item=>mappedItem(item,evaluationPolicy(configuration)))}}:null;
   const dependencies=source?analyzeDependencies(source.data,now):[];
   const result:SupervisionResult={analysisVersion:'supervision-v1',evaluatedAt:now.toISOString(),trelloSnapshotId:source?.id??null,githubSnapshotId:github.latest?.id??null,baselineVersion:baseline?.version??null,
     tracking,dependencies,deviations:baseline&&source?baselineDeviations(baseline.data,source.data):[],code:github.latest?.data??null,

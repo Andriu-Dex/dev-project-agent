@@ -7,6 +7,7 @@ export interface TrackingPolicy {
   thresholdsConfirmed: boolean;
   priorityLabels: Record<string, 'high' | 'medium' | 'low'>;
   blockedLabels: string[];
+  stateLabels?: Record<string, 'pending' | 'in_progress' | 'completed'>;
 }
 const hour = 3_600_000;
 const rank: Record<AttentionLevel, number> = { immediate: 3, upcoming: 2, review: 1, none: 0 };
@@ -48,7 +49,7 @@ export function evaluateTracking(overview: TrelloOverview, evaluatedAt: Date, po
     lastAttemptFailed: overview.lastAttempt?.status === 'failed' };
   if (freshness !== 'recent') result.limitations.push('La fuente es histórica, desactualizada o tiene una fecha inválida. Los hallazgos no acreditan el estado actual de Trello.');
 
-  const operational = latest.data.items.filter(item => !item.archived && item.kind !== 'reference');
+  const operational = latest.data.items.filter(item => !item.archived && item.kind !== 'reference').map(item => mappedItem(item, policy));
   for (const item of operational) {
     const tracking = evaluateItem(item, now, policy, validSourceDate);
     result.items.push(tracking);
@@ -104,7 +105,7 @@ function evaluateItem(item: TrelloItem, now: number, policy: TrackingPolicy, val
   if (due !== null && start !== null && start > due) issues.add('invalid_schedule');
   if (item.state !== 'unknown' && (item.state === 'completed') !== item.dueComplete) issues.add('completion_conflict');
   if (blocked && item.state === 'completed') issues.add('completed_with_block');
-  const result: ItemTracking = { itemId: item.id, schedule: 'not_evaluable', attention: 'none', overdueHours: null,
+  const result: ItemTracking = { itemId: item.id, declaredState: item.state, schedule: 'not_evaluable', attention: 'none', overdueHours: null,
     priority: priorities.length === 1 ? priorities[0]! : null, blocked, qualityIssues: [] };
   const completionReliable = item.state !== 'unknown' && !issues.has('completion_conflict');
   if (validSourceDate && completionReliable) {
@@ -119,4 +120,11 @@ function evaluateItem(item: TrelloItem, now: number, policy: TrackingPolicy, val
   if (issues.size && result.attention === 'none') result.attention = 'review';
   result.qualityIssues = [...issues].sort();
   return result;
+}
+
+export function mappedItem(item: TrelloItem, policy: TrackingPolicy): TrelloItem {
+  if (!policy.stateLabels) return item;
+  const states = [...new Set(item.labelNames.flatMap(label => Object.hasOwn(policy.stateLabels!, label) ? [policy.stateLabels![label]!] : []))];
+  return { ...item, state: states.length === 1 ? states[0]! : 'unknown',
+    qualityIssues: item.qualityIssues.filter(issue => !['missing_state', 'conflicting_state', 'completion_conflict'].includes(issue)) };
 }

@@ -64,6 +64,9 @@ export interface TrelloOverview {
 
 export type AttentionLevel = 'immediate' | 'upcoming' | 'review' | 'none';
 export interface TrackingPolicyResponse {
+  priorityLabels?: Record<string, 'high' | 'medium' | 'low'>;
+  blockedLabels?: string[];
+  stateLabels?: Record<string, 'pending' | 'in_progress' | 'completed'>;
   version: number;
   dueSoonHours: number;
   staleAfterMinutes: number;
@@ -85,6 +88,7 @@ export interface TrackingFinding {
   impact: 'not_assessed';
 }
 export interface ItemTracking {
+  declaredState?: TrelloItem['state'];
   itemId: string;
   schedule: ScheduleStatus;
   attention: AttentionLevel;

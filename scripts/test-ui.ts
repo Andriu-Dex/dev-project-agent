@@ -80,21 +80,21 @@ const timer=setInterval(()=>{if(pending)return;pending=(async()=>{const job=awai
 try{
   const context=await browser.newContext({viewport:{width:1280,height:900}}),page=await context.newPage();const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));
   await page.goto('http://127.0.0.1:3133');await page.getByLabel('Usuario',{exact:true}).fill(login+'-manager');await page.getByLabel('Contraseña',{exact:true}).fill(password);await page.getByRole('button',{name:'Ingresar',exact:true}).click();
-  await expect(page.getByRole('heading',{name:'Supervisión e historial',exact:true})).toBeVisible();await expect(page.getByRole('heading',{name:'Resultado de supervisión',exact:true})).toBeVisible();
-  await expect(page.getByRole('heading',{name:'ChatGPT y evaluación del proveedor',exact:true})).toBeVisible();
+  await page.goto('http://127.0.0.1:3133/#operations');await expect(page.getByRole('heading',{name:'Supervisión e historial',exact:true})).toBeVisible();await expect(page.getByRole('heading',{name:'Resultado de supervisión',exact:true})).toBeVisible();
+  await page.goto('http://127.0.0.1:3133/#settings');await expect(page.getByRole('heading',{name:'ChatGPT y evaluación del proveedor',exact:true})).toBeVisible();
   await page.getByRole('button',{name:'Conectar con ChatGPT',exact:true}).click();
   const loginLink=page.getByRole('link',{name:'Continue with ChatGPT',exact:true});await expect(loginLink).toBeVisible();
   const providerUrl=new URL((await loginLink.getAttribute('href'))!);providerNonce=providerUrl.searchParams.get('nonce')!;
   const callback=new URL(providerUrl.searchParams.get('redirect_uri')!);callback.search=new URLSearchParams({state:providerUrl.searchParams.get('state')!,code:'ui-code',client_id:'oaiapp_ui'}).toString();
   await page.goto(callback.toString());await expect(page.getByRole('heading',{name:'ChatGPT conectado',exact:true})).toBeVisible();await page.goto('http://127.0.0.1:3133');
-  await expect(page.getByLabel('Modelo de tu cuenta',{exact:true})).toBeVisible();await expect(page.getByRole('button',{name:'Evaluar proveedor',exact:true})).toBeDisabled();
+  await page.getByRole('link',{name:'Configuración',exact:true}).click();await expect(page.getByLabel('Modelo de tu cuenta',{exact:true})).toBeVisible();await expect(page.getByRole('button',{name:'Evaluar proveedor',exact:true})).toBeDisabled();
   await page.locator('#provider-effort').selectOption('xhigh');
   await page.getByRole('checkbox',{name:'Quiero enviar los seis casos sintéticos usando mi plan de ChatGPT.',exact:true}).check();await page.getByRole('button',{name:'Evaluar proveedor',exact:true}).click();
   await expect(page.getByText('6 de 6',{exact:true})).toBeVisible({timeout:15000});await page.getByText('Ver casos y respuestas',{exact:true}).click();await expect(page.getByText('Revisar la evidencia con el gestor.',{exact:true}).first()).toBeVisible();
   await page.getByText('Configuración del seguimiento',{exact:true}).click();
   await page.getByLabel('Próximos vencimientos (horas)',{exact:true}).fill('24');await page.getByLabel('Lectura desactualizada después de (minutos)',{exact:true}).fill('120');await page.getByRole('button',{name:'Guardar configuración',exact:true}).click();
   await expect(page.getByText('Configuración guardada. La evaluación se actualiza con los nuevos valores.',{exact:true})).toBeVisible();
-  await page.getByRole('checkbox',{name:'He revisado esta lectura y quiero conservarla como línea base del agente.',exact:true}).check();await page.getByRole('button',{name:'Confirmar nueva versión de línea base',exact:true}).click();
+  await page.goto('http://127.0.0.1:3133/#operations');await page.getByRole('link',{name:'Operación',exact:true}).click();await page.getByRole('checkbox',{name:'He revisado esta lectura y quiero conservarla como línea base del agente.',exact:true}).check();await page.getByRole('button',{name:'Confirmar nueva versión de línea base',exact:true}).click();
   await expect(page.getByText(/Versión 1 confirmada por Gestor de prueba/)).toBeVisible();
   const action=page.getByRole('button',{name:'Actualizar fuentes y analizar',exact:true});await action.click();
   await expect.poll(async()=>Number((await query('SELECT count(*) FROM supervision_runs WHERE project_id=$1',[projectId])).rows[0].count),{timeout:15000}).toBe(2);
@@ -102,7 +102,7 @@ try{
   await expect(page.getByText(/Línea base: 1\./)).toBeVisible();
   await page.getByText('Análisis recientes (2)',{exact:true}).click();await page.getByRole('button',{name:'Abrir análisis',exact:true}).last().click();await expect(page.getByText(/Línea base: Sin confirmar\./)).toBeVisible();
   await page.getByRole('button',{name:'Mostrar último análisis',exact:true}).click();await expect(page.getByText(/Línea base: 1\./)).toBeVisible();
-  const proposalPanel=page.locator('.proposal-panel:not(.code-review-panel)');
+  await page.getByRole('link',{name:'Propuestas',exact:true}).click();const proposalPanel=page.locator('.proposal-panel:not(.code-review-panel)');
   await proposalPanel.getByRole('button',{name:'Actualizar propuestas',exact:true}).click();
   await proposalPanel.getByLabel('Modelo para los agentes',{exact:true}).selectOption('gpt-6.1-sol');
   await proposalPanel.getByLabel('Nivel de razonamiento',{exact:true}).selectOption('high');
@@ -143,7 +143,7 @@ try{
   await expect(proposalPanel.getByText('Resultado verificado',{exact:true})).toBeVisible({timeout:15000});await expect(proposalPanel.locator('.proposal-detail').getByText('Cambio verificado',{exact:true})).toBeVisible({timeout:15000});expect(writeCalls).toBe(1);
   await proposalPanel.getByText('Comprobaciones y evidencia de ejecución',{exact:true}).click();
   await expect(proposalPanel.getByText(/Verificación posterior · Superada/)).toBeVisible();
-  const codePanel=page.locator('.code-review-panel');
+  await page.getByRole('link',{name:'Código',exact:true}).click();const codePanel=page.locator('.code-review-panel');
   await codePanel.getByRole('button',{name:'Leer catálogo de GitHub',exact:true}).click();
   await codePanel.getByRole('checkbox',{name:/src\/parse.ts/}).check();
   await codePanel.getByRole('button',{name:'Analizar código seleccionado',exact:true}).click();
@@ -177,7 +177,7 @@ try{
   await codePanel.getByLabel('Motivo de la decisión sobre código',{exact:true}).fill('Demostración terminada.');await codePanel.getByRole('button',{name:'Retirar corrección',exact:true}).click();
   await expect(codePanel.getByRole('button',{name:'Simular publicación en GitHub',exact:true})).toHaveCount(0);
   const output=process.env.UI_ARTIFACT_DIR??fileURLToPath(new URL('../work/ui/',import.meta.url));await mkdir(output,{recursive:true});
-  const reportPanel=page.locator('.reports-panel');await reportPanel.getByText('Configurar programación semanal',{exact:true}).click();
+  await page.goto('http://127.0.0.1:3133/#reports');const reportPanel=page.locator('.reports-panel');await reportPanel.getByText('Configurar programación semanal',{exact:true}).click();
   await reportPanel.getByRole('checkbox',{name:'Activar generación semanal en este equipo',exact:true}).check();await reportPanel.getByRole('button',{name:'Guardar programación',exact:true}).click();
   await expect(reportPanel.getByText('Programación guardada. El servicio recuperará los cortes pendientes cuando esté encendido.',{exact:true})).toBeVisible();
   await reportPanel.getByRole('button',{name:'Generar reporte ahora',exact:true}).click();await expect(reportPanel.getByText('Publicado · validación automática',{exact:true}).last()).toBeVisible({timeout:15000});
@@ -186,22 +186,28 @@ try{
   expect(await printed.locator('body').innerText()).not.toMatch(/ui-secret|ui-refresh-secret/);await printed.screenshot({path:output+'/report-print.png',fullPage:true});await printed.pdf({path:output+'/weekly-report-test.pdf',preferCSSPageSize:true,printBackground:true});await printed.close();
   await reportPanel.getByRole('button',{name:'Preparar nueva versión del mismo periodo',exact:true}).click();await expect(reportPanel.getByRole('heading',{name:'Detalle del reporte · Versión 2',exact:true})).toBeVisible({timeout:15000});await expect(reportPanel.getByText('Publicado · validación automática',{exact:true}).last()).toBeVisible({timeout:15000});
   await reportPanel.screenshot({path:output+'/reports-light.png'});
-  await page.getByText('Ver casos y respuestas',{exact:true}).click();
-  await codePanel.screenshot({path:output+'/code-review-light.png'});await page.screenshot({path:output+'/supervision-light.png',fullPage:true});await page.getByRole('button',{name:'Cambiar a modo oscuro',exact:true}).click();await page.screenshot({path:output+'/supervision-dark.png',fullPage:true});
-  await page.setViewportSize({width:390,height:844});await page.screenshot({path:output+'/supervision-mobile.png',fullPage:true});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
-  await page.locator('.provider-panel').screenshot({path:output+'/provider-mobile.png'});
-  await reportPanel.screenshot({path:output+'/reports-mobile.png'});
-  await proposalPanel.screenshot({path:output+'/proposals-mobile.png'});await codePanel.screenshot({path:output+'/code-review-mobile.png'});
-  await page.setViewportSize({width:1280,height:900});await proposalPanel.screenshot({path:output+'/proposals-dark.png'});await codePanel.screenshot({path:output+'/code-review-dark.png'});await reportPanel.screenshot({path:output+'/reports-dark.png'});
+  for(const theme of ['light','dark']) {
+    if(theme==='dark')await page.locator('.theme-toggle').click();
+    for(const hash of ['overview','planning','alerts','proposals','code','reports','operations','settings']) {
+      await page.goto('http://127.0.0.1:3133/#'+hash);await expect(page.locator('.page-heading h1')).toBeVisible();
+      await page.waitForLoadState('networkidle');await page.screenshot({path:output+'/'+hash+'-'+theme+'.png',fullPage:true});
+    }
+  }
+  await page.setViewportSize({width:390,height:844});
+  for(const hash of ['overview','planning','proposals','code','reports','settings']) {
+    await page.goto('http://127.0.0.1:3133/#'+hash);await expect(page.locator('.page-heading h1')).toBeVisible();
+    await page.waitForLoadState('networkidle');await page.screenshot({path:output+'/'+hash+'-mobile.png',fullPage:true});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
+  }
+  await page.setViewportSize({width:1280,height:900});
   await page.getByRole('button',{name:'Cerrar sesión',exact:true}).click();await page.getByLabel('Usuario',{exact:true}).fill(login+'-viewer');await page.getByLabel('Contraseña',{exact:true}).fill(password);await page.getByRole('button',{name:'Ingresar',exact:true}).click();
-  await expect(page.getByRole('heading',{name:'Supervisión e historial',exact:true})).toBeVisible();await expect(page.getByRole('button',{name:'Actualizar fuentes y analizar',exact:true})).toHaveCount(0);await expect(page.getByRole('button',{name:'Confirmar nueva versión de línea base',exact:true})).toHaveCount(0);
-  await expect(page.getByRole('button',{name:'Conectar con ChatGPT',exact:true})).toHaveCount(0);await expect(page.getByText('6 de 6',{exact:true})).toBeVisible();
-  await expect(page.locator('.reports-panel').getByRole('button',{name:'Generar reporte ahora',exact:true})).toHaveCount(0);await expect(page.locator('.reports-panel').getByRole('button',{name:'Abrir reporte',exact:true}).first()).toBeVisible();
-  await page.getByText('Configuración del seguimiento',{exact:true}).click();await expect(page.getByText(/Solo el gestor puede modificar estos valores/)).toBeVisible();await expect(page.getByRole('button',{name:'Solicitar ejecución real',exact:true})).toHaveCount(0);await expect(page.getByRole('button',{name:'Retirar autorización',exact:true})).toHaveCount(0);await expect(page.locator('.code-review-panel').getByRole('button',{name:'Leer catálogo de GitHub',exact:true})).toHaveCount(0);await expect(page.locator('.code-review-panel').getByRole('heading',{name:'Simulación · Versión 2',exact:true})).toBeVisible();expect(errors).toEqual([]);
-  await page.getByRole('button',{name:'Cerrar sesión',exact:true}).click();await page.getByLabel('Usuario',{exact:true}).fill(login+'-manager');await page.getByLabel('Contraseña',{exact:true}).fill(password);await page.getByRole('button',{name:'Ingresar',exact:true}).click();await expect(page.getByLabel('Modelo de tu cuenta',{exact:true})).toBeVisible();await expect(page.getByText(/Renovación automática activa/)).toBeVisible();expect(errors).toEqual([]);
+  await page.goto('http://127.0.0.1:3133/#operations');await expect(page.getByRole('heading',{name:'Supervisión e historial',exact:true})).toBeVisible();await expect(page.getByRole('button',{name:'Actualizar fuentes y analizar',exact:true})).toHaveCount(0);await expect(page.getByRole('button',{name:'Confirmar nueva versión de línea base',exact:true})).toHaveCount(0);
+  await page.goto('http://127.0.0.1:3133/#settings');await expect(page.getByRole('button',{name:'Conectar con ChatGPT',exact:true})).toHaveCount(0);await expect(page.getByText('6 de 6',{exact:true})).toBeVisible();
+  await page.goto('http://127.0.0.1:3133/#reports');await expect(page.locator('.reports-panel').getByRole('button',{name:'Generar reporte ahora',exact:true})).toHaveCount(0);await expect(page.locator('.reports-panel').getByRole('button',{name:'Abrir reporte',exact:true}).first()).toBeVisible();
+  await page.goto('http://127.0.0.1:3133/#settings');await page.getByText('Configuración del seguimiento',{exact:true}).click();await expect(page.getByText(/Solo el gestor puede modificar estos valores/)).toBeVisible();await expect(page.getByRole('button',{name:'Solicitar ejecución real',exact:true})).toHaveCount(0);await expect(page.getByRole('button',{name:'Retirar autorización',exact:true})).toHaveCount(0);await page.goto('http://127.0.0.1:3133/#code');await expect(page.locator('.code-review-panel').getByRole('button',{name:'Leer catálogo de GitHub',exact:true})).toHaveCount(0);await expect(page.locator('.code-review-panel').getByRole('heading',{name:'Simulación · Versión 2',exact:true})).toBeVisible();expect(errors).toEqual([]);
+  await page.getByRole('button',{name:'Cerrar sesión',exact:true}).click();await page.getByLabel('Usuario',{exact:true}).fill(login+'-manager');await page.getByLabel('Contraseña',{exact:true}).fill(password);await page.getByRole('button',{name:'Ingresar',exact:true}).click();await page.goto('http://127.0.0.1:3133/#settings');await expect(page.getByLabel('Modelo de tu cuenta',{exact:true})).toBeVisible();await expect(page.getByText(/Renovación automática activa/)).toBeVisible();expect(errors).toEqual([]);
   console.log('UI verified: weekly schedule, frozen report versions, printable A4/PDF, renewed provider access after dashboard logout, code review and proposal workflows, controlled synthetic execution, viewer restrictions, light/dark themes, mobile layout and no browser errors.');
 }catch(error){
-  const page=browser.contexts()[0]?.pages()[0]; if(page)console.log((await page.locator('.reports-panel').innerText()).slice(0,4000)); throw error;
+  const page=browser.contexts()[0]?.pages()[0]; if(page)console.log((await page.locator('body').innerText()).slice(-4000)); throw error;
 }finally{
   clearInterval(timer);await pending;await browser.close();await chatgpt.close();await proposals.close();await executions.close();await codeReview.close();await app.close();await query('ROLLBACK');client.release();await pool.end();
 }

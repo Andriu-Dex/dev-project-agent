@@ -1,6 +1,10 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import type { SessionResponse, ProjectRole } from '@dev-project-agent/contracts';
-import { TrelloPanel } from './TrelloPanel';
+import {Workspace} from './Workspace';
+import {OverviewPage} from './OverviewPage';
+import {PlanningPage} from './PlanningPage';
+import {TrackingPanel} from './TrackingPanel';
+import {TrackingSettings} from './TrackingSettings';
 import { SupervisionPanel } from './SupervisionPanel';
 import { ProviderPanel } from './ProviderPanel';
 import {CodeReviewPanel} from './CodeReviewPanel';
@@ -77,7 +81,18 @@ export function SessionPanel() {
     }
   }
 
-  return <><section aria-labelledby="session-title">
+  if(session?.authenticated&&session.project)return <><Workspace session={session} logout={()=>void submit()} render={(page,project)=>{
+    const props={project,csrfToken:session.csrfToken};
+    if(page==='overview')return <OverviewPage project={project}/>;
+    if(page==='planning')return <PlanningPage key={sourceRevision} project={project}/>;
+    if(page==='alerts')return <section><TrackingPanel projectId={project.id} canManage={false} csrfToken={session.csrfToken} showSettings={false}/></section>;
+    if(page==='proposals')return <ProposalPanel {...props} sourceRevision={sourceRevision}/>;
+    if(page==='code')return <CodeReviewPanel {...props}/>;
+    if(page==='reports')return <ReportsPanel {...props}/>;
+    if(page==='operations')return <SupervisionPanel {...props} onCompleted={()=>setSourceRevision(value=>value+1)}/>;
+    return <><ProviderPanel {...props}/><section><h2>Reglas del proyecto</h2><TrackingSettings projectId={project.id} canManage={project.canManageProject} csrfToken={session.csrfToken} onSaved={()=>setSourceRevision(value=>value+1)}/></section><section><h2>Equipo con acceso</h2>{memberError&&<p role="alert">{memberError}</p>}{members?<div className="member-grid">{members.map(member=><div className="member-card" key={member.id}><span className="profile-avatar">{member.displayName.slice(0,1)}</span><div><strong>{member.displayName}</strong><p className="muted">{member.role==='manager'?'Gestor':'Consulta'}</p></div></div>)}</div>:<p className="muted">{project.canManageProject?'Cargando equipo…':'La administración del equipo corresponde al gestor.'}</p>}</section></>;
+  }}/>{error&&<div className="global-notice" role="alert">{error}</div>}</>;
+  return <main className="login-layout"><div className="login-story"><a className="workspace-brand" href="#overview"><img src="/brand-logo.jpg" alt=""/><span>Dev Project Agent</span></a><div><p className="eyebrow">CLARIDAD PARA DECIDIR</p><h1>Tu proyecto,<br/>bajo control.</h1><p>Comprende el avance, anticipa los riesgos y revisa cada propuesta con evidencia.</p><div className="login-points"><p>01 <span>Planificación conectada con Trello</span></p><p>02 <span>Revisión de código y recomendaciones</span></p><p>03 <span>Decisiones humanas, trazabilidad completa</span></p></div></div><small>Dev Project Agent · Seguimiento de proyectos de software</small></div><div className="login-content"><section aria-labelledby="session-title">
     <h2 id="session-title">{session?.authenticated ? 'Tu proyecto' : 'Iniciar sesión'}</h2>
     {error && <p role="alert" className="form-error">{error}</p>}
     {!session && (error
@@ -137,13 +152,6 @@ export function SessionPanel() {
       <button disabled={busy} onClick={() => void submit()}>{busy ? 'Cerrando sesión…' : 'Cerrar sesión'}</button>
     </>}
   </section>
-    {session?.authenticated && session.project && <>
-      <ProviderPanel key={'provider:'+session.project.id} project={session.project} csrfToken={session.csrfToken}/>
-      <SupervisionPanel key={session.project.id} project={session.project} csrfToken={session.csrfToken} onCompleted={()=>setSourceRevision(value=>value+1)}/>
-      <ProposalPanel key={'proposals:'+session.project.id} project={session.project} csrfToken={session.csrfToken} sourceRevision={sourceRevision}/>
-      <CodeReviewPanel key={'code:'+session.project.id} project={session.project} csrfToken={session.csrfToken}/>
-      <ReportsPanel key={'reports:'+session.project.id} project={session.project} csrfToken={session.csrfToken}/>
-      <TrelloPanel key={`${session.project.id}:${sourceRevision}`} project={session.project} csrfToken={session.csrfToken} />
-    </>}
-  </>;
+
+  </div></main>;
 }

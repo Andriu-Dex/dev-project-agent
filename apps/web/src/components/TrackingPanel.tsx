@@ -23,7 +23,7 @@ function evidenceValue(field: string, value: string | boolean | string[] | null)
   return field === 'state' ? states[value] ?? value : value;
 }
 
-export function TrackingPanel({ projectId, canManage, csrfToken }: { projectId: string; canManage: boolean; csrfToken: string }) {
+export function TrackingPanel({ projectId, canManage, csrfToken, showSettings=true }: { projectId: string; canManage: boolean; csrfToken: string; showSettings?:boolean }) {
   const [data, setData] = useState<TrackingResponse | null>(null);
   const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
@@ -49,7 +49,7 @@ export function TrackingPanel({ projectId, canManage, csrfToken }: { projectId: 
   const findings = data?.findings.filter(item => filter === 'all' || item.attention === filter) ?? [];
   return <div className="tracking-panel" aria-labelledby="tracking-title">
     <h3 id="tracking-title">Retrasos y riesgos de seguimiento</h3>
-    <TrackingSettings projectId={projectId} canManage={canManage} csrfToken={csrfToken} onSaved={() => setAttempt(value => value + 1)} />
+    {showSettings&&<TrackingSettings projectId={projectId} canManage={canManage} csrfToken={csrfToken} onSaved={() => setAttempt(value => value + 1)} />}
     {error && <p role="alert" className="form-error">{error} {data && 'La evaluación mostrada corresponde al corte anterior.'}</p>}
     {!data && !error && <p role="status">Evaluando la lectura guardada…</p>}
     <button onClick={() => setAttempt(value => value + 1)}>Reevaluar datos guardados</button>

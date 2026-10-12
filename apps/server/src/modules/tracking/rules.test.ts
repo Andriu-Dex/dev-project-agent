@@ -17,6 +17,14 @@ const source = (items: TrelloItem[]): TrelloOverview => ({
 });
 
 describe('Deterministic tracking rules', () => {
+  it('applies explicit state, priority and blocking mappings without rewriting the source', () => {
+    const input=source([item({state:'unknown',labelNames:['DONE','URGENT'],dueComplete:true,qualityIssues:['missing_state']}),item({labelNames:['TODO','STOP'],due:'2026-10-09T17:00:00Z'})]);
+    const result=evaluateTracking(input,now,{...initialTrackingPolicy,stateLabels:{DONE:'completed',TODO:'pending'},priorityLabels:{URGENT:'high'},blockedLabels:['STOP']});
+    expect(result.summary?.progress.percent).toBe(50);expect(result.items[0]).toMatchObject({declaredState:'completed',priority:'high',schedule:'completed_declared',qualityIssues:[]});
+    expect(result.items[1]).toMatchObject({blocked:true,schedule:'overdue'});expect(input.latest?.data.items[0]?.state).toBe('unknown');
+    const contradictory=evaluateTracking(source([item({labelNames:['TODO','DONE'],dueComplete:true})]),now,{...initialTrackingPolicy,stateLabels:{DONE:'completed',TODO:'pending'}});
+    expect(contradictory.items[0]).toMatchObject({declaredState:'unknown',schedule:'not_evaluable'});
+  });
   it('uses strict overdue and inclusive due-soon boundaries', () => {
     for (const [due, expected] of [
       ['2026-10-10T16:59:59.999Z', 'overdue'], ['2026-10-10T17:00:00Z', 'due_soon'],
