@@ -6,12 +6,13 @@ import {readCodeCatalog} from '../../integrations/github/code-client.js';
 import type {SupervisionOptions} from '../supervision/worker.js';
 import {enqueueJob} from '../supervision/jobs.js';
 import {assertManager} from '../supervision/access.js';
+import {OperationError} from './errors.js';
+export {OperationError} from './errors.js';
 
 export interface OperationConfiguration {version:number;enabled:boolean;intervalMinutes:number;codeEnabled:boolean;codeHour:number;codeWithAi:boolean;model:string|null;reasoningEffort:string|null;consent:boolean;maxFiles:number}
 interface ConfigurationRow {project_id:string;version:number;enabled:boolean;interval_minutes:number;code_enabled:boolean;code_hour:number;code_with_ai:boolean;model:string|null;reasoning_effort:string|null;consent:boolean;max_files:number;changed_by:string;auth_version:number}
 const view=(row:ConfigurationRow):OperationConfiguration=>({version:row.version,enabled:row.enabled,intervalMinutes:row.interval_minutes,codeEnabled:row.code_enabled,codeHour:row.code_hour,codeWithAi:row.code_with_ai,model:row.model,reasoningEffort:row.reasoning_effort,consent:row.consent,maxFiles:row.max_files});
 export const initialOperations:OperationConfiguration={version:0,enabled:false,intervalMinutes:60,codeEnabled:false,codeHour:18,codeWithAi:false,model:null,reasoningEffort:null,consent:false,maxFiles:64};
-export class OperationError extends Error {constructor(readonly code:string){super('Operation request failed.');}}
 export function nextDaily(now:Date,hour:number) {
   // Ecuador has a fixed UTC-05 offset. The configured wall-clock hour is converted explicitly.
   const candidate=new Date(now.getTime()-5*3_600_000);candidate.setUTCHours(hour+5,0,0,0);
@@ -30,7 +31,7 @@ export class OperationService {
     return {configuration:row?view(row):initialOperations,cursor,runs,timeZone:'America/Guayaquil',writesEnabled:false};
   }
   async configure(projectId:string,actor:AuthUser,values:Omit<OperationConfiguration,'version'>&{expectedVersion:number}) {
-    if(!Number.isInteger(values.intervalMinutes)||values.intervalMinutes<5||values.intervalMinutes>10080||!Number.isInteger(values.codeHour)||values.codeHour<0||values.codeHour>23||!Number.isInteger(values.maxFiles)||values.maxFiles<1||values.maxFiles>100||values.codeWithAi&&(!values.consent||!values.model)||values.model&& !/^[a-zA-Z0-9._-]{1,100}$/.test(values.model)||values.reasoningEffort&&!['low','medium','high','xhigh','max','ultra'].includes(values.reasoningEffort))throw new OperationError('INVALID_REQUEST');
+    if(!Number.isInteger(values.intervalMinutes)||values.intervalMinutes<5||values.intervalMinutes>10080||!Number.isInteger(values.codeHour)||values.codeHour<0||values.codeHour>23||!Number.isInteger(values.maxFiles)||values.maxFiles<1||values.maxFiles>100||values.codeWithAi&&(!values.consent||!values.model)||values.model&& !/^[a-zA-Z0-9._-]{1,100}$/.test(values.model)||values.reasoningEffort&&!['low','medium','high','xhigh','max'].includes(values.reasoningEffort))throw new OperationError('INVALID_REQUEST');
     if(values.codeWithAi)await this.codeReview.validateScheduledProvider({projectId,userId:actor.id,authVersion:actor.auth_version,sessionId:'scheduled:'+projectId},values.model!,values.reasoningEffort as 'medium'|null);
     const client=await this.database.connect();try{await client.query('BEGIN');await client.query('SELECT pg_advisory_xact_lock(hashtext($1))',['operations:'+projectId]);await assertManager(client,projectId,actor);
       const previous=(await client.query<ConfigurationRow>('SELECT * FROM operation_configurations WHERE project_id=$1 ORDER BY version DESC LIMIT 1',[projectId])).rows[0];if((previous?.version??0)!==values.expectedVersion)throw new OperationError('CONFLICT');
@@ -47,7 +48,7 @@ export class OperationService {
       SELECT f.*,c.next_sync,c.next_code,c.code_inventory,c.lease_token FROM claimed c JOIN operation_configurations f ON f.project_id=c.project_id AND f.version=c.configuration_version`,[now])).rows[0];
     if(!claimed)return false;
     const projectId=claimed.project_id,token=claimed.lease_token;
-    let failed=false;
+    let failed=false,currentKind:'sources'|'code'='sources';
     try{
       await assertManager(this.database,projectId,{id:claimed.changed_by,auth_version:claimed.auth_version});
       const actor=(await this.database.query<AuthUser>('SELECT * FROM users WHERE id=$1',[claimed.changed_by])).rows[0]!;
@@ -57,29 +58,37 @@ export class OperationService {
         await this.database.query(`INSERT INTO operation_runs(project_id,configuration_version,kind,occurrence,status,detail,finished_at) VALUES($1,$2,'sources',$3,'succeeded',$4,clock_timestamp()) ON CONFLICT DO NOTHING`,[projectId,claimed.version,claimed.next_sync,JSON.stringify({jobId:job.id,result:'queued',coalesced:true})]);
         await this.database.query('UPDATE operation_cursors SET next_sync=$3,last_error=NULL WHERE project_id=$1 AND lease_token=$2',[projectId,token,new Date(now.getTime()+claimed.interval_minutes*60_000)]);
       }
-      if(claimed.next_code&&claimed.next_code<=now){await this.reviewCode(claimed,actor,now);}
+      if(claimed.next_code&&claimed.next_code<=now){currentKind='code';await this.reviewCode(claimed,actor,now);}
     }catch(error){
       failed=true;
       const code=error&&typeof error==='object'&&'code' in error&&typeof error.code==='string'?error.code:'OPERATION_UNAVAILABLE';
-      await this.database.query(`UPDATE operation_cursors SET last_error=$3,next_sync=CASE WHEN $3='FORBIDDEN' THEN NULL ELSE next_sync END,next_code=CASE WHEN $3='FORBIDDEN' THEN NULL ELSE next_code END,lease_until=$4::timestamptz+interval '15 minutes' WHERE project_id=$1 AND lease_token=$2`,[projectId,token,code,now]);
-      await this.database.query(`INSERT INTO operation_runs(project_id,configuration_version,kind,occurrence,status,detail,finished_at) VALUES($1,$2,$3,$4,$5,$6,clock_timestamp()) ON CONFLICT DO NOTHING`,[projectId,claimed.version,claimed.next_sync&&claimed.next_sync<=now?'sources':'code',now,code==='FORBIDDEN'?'suspended':'failed',JSON.stringify({errorCode:code})]);
+      const failures=(await this.database.query<{count:string}>("SELECT count(*)::text AS count FROM operation_runs WHERE project_id=$1 AND configuration_version=$2 AND kind=$3 AND status='failed'",[projectId,claimed.version,currentKind])).rows[0];
+      const pause=code==='FORBIDDEN'||['USAGE_LIMIT','CONNECTION_REQUIRED','AUTHORIZATION_EXPIRED','UNSUPPORTED_EFFORT','CODE_ANALYSIS_FAILED'].includes(code)||code!=='CODE_ANALYSIS_PENDING'&&Number(failures?.count??0)>=2;
+      await this.database.query(`UPDATE operation_cursors SET last_error=$3,next_sync=CASE WHEN $3='FORBIDDEN' OR ($5 AND $6='sources') THEN NULL ELSE next_sync END,next_code=CASE WHEN $3='FORBIDDEN' OR ($5 AND $6='code') THEN NULL ELSE next_code END,lease_until=$4::timestamptz+interval '15 minutes' WHERE project_id=$1 AND lease_token=$2`,[projectId,token,code,now,pause,currentKind]);
+      await this.database.query(`INSERT INTO operation_runs(project_id,configuration_version,kind,occurrence,status,detail,finished_at) VALUES($1,$2,$3,$4,$5,$6,clock_timestamp()) ON CONFLICT DO NOTHING`,[projectId,claimed.version,currentKind,now,pause?'suspended':code==='CODE_ANALYSIS_PENDING'?'started':'failed',JSON.stringify({errorCode:code,scheduledOccurrence:currentKind==='code'?claimed.next_code:claimed.next_sync,retryAfterMinutes:pause?null:15})]);
     }finally{await this.database.query('UPDATE operation_cursors SET lease_token=NULL,lease_until=CASE WHEN $3 THEN lease_until ELSE NULL END,updated_at=clock_timestamp() WHERE project_id=$1 AND lease_token=$2',[projectId,token,failed]);}
     return true;
   }
   private async reviewCode(row:ConfigurationRow&{next_code:Date|null;code_inventory:Record<string,string>;lease_token:string},actor:AuthUser,now:Date) {
     const connection=(await this.database.query<{owner:string;repository:string;branch:string}>('SELECT owner,repository,branch FROM github_connections WHERE project_id=$1',[row.project_id])).rows[0];if(!connection)throw new OperationError('NOT_CONFIGURED');
     const catalog=await readCodeCatalog(connection,this.options.githubToken,this.options.fetcher??fetch);
-    const changed=catalog.files.filter(file=>row.code_inventory[file.path]!==file.blobSha),selected=changed.slice(0,row.max_files),completed:Record<string,string>={...row.code_inventory},analyses:string[]=[];
+    const progress=(await this.database.query<{detail:{analyses:string[];reviewed:string[]}}>('SELECT detail FROM operation_runs WHERE project_id=$1 AND configuration_version=$2 AND kind=\'code\' AND occurrence=$3',[row.project_id,row.version,row.next_code])).rows[0]?.detail??{analyses:[],reviewed:[]};
+    const changed=catalog.files.filter(file=>row.code_inventory[file.path]!==file.blobSha),selected=changed.slice(0,Math.max(0,row.max_files-progress.reviewed.length)),completed:Record<string,string>={...row.code_inventory},analyses:string[]=[...progress.analyses],reviewed=[...progress.reviewed];
+    await this.database.query(`INSERT INTO operation_runs(project_id,configuration_version,kind,occurrence,status,detail) VALUES($1,$2,'code',$3,'started',$4) ON CONFLICT DO NOTHING`,[row.project_id,row.version,row.next_code,JSON.stringify({head:catalog.head,analyses,reviewed,withAi:row.code_with_ai})]);
     for(let index=0;index<selected.length;index+=4){
       await assertManager(this.database,row.project_id,actor);
       const stillCurrent=(await this.database.query('SELECT project_id FROM operation_cursors WHERE project_id=$1 AND configuration_version=$2 AND lease_token=$3 AND lease_until>clock_timestamp()',[row.project_id,row.version,row.lease_token])).rows.length;if(!stillCurrent)throw new OperationError('CONFLICT');
-      const batch=selected.slice(index,index+4),analysis=await this.codeReview.analyze({projectId:row.project_id,userId:actor.id,authVersion:actor.auth_version,sessionId:'scheduled:'+row.project_id},actor,{paths:batch.map(file=>file.path),expectedHead:catalog.head,mode:'files',withAi:row.code_with_ai,consent:row.consent,...(row.model?{model:row.model}:{}),...(row.reasoning_effort?{reasoningEffort:row.reasoning_effort as 'medium'}:{}),requestKey:occurrenceKey(row.project_id,row.version,'code',row.next_code!,String(index))});
+      const batch=selected.slice(index,index+4),analysis=await this.codeReview.analyze({projectId:row.project_id,userId:actor.id,authVersion:actor.auth_version,sessionId:'scheduled:'+row.project_id},actor,{paths:batch.map(file=>file.path),expectedHead:catalog.head,mode:'files',withAi:row.code_with_ai,consent:row.consent,...(row.model?{model:row.model}:{}),...(row.reasoning_effort?{reasoningEffort:row.reasoning_effort as 'medium'}:{}),requestKey:occurrenceKey(row.project_id,row.version,'code',row.next_code!,catalog.head+':'+batch.map(file=>file.path+':'+file.blobSha).join('|'))});
       // A running AI analysis is not coverage. Retry the same idempotent request after it completes.
       const outcome=await this.codeReview.analysis(row.project_id,analysis.id);if(outcome?.status!=='ready')throw new OperationError(outcome?.status==='failed'?'CODE_ANALYSIS_FAILED':'CODE_ANALYSIS_PENDING');
-      analyses.push(analysis.id);for(const file of batch)completed[file.path]=file.blobSha;
+      analyses.push(analysis.id);for(const file of batch){completed[file.path]=file.blobSha;reviewed.push(file.path);}
+      const client=await this.database.connect();try{await client.query('BEGIN');await assertManager(client,row.project_id,actor);
+        const saved=await client.query('UPDATE operation_cursors SET code_inventory=$3 WHERE project_id=$1 AND lease_token=$2 AND configuration_version=$4 AND lease_until>clock_timestamp() RETURNING project_id',[row.project_id,row.lease_token,JSON.stringify(completed),row.version]);if(!saved.rowCount)throw new OperationError('CONFLICT');
+        await client.query('UPDATE operation_runs SET detail=$4 WHERE project_id=$1 AND configuration_version=$2 AND kind=\'code\' AND occurrence=$3',[row.project_id,row.version,row.next_code,JSON.stringify({head:catalog.head,analyses,reviewed,withAi:row.code_with_ai})]);await client.query('COMMIT');
+      }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
     }
     const eligible=new Set(catalog.files.map(file=>file.path)),omitted=catalog.inventory.filter(file=>!eligible.has(file.path)).map(file=>({path:file.path,reason:'unsupported_or_exceeds_source_limits'}));
-    await this.database.query(`INSERT INTO operation_runs(project_id,configuration_version,kind,occurrence,status,detail,finished_at) VALUES($1,$2,'code',$3,$4,$5,clock_timestamp()) ON CONFLICT DO NOTHING`,[row.project_id,row.version,row.next_code,changed.length>selected.length?'partial':'succeeded',JSON.stringify({head:catalog.head,analyses,reviewed:selected.map(file=>file.path),deferred:changed.slice(selected.length).map(file=>file.path),omitted,withAi:row.code_with_ai})]);
+    await this.database.query(`UPDATE operation_runs SET status=$4,detail=$5,finished_at=clock_timestamp() WHERE project_id=$1 AND configuration_version=$2 AND kind='code' AND occurrence=$3`,[row.project_id,row.version,row.next_code,changed.length>selected.length?'partial':'succeeded',JSON.stringify({head:catalog.head,analyses,reviewed,deferred:changed.slice(selected.length).map(file=>file.path),omitted,withAi:row.code_with_ai})]);
     await this.database.query('UPDATE operation_cursors SET code_inventory=$3,next_code=$4,last_error=NULL WHERE project_id=$1 AND lease_token=$2',[row.project_id,row.lease_token,JSON.stringify(completed),nextDaily(now,row.code_hour)]);
   }
 }

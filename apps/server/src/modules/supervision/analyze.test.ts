@@ -2,7 +2,7 @@ import { describe,expect,it } from 'vitest';
 import { normalizeBoard } from '../../integrations/trello/normalize.js';
 import { boardFixture,boardId,listId } from '../../integrations/trello/fixtures.js';
 import { parsePlanning } from '../../integrations/trello/planning.js';
-import { analyzeDependencies,baselineDeviations } from './analyze.js';
+import { analyzeDependencies,baselineDeviations,analyzeSources } from './analyze.js';
 function snapshot(first='Ninguna',second='1.1 (Fin–Inicio; desfase 0)') {
   const board=boardFixture();
   const a={...board.cards[0]!,desc:`CÓDIGO WBS: 1.1\nPREDECESORAS WBS: ${first}`,idChecklists:[]};
@@ -10,6 +10,16 @@ function snapshot(first='Ninguna',second='1.1 (Fin–Inicio; desfase 0)') {
   return normalizeBoard({...board,cards:[a,b]},boardId,[listId]);
 }
 describe('Explicit planning and dependency analysis',()=>{
+  it('applies the same declared-state policy to both baseline and current evidence',()=>{
+    const baseline=snapshot(),current=structuredClone(baseline),now=new Date('2026-10-11T12:00:00Z');
+    baseline.items[0]!.labelNames=['Working'];current.items[0]!.labelNames=['Working'];baseline.items[0]!.state='unknown';current.items[0]!.state='unknown';
+    const configuration={version:1,dueSoonHours:72,staleAfterMinutes:60,confirmed:true,changedAt:now.toISOString(),changedBy:null,stateLabels:{Working:'in_progress' as const}};
+    const result=analyzeSources({connection:null,lastAttempt:null,latest:{id:'snapshot',observedAt:now.toISOString(),source:'api',data:current,changes:[]}}, {connection:null,latest:null,lastAttempt:null},configuration,{version:1,data:baseline},now);
+    expect(result.deviations).toEqual([]);expect(result.tracking?.items[0]?.declaredState).toBe('in_progress');
+    current.items[0]!.labelNames.push('Urgent');
+    expect(baselineDeviations(baseline,current)).toContainEqual(expect.objectContaining({field:'labelNames',before:['Working'],after:['Working','Urgent']}));
+    expect(baseline.items[0]!.state).toBe('unknown');
+  });
   it('parses explicit types and lags and preserves absent information',()=>{
     expect(parsePlanning('CÓDIGO WBS: 2.1\nPREDECESORAS WBS: 1.1 (Fin–Inicio; desfase 2 días), 1.2 (Inicio-Inicio; desfase -3 horas)')).toMatchObject({wbs:'2.1',dependencyDeclaration:'provided',dependencies:[{relation:'finish_start',lagHours:48},{relation:'start_start',lagHours:-3}]});
     expect(parsePlanning('Finish 1.1 before starting')).toMatchObject({wbs:null,dependencyDeclaration:'unavailable'});

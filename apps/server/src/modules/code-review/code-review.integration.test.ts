@@ -10,6 +10,8 @@ import type {ConnectionBinding} from '../../providers/chatgpt/connection.js';
 import {CodeReviewService,type CorrectionRequest} from './service.js';
 import {codeFixture,codeSourceFetcher,syntheticCodeVerdict,syntheticCorrection,syntheticHead} from './fixtures.js';
 import {deterministicAnalysis} from './evidence.js';
+import {PublicationService,publicationOverview} from './publication.js';
+import {publicationFixture} from './publication.fixtures.js';
 
 describe.skipIf(process.env.RUN_CODE_DB_TESTS!=='true')('PostgreSQL pinned code review and simulated publication',()=>{
   let pool:pg.Pool,client:pg.PoolClient,database:TrelloDatabase,provider:ChatGPTService,service:CodeReviewService,app:ReturnType<typeof buildApp>,projectId:string,actor:AuthUser,binding:ConnectionBinding,analysisId:string;
@@ -51,7 +53,7 @@ describe.skipIf(process.env.RUN_CODE_DB_TESTS!=='true')('PostgreSQL pinned code 
     expect((await app.inject({method:'GET',url:path()})).statusCode).toBe(401);expect((await app.inject({method:'GET',url:`/api/v1/projects/${randomUUID()}/code-review`,headers})).statusCode).toBe(404);
     expect((await app.inject({method:'GET',url:path()+'/catalog',headers:viewerHeaders})).statusCode).toBe(403);expect((await app.inject({method:'POST',url:path()+'/analyses',headers:viewerHeaders,payload:analyzeRequest()})).statusCode).toBe(403);
     expect((await app.inject({method:'POST',url:path()+'/analyses',headers:{origin,cookie:headers.cookie},payload:analyzeRequest()})).statusCode).toBe(403);expect((await app.inject({method:'POST',url:path()+'/analyses',headers:{...headers,origin:'https://evil.example'},payload:analyzeRequest()})).statusCode).toBe(403);
-    expect((await app.inject({method:'POST',url:path()+'/proposals',headers,payload:{...request(),purpose:'live'}})).statusCode).toBe(400);
+    expect((await app.inject({method:'POST',url:path()+'/proposals',headers,payload:{...request(),purpose:'unreviewed'}})).statusCode).toBe(400);
   });
   it('makes local analysis available without provider calls and deduplicates exact requests',async()=>{
     const payload=analyzeRequest(),before=calls.length,analysis=await service.analyze(binding,actor,payload);expect((await service.analyze(binding,actor,payload)).id).toBe(analysis.id);expect(calls.length).toBe(before);expect((await service.analysis(projectId,analysis.id))?.result?.findings[0]?.confidence).toBe('hypothesis');await expect(service.analyze(binding,actor,{...payload,withAi:true})).rejects.toMatchObject({code:'CONFLICT'});
@@ -102,4 +104,24 @@ describe.skipIf(process.env.RUN_CODE_DB_TESTS!=='true')('PostgreSQL pinned code 
     await client.query('SET LOCAL ROLE dev_project_agent_app');try{const first=await prepare();await service.decide(projectId,actor,first.job.proposalId,1,first.detail.contentHash!,'approved','Reviewed.',randomUUID());expect((await service.simulate(projectId,actor,first.job.proposalId,1,first.detail.contentHash!,randomUUID())).status).toBe('simulated');}finally{await client.query('RESET ROLE');}
     const grants=(await client.query("SELECT has_column_privilege('dev_project_agent_app','code_versions','state','UPDATE') AS state,has_column_privilege('dev_project_agent_app','code_versions','goal','UPDATE') AS goal,has_table_privilege('dev_project_agent_app','code_candidates','UPDATE') AS candidate,has_table_privilege('dev_project_agent_app','code_messages','DELETE') AS messages,has_table_privilege('dev_project_agent_app','code_decisions','UPDATE') AS decisions,has_table_privilege('dev_project_agent_app','code_publications','UPDATE') AS publications")).rows[0];expect(grants).toEqual({state:true,goal:false,candidate:false,messages:false,decisions:false,publications:false});expect(JSON.stringify(await service.overview(projectId))).not.toMatch(/SYNTHETIC_ACCESS|PRIVATE_UPSTREAM/);
   });
+  it.each(['ok','lost_response','denied'] as const)('publishes only the approved live diff and handles %s without replay',async transportMode=>{
+    const transport=publicationFixture(transportMode),publication=new PublicationService(database,service,{enabled:true,token:'synthetic-write-token'},transport.fetcher);
+    const result=await prepare({purpose:'live'});expect(result.detail.purpose).toBe('live');
+    await service.decide(projectId,actor,result.job.proposalId,1,result.detail.contentHash!,'approved','Exact bounded diff reviewed.',randomUUID());
+    const key=randomUUID();if(transportMode==='ok')await client.query('SET LOCAL ROLE dev_project_agent_app');try{
+      const job=await publication.request(projectId,actor,result.job.proposalId,1,result.detail.contentHash!,key,true);await publication.waitForIdle();
+      const saved=(await publicationOverview(database,projectId)).find(item=>item.id===job.id)!;const event=(await client.query('SELECT detail FROM github_publication_events WHERE project_id=$1 AND job_id=$2 AND stage=\'request\'',[projectId,job.id])).rows[0]!;expect(event.detail).toMatchObject({actorId:actor.id,actorType:'user'});
+      if(transportMode==='denied'){expect(saved.status).toBe('failed');expect(transport.writes).toHaveLength(0);}
+      else if(transportMode==='lost_response'){expect(saved.status).toBe('reconciliation_required');const count=transport.writes.length;expect((await publication.reconcile(projectId,actor,job.id)).verified).toBe(true);expect(transport.writes).toHaveLength(count);}
+      else{expect(saved.status).toBe('succeeded');expect(saved.pullUrl).toBe('https://github.com/example/project/pull/1');expect(saved.integrationStatus).toBe('pending_human');}
+      const count=transport.writes.length;expect((await publication.request(projectId,actor,result.job.proposalId,1,result.detail.contentHash!,key,true)).id).toBe(job.id);expect(transport.writes).toHaveLength(count);expect(transport.writes).not.toContain('/merge');
+    }finally{await publication.close();if(transportMode==='ok')await client.query('RESET ROLE');}
+  });
+  it('blocks permanent demonstrations and disabled publication with no transport calls',async()=>{
+    const transport=publicationFixture(),publication=new PublicationService(database,service,{enabled:true,token:'synthetic-write-token'},transport.fetcher),result=await prepare();
+    await service.decide(projectId,actor,result.job.proposalId,1,result.detail.contentHash!,'approved','Demonstration reviewed.',randomUUID());
+    await expect(publication.request(projectId,actor,result.job.proposalId,1,result.detail.contentHash!,randomUUID(),true)).rejects.toMatchObject({code:'DEMONSTRATION_ONLY'});
+    const disabled=new PublicationService(database,service,{enabled:false,token:null},transport.fetcher);await expect(disabled.request(projectId,actor,result.job.proposalId,1,result.detail.contentHash!,randomUUID(),true)).rejects.toMatchObject({code:'WRITES_DISABLED'});expect(transport.writes).toHaveLength(0);await publication.close();await disabled.close();
+  });
+
 });

@@ -15,6 +15,8 @@ import { ProposalService } from './modules/proposals/service.js';
 import {credentialKey} from './providers/chatgpt/vault.js';
 import {ReportService,startReportWorker} from './modules/reports/service.js';
 import {OperationService,startOperationWorker} from './modules/operations/service.js';
+import {PublicationService} from './modules/code-review/publication.js';
+import {publicationConfiguration} from './integrations/github/publication-client.js';
 
 const connectionString = process.env.APP_DATABASE_URL;
 if (!connectionString) throw new Error('APP_DATABASE_URL is required. Run npm run setup first.');
@@ -35,18 +37,20 @@ const reports=new ReportService(pool);
 const proposals=new ProposalService(pool,chatgpt,()=>app.log.error('Agent workflow could not publish its result.'));
 const writeConfig=executionConfiguration(process.env);
 const executions=new ExecutionService(pool,{enabled:writeConfig.enabled,remote:writeConfig.credentials?trelloExecutionRemote(writeConfig.credentials):null,onFailure:()=>app.log.error('Execution result could not be persisted. Reconciliation is required before any further write.')});
-const codeReview=new CodeReviewService(pool,chatgpt,supervision.githubToken,fetch,()=>app.log.error('Code review could not persist its result.'));
+const githubWriteConfiguration=publicationConfiguration(process.env);
+const codeReview=new CodeReviewService(pool,chatgpt,supervision.githubToken,fetch,()=>app.log.error('Code review could not persist its result.'),githubWriteConfiguration);
+const publications=new PublicationService(pool,codeReview,githubWriteConfiguration,fetch,()=>app.log.error('GitHub publication requires reconciliation.'));
 const operations=new OperationService(pool,supervision,codeReview);
 const app = buildApp({
   checkDatabase: async () => { await pool.query('SELECT 1'); },
   logger: true,
-  auth: { ...authConfigFromEnvironment(process.env), database: pool, trello: { database: pool, credentials: supervision.trelloCredentials },supervision,chatgpt,proposals,executions,codeReview,reports,operations },
+  auth: { ...authConfigFromEnvironment(process.env), database: pool, trello: { database: pool, credentials: supervision.trelloCredentials },supervision,chatgpt,proposals,executions,codeReview,reports,operations,publications },
 });
 pool.on('error', () => { app.log.error('Idle database connection failed.'); });
 let worker:ReturnType<typeof startSupervisionWorker>|undefined;
 let reportWorker:ReturnType<typeof startReportWorker>|undefined;
 let operationWorker:ReturnType<typeof startOperationWorker>|undefined;
-app.addHook('onClose', async () => {await operationWorker?.close();await reportWorker?.close();await chatgpt.close();await proposals.close();await executions.close();await codeReview.close();await worker?.close();await pool.end(); });
+app.addHook('onClose', async () => {await operationWorker?.close();await reportWorker?.close();await publications.close();await chatgpt.close();await proposals.close();await executions.close();await codeReview.close();await worker?.close();await pool.end(); });
 
 const webRoot = fileURLToPath(new URL('../../web/dist/', import.meta.url));
 if (existsSync(webRoot)) {
@@ -63,6 +67,7 @@ try {
   await proposals.initialize();
   await executions.initialize();
   await codeReview.initialize();
+  await publications.initialize();
   await app.listen({ host: '127.0.0.1', port });
   worker=startSupervisionWorker(supervision,()=>app.log.error('Supervision worker could not access storage.'));
   reportWorker=startReportWorker(reports,()=>app.log.error('Report worker could not access storage.'));

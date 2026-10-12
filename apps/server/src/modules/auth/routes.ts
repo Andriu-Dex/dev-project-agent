@@ -26,8 +26,10 @@ import type {ReportService} from '../reports/service.js';
 import {registerReportRoutes} from '../reports/routes.js';
 import type {OperationService} from '../operations/service.js';
 import {registerOperationRoutes} from '../operations/routes.js';
+import type {PublicationService} from '../code-review/publication.js';
+import {registerPublicationRoutes} from '../code-review/publication-routes.js';
 
-export interface AuthOptions extends AuthConfig { database: AuthDatabase; trello?: TrelloOptions; supervision?:SupervisionOptions; chatgpt?:ChatGPTService; proposals?:ProposalService; executions?:ExecutionService; codeReview?:CodeReviewService; reports?:ReportService; operations?:OperationService }
+export interface AuthOptions extends AuthConfig { database: AuthDatabase; trello?: TrelloOptions; supervision?:SupervisionOptions; chatgpt?:ChatGPTService; proposals?:ProposalService; executions?:ExecutionService; codeReview?:CodeReviewService; reports?:ReportService; operations?:OperationService; publications?:PublicationService }
 
 export async function registerAuth(app: FastifyInstance, options: AuthOptions) {
   const repository = new AuthRepository(options.database);
@@ -101,6 +103,7 @@ export async function registerAuth(app: FastifyInstance, options: AuthOptions) {
   if (options.codeReview) registerCodeReviewRoutes(app, options.codeReview, requireUser, repository);
   if (options.reports) registerReportRoutes(app, options.reports, requireUser, repository);
   if (options.operations) registerOperationRoutes(app, options.operations, requireUser, repository);
+  if (options.publications) registerPublicationRoutes(app, options.publications, requireUser, repository);
 
   const loginSchema = {
     body: {

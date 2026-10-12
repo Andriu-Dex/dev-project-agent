@@ -97,6 +97,7 @@ export interface ItemTracking {
   blocked: boolean | null;
   qualityIssues: string[];
 }
+export type ProjectAlertFinding=Omit<TrackingFinding,'code'> & {code:TrackingFindingCode|'baseline_deviation'|'dependency_risk'};
 export interface TrackingResponse {
   evaluatedAt: string;
   policy: { version: string; dueSoonHours: number; staleAfterMinutes: number; thresholdsConfirmed: boolean };
@@ -192,9 +193,15 @@ export interface ProviderOverview {connection:ProviderConnection;evaluations:Pro
 
 export type ProposalState='draft'|'pending_review'|'in_review'|'pending_policy_check'|'in_policy_check'|'pending_human_approval'|'authorized'|'changes_requested'|'rejected'|'invalidated'|'executing'|'executed'|'execution_failed'|'reconciliation_required';
 export type AgentStage='executor'|'reviewer'|'approver';
+export type TrelloAction =
+  | {type:'trello_due_change';cardId:string;expectedDue:string|null;proposedDue:string}
+  | {type:'trello_dates_change';cardId:string;expectedStart:string|null;expectedDue:string|null;proposedStart:string;proposedDue:string}
+  | {type:'trello_members_change';cardId:string;expectedMembers:string[];proposedMembers:string[]}
+  | {type:'trello_priority_change'|'trello_state_change';cardId:string;expectedLabels:string[];proposedLabels:string[];expectedDueComplete:boolean;proposedDueComplete:boolean};
+export type RequestedTrelloChange = {family:'dates';start:string;due:string}|{family:'members';memberIds:string[]}|{family:'priority'|'state';label:string};
 export interface ProposalContent {
   objective:string;justification:string;alternatives:string[];impact:string;risks:string[];verificationPlan:string;recoveryPlan:string;unresolvedQuestions:string[];evidenceIds:string[];
-  actions:{type:'trello_due_change';cardId:string;expectedDue:string|null;proposedDue:string}[];
+  actions:TrelloAction[];
 }
 export interface AgentVerdict {
   contentHash:string;
@@ -202,7 +209,7 @@ export interface AgentVerdict {
   checks:{code:string;status:'pass'|'fail'|'not_checked';reason:string}[];
 }
 export interface ProposalVersionView {
-  proposalId:string;version:number;purpose:'demonstration'|'live';state:ProposalState;createdAt:string;goal:string;requestedDue:string;sourceRunId:string;
+  proposalId:string;version:number;purpose:'demonstration'|'live';state:ProposalState;createdAt:string;goal:string;requestedDue:string|null;sourceRunId:string;
   context:{schemaVersion:1;card:{id:string;name:string;state:string;due:string|null;start:string|null;wbs:string|null};[key:string]:unknown};
   content:ProposalContent|null;contentHash:string|null;
   messages:{id:string;jobId:string;stage:AgentStage;status:'succeeded'|'failed';input:unknown;output:unknown;errorCode:string|null;durationMs:number|null;usage:Record<string,number>|null;createdAt:string}[];
@@ -230,7 +237,7 @@ export interface CodeFile {path:string;blobSha:string;mode:string;size:number;co
 export interface CodeInventoryEntry {path:string;type:'blob'|'commit';mode:string;sha:string;size:number|null}
 export interface CodeCatalog {connection:{owner:string;repository:string;branch:string};head:string;treeSha:string;observedAt:string;files:Omit<CodeFile,'content'>[];inventory:CodeInventoryEntry[];limits:{files:number;fileBytes:number;totalBytes:number;treeEntries:number}}
 export interface CodeSource {schemaVersion:1;connection:CodeCatalog['connection'];head:string;treeSha:string;observedAt:string;mode:'files'|'comparison';baseSha:string|null;files:CodeFile[];inventory:CodeInventoryEntry[]}
-export interface CodeFinding {id:string;path:string;startLine:number;endLine:number;category:'correctness'|'security'|'duplication'|'maintainability'|'performance';severity:'high'|'medium'|'low';confidence:'confirmed'|'hypothesis';origin:'deterministic'|'model';title:string;explanation:string;evidence:string;recommendation:string}
+export interface CodeFinding {id:string;path:string;startLine:number;endLine:number;category:'correctness'|'security'|'duplication'|'maintainability'|'complexity'|'performance';severity:'high'|'medium'|'low';confidence:'confirmed'|'hypothesis';origin:'deterministic'|'model';title:string;explanation:string;evidence:string;recommendation:string}
 export interface CodeCheck {path:string;code:string;status:'pass'|'fail'|'not_checked';message:string}
 export interface CodeAnalysisResult {summary:string;findings:CodeFinding[];checks:CodeCheck[];limitations:string[]}
 export interface CodeAnalysisView {id:string;status:'queued'|'running'|'ready'|'failed'|'interrupted';errorCode:string|null;createdAt:string;finishedAt:string|null;model:string|null;reasoningEffort:ReasoningEffort|null;source:CodeSource|null;result:CodeAnalysisResult|null}
@@ -245,6 +252,7 @@ export interface CodeOverview {analyses:Omit<CodeAnalysisView,'source'|'result'>
 export interface ReportSchedule {version:number;enabled:boolean;weekday:number;hour:number;minute:number;timeZone:'America/Guayaquil';changedAt:string|null;nextCutoff:string|null;errorCode?:string|null}
 export interface ReportSummary {id:string;version:number;kind:'scheduled'|'manual';status:'queued'|'published'|'draft'|'failed';periodStart:string;cutoff:string;createdAt:string;finishedAt:string|null;errorCode:string|null}
 export interface WeeklyReport {
+  riskAssessments?:{itemId:string;name:string;causeStatus:string;cause:string;impact:string;alternatives:{title:string;goal:string;eligible:boolean}[]}[];
   schemaVersion:1;project:{id:string;name:string};responsible:{id:string;name:string};periodStart:string;cutoff:string;generatedAt:string;partialPeriod:boolean;late:boolean;
   policyVersion:number|null;scheduleVersion:number|null;baselineVersion:number|null;
   executiveSummary:string;tracking:TrackingResponse|null;progressChangePoints:number|null;comparisonNote:string;

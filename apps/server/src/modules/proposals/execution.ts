@@ -1,3 +1,4 @@
+import {matchesAction,restoreExpected,validateActionDate} from './actions.js';
 import type pg from 'pg';
 import type {ExecutionJobView,ExecutionOverview,ExecutionEventView,ProposalContent,ProposalState,TrelloItem} from '@dev-project-agent/contracts';
 import type {TrelloDatabase} from '../../integrations/trello/service.js';
@@ -8,7 +9,7 @@ import {assertTargetDate,fingerprint,parseContent,parseVerdict,safeText,type Pro
 import {cardHash} from './service.js';
 
 interface JobRow {id:string;project_id:string;proposal_id:string;version:number;approval_id:string;requested_by:string;requested_auth_version:number;request_hash:string;content_hash:string;status:ExecutionJobView['status'];error_code:string|null;created_at:Date;write_started_at:Date|null;finished_at:Date|null}
-interface Candidate {purpose:'demonstration'|'live';state:ProposalState;latest_version:number;context:ProposalContext;goal:string;requested_due:Date;content:ProposalContent;content_hash:string;approval_id:string;actor_id:string;actor_auth_version:number|null;decision:string;approval_hash:string}
+interface Candidate {purpose:'demonstration'|'live';state:ProposalState;latest_version:number;context:ProposalContext;goal:string;requested_due:Date|null;content:ProposalContent;content_hash:string;approval_id:string;actor_id:string;actor_auth_version:number|null;decision:string;approval_hash:string}
 const selectCandidate=`SELECT p.purpose,p.latest_version,v.state,v.context,v.goal,v.requested_due,c.content,c.content_hash,d.id AS approval_id,d.actor_id,d.actor_auth_version,d.decision,d.content_hash AS approval_hash FROM proposals p JOIN proposal_versions v ON v.project_id=p.project_id AND v.proposal_id=p.id LEFT JOIN proposal_contents c ON c.project_id=v.project_id AND c.proposal_id=v.proposal_id AND c.version=v.version LEFT JOIN proposal_decisions d ON d.project_id=v.project_id AND d.proposal_id=v.proposal_id AND d.version=v.version WHERE p.project_id=$1 AND p.id=$2 AND v.version=$3`;
 const view=(row:JobRow):ExecutionJobView=>({id:row.id,proposalId:row.proposal_id,version:row.version,contentHash:row.content_hash,status:row.status,errorCode:row.error_code,createdAt:row.created_at.toISOString(),writeStartedAt:row.write_started_at?.toISOString()??null,finishedAt:row.finished_at?.toISOString()??null});
 const errorCode=(error:unknown)=>error&&typeof error==='object'&&'code' in error&&typeof error.code==='string'&&/^[A-Z_]{1,60}$/.test(error.code)?error.code:'EXECUTION_FAILED';
@@ -50,8 +51,8 @@ export class ExecutionService {
     const row=(await db.query<Candidate>(selectCandidate,[projectId,proposalId,version])).rows[0];if(!row)throw new ExecutionError('NOT_FOUND');
     if(row.purpose!=='live')throw new ExecutionError('DEMONSTRATION_ONLY');
     if(row.latest_version!==version||!allowed.includes(row.state))throw new ExecutionError('CONFLICT');
-    if(!row.content||row.content_hash!==hash||fingerprint({schemaVersion:1,context:row.context,goal:row.goal,requestedDue:row.requested_due.toISOString(),content:row.content})!==hash)throw new ExecutionError('HASH_MISMATCH');
-    parseContent(row.content,row.context,row.requested_due.toISOString());
+    if(!row.content||row.content_hash!==hash||fingerprint({schemaVersion:1,context:row.context,goal:row.goal,requestedDue:row.requested_due?.toISOString()??null,content:row.content})!==hash)throw new ExecutionError('HASH_MISMATCH');
+    parseContent(row.content,row.context,row.requested_due?.toISOString()??null);
     if(!row.approval_id||row.decision!=='approved'||row.approval_hash!==hash||!row.actor_auth_version)throw new ExecutionError('MISSING_APPROVAL');
     await assertManager(db,projectId,{id:row.actor_id,auth_version:row.actor_auth_version});
     const messages=(await db.query("SELECT stage,input,output FROM agent_messages WHERE project_id=$1 AND proposal_id=$2 AND version=$3 AND status='succeeded' AND stage IN ('reviewer','approver')",[projectId,proposalId,version])).rows;
@@ -73,7 +74,7 @@ export class ExecutionService {
       const previous=(await db.query<JobRow>('SELECT * FROM execution_jobs WHERE project_id=$1 AND requested_by=$2 AND request_key=$3',[projectId,actor.id,requestKey])).rows[0];if(previous){if(previous.request_hash!==requestHash)throw new ExecutionError('CONFLICT');return previous;}
       const row=await this.candidate(db,projectId,proposalId,version,hash,['authorized','execution_failed']);
       if(this.closed||!this.options.enabled||!this.options.remote)throw new ExecutionError('WRITES_DISABLED');
-      await this.configuration(db,projectId,row);assertTargetDate(row.requested_due.toISOString(),row.context.card.start);
+      await this.configuration(db,projectId,row);validateActionDate(row.content.actions[0]!,row.context.card.start);
       if((await db.query("SELECT id FROM execution_jobs WHERE project_id=$1 AND status IN ('queued','running','reconciliation_required')",[projectId])).rowCount)throw new ExecutionError('CONFLICT');
       const inserted=(await db.query<JobRow>('INSERT INTO execution_jobs (project_id,proposal_id,version,approval_id,requested_by,requested_auth_version,request_key,request_hash,content_hash) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *',[projectId,proposalId,version,row.approval_id,actor.id,actor.auth_version,requestKey,requestHash,hash])).rows[0]!;
       await db.query("UPDATE proposal_versions SET state='executing' WHERE project_id=$1 AND proposal_id=$2 AND version=$3",[projectId,proposalId,version]);await this.event(db,inserted,'request','requested');created=true;return inserted;
@@ -82,7 +83,7 @@ export class ExecutionService {
   }
   private evidence(item:TrelloItem,boardId:string):ExecutionEventView['evidence'] {return {cardId:item.id,boardId,due:item.due,fingerprint:cardHash(item),observedAt:new Date().toISOString()};}
   private matches(item:TrelloItem|undefined,row:Candidate,after=false) {
-    return Boolean(item&&(!after?cardHash(item)===row.context.sourceFingerprint:item.due===row.requested_due.toISOString()&&cardHash({...item,due:row.context.card.due})===row.context.sourceFingerprint));
+    return Boolean(item&&(!after?cardHash(item)===row.context.sourceFingerprint:matchesAction(item,row.content.actions[0]!)&&cardHash(restoreExpected(item,row.content.actions[0]!,row.context.card.state as TrelloItem['state']))===row.context.sourceFingerprint));
   }
   private async withLocks<T>(projectId:string,operation:()=>Promise<T>) {
     const client=await this.database.connect(),held:string[]=[];
@@ -103,14 +104,14 @@ export class ExecutionService {
         await assertManager(db,job.project_id,{id:job.requested_by,auth_version:job.requested_auth_version});
         const checked=await this.candidate(db,job.project_id,job.proposal_id,job.version,job.content_hash,['executing']);
         if(checked.approval_id!==job.approval_id)throw new ExecutionError('MISSING_APPROVAL');
-        await this.configuration(db,job.project_id,checked);assertTargetDate(checked.requested_due.toISOString(),before!.start);
+        await this.configuration(db,job.project_id,checked);validateActionDate(checked.content.actions[0]!,before!.start);
         await this.event(db,job,'preflight','succeeded',null,this.evidence(before!,destination.board_id));
         const marked=await db.query("UPDATE execution_jobs SET write_started_at=clock_timestamp() WHERE id=$1 AND status='running'",[job.id]);if(!marked.rowCount)throw new ExecutionError('CONFLICT');await this.event(db,job,'write','started');
       });
       // The durable boundary precedes the only PUT. After it, storage/network failures never authorize a retry.
       writeStarted=true;
       if(this.closed)throw new ExecutionError('SERVICE_STOPPED',true);
-      try{await remote.write(row.context.card.id,row.requested_due.toISOString());}
+      try{const action=row.content.actions[0]!;if(action.type==='trello_due_change')await remote.write(row.context.card.id,action.proposedDue);else {if(!remote.writeAction)throw new ExecutionError('UNSUPPORTED_ACTION');await remote.writeAction(destination.board_id,action);}}
       catch(error){if(error instanceof ExecutionError&&!error.uncertain){await this.finish(job,'failed','execution_failed','write',error.code);return;}}
       let after:TrelloItem|undefined;
       try{after=(await remote.read(destination.board_id,destination.operational_list_ids)).items.find(item=>item.id===row.context.card.id);}

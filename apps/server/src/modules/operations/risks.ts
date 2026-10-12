@@ -1,7 +1,8 @@
-import type {TrelloSnapshot,TrackingFinding,TrackingPolicyResponse} from '@dev-project-agent/contracts';
+import type {TrelloSnapshot,ProjectAlertFinding,TrackingPolicyResponse} from '@dev-project-agent/contracts';
 
-export function riskAssessment(snapshot:TrelloSnapshot, finding:TrackingFinding, policy:TrackingPolicyResponse) {
-  const item=snapshot.items.find(item=>item.id===finding.itemId)!;
+export function riskAssessment(snapshot:TrelloSnapshot, finding:ProjectAlertFinding, policy:TrackingPolicyResponse) {
+  const item=snapshot.items.find(item=>item.id===finding.itemId);
+  if(!item||item.archived||item.kind==='reference')return {cause:{status:'hypothesis',text:'El elemento dejó de formar parte del alcance activo observado. Confirma el motivo con el gestor.',source:'rule_context'},impactedItems:[],impact:'La exclusión del alcance requiere revisar el compromiso y las relaciones conservadas en la línea base. No se acredita cancelación ni aceptación.',alternatives:[{family:'keep_plan',title:'Aclarar la exclusión del alcance',eligible:true,goal:`Documentar el motivo y la decisión sobre ${finding.itemName}.`,benefit:'Conserva evidencia antes de cambiar la línea base.',risk:'No se puede ejecutar un cambio sobre una tarjeta ausente del alcance activo.'}],eligibleMembers:[],limitations:['La ausencia en una lectura no demuestra eliminación ni cancelación.']};
   const description=item.planning?.description??'';
   const cause=/^\s*(?:CAUSA(?:\s+DE\s+RETRASO)?|BLOQUEO)\s*:\s*(.+)$/im.exec(description)?.[1]?.trim()??null;
   const impacted=new Set<string>(),queue=[item.id];

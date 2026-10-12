@@ -1,6 +1,6 @@
 import {credentialsFromEnvironment,readBoard,type TrelloCredentials} from './client.js';
 import {normalizeBoard,TrelloError} from './normalize.js';
-import type {TrelloSnapshot} from '@dev-project-agent/contracts';
+import type {TrelloSnapshot,TrelloAction} from '@dev-project-agent/contracts';
 
 export class ExecutionError extends Error {
   constructor(readonly code:string,readonly uncertain=false) {super('Trello execution failed.');}
@@ -20,6 +20,7 @@ export interface ExecutionRemote {
   read(boardId:string,lists:string[]):Promise<TrelloSnapshot>;
   assertPermission(boardId:string):Promise<void>;
   write(cardId:string,due:string):Promise<void>;
+  writeAction?(boardId:string,action:TrelloAction):Promise<void>;
 }
 export function trelloExecutionRemote(credentials:TrelloCredentials,fetcher:typeof fetch=fetch):ExecutionRemote {
   async function get(path:string) {
@@ -29,6 +30,26 @@ export function trelloExecutionRemote(credentials:TrelloCredentials,fetcher:type
   }
   function assertId(value:string){if(!/^[a-f0-9]{24}$/.test(value))throw new ExecutionError('INVALID_REMOTE_ID');}
   return {
+    async writeAction(boardId,action){
+      assertId(boardId);assertId(action.cardId);
+      let body:Record<string,unknown>;
+      if(action.type==='trello_due_change')body={due:action.proposedDue};
+      else if(action.type==='trello_dates_change')body={start:action.proposedStart,due:action.proposedDue};
+      else if(action.type==='trello_members_change'){
+        action.proposedMembers.forEach(assertId);const members=await get(`boards/${boardId}/members?fields=id`) as {id:string}[];
+        if(!Array.isArray(members)||action.proposedMembers.some(id=>!members.some(member=>member.id===id)))throw new ExecutionError('INVALID_SCOPE');
+        body={idMembers:action.proposedMembers.join(',')};
+      }else {
+        const labels=await get(`boards/${boardId}/labels?fields=id,name&limit=1000`) as {id:string;name:string}[];
+        if(!Array.isArray(labels)||labels.length>=1000)throw new ExecutionError('INVALID_SCOPE');
+        const ids=action.proposedLabels.map(name=>{const matches=labels.filter(label=>label.name===name);if(matches.length!==1)throw new ExecutionError('INVALID_SCOPE');assertId(matches[0]!.id);return matches[0]!.id;});
+        body={idLabels:ids.join(','),dueComplete:action.proposedDueComplete};
+      }
+      try{const response=await fetcher(new URL(`https://api.trello.com/1/cards/${action.cardId}`),{method:'PUT',redirect:'error',signal:AbortSignal.timeout(15000),headers:{...auth(credentials),'Content-Type':'application/json'},body:JSON.stringify(body)});
+        if(!response.ok)throw new ExecutionError(response.status===429?'RATE_LIMITED':'REMOTE_WRITE_REJECTED',![400,401,403,404,429].includes(response.status));
+        const result=await json(response) as {id?:unknown};if(result?.id!==action.cardId)throw new ExecutionError('REMOTE_WRITE_UNCONFIRMED',true);
+      }catch(error){if(error instanceof ExecutionError)throw error;throw new ExecutionError('REMOTE_WRITE_UNCONFIRMED',true);}
+    },
     async read(boardId,lists){try{return normalizeBoard(await readBoard(boardId,credentials,fetcher),boardId,lists);}catch(error){throw new ExecutionError(error instanceof TrelloError?error.code:'REMOTE_READ_FAILED');}},
     async assertPermission(boardId){
       assertId(boardId);

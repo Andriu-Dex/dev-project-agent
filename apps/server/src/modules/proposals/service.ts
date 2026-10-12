@@ -1,3 +1,6 @@
+import {buildAction,validateActionDate} from './actions.js';
+import {readTrackingPolicy} from '../tracking/policy.js';
+import type {RequestedTrelloChange} from '@dev-project-agent/contracts';
 import type pg from 'pg';
 import {randomUUID} from 'node:crypto';
 import type {AgentJobView,AgentStage,ProposalContent,ProposalState,ProposalVersionView,ReasoningEffort,TrelloItem,TrelloSnapshot} from '@dev-project-agent/contracts';
@@ -9,13 +12,13 @@ import type {ConnectionBinding} from '../../providers/chatgpt/connection.js';
 import {supportedEfforts} from '../../providers/chatgpt/validation.js';
 import {assertTargetDate,fingerprint,instructions,parseContent,parseVerdict,ProposalError,safeText,type ProposalContext} from './contracts.js';
 
-export interface ProposalRequest {sourceRunId:string;cardId:string;requestedDue:string;goal:string;model:string;reasoningEffort?:ReasoningEffort;requestKey:string;purpose?:'demonstration'|'live';proposalId?:string;expectedVersion?:number}
-interface VersionRow {project_id:string;proposal_id:string;version:number;purpose:'demonstration'|'live';state:ProposalState;source_run_id:string;context:ProposalContext;goal:string;requested_due:Date;created_at:Date;content:ProposalContent|null;content_hash:string|null}
+export interface ProposalRequest {sourceRunId:string;cardId:string;requestedDue?:string;requestedChange?:RequestedTrelloChange;goal:string;model:string;reasoningEffort?:ReasoningEffort;requestKey:string;purpose?:'demonstration'|'live';proposalId?:string;expectedVersion?:number}
+interface VersionRow {project_id:string;proposal_id:string;version:number;purpose:'demonstration'|'live';state:ProposalState;source_run_id:string;context:ProposalContext;goal:string;requested_due:Date|null;created_at:Date;content:ProposalContent|null;content_hash:string|null}
 interface JobRow {id:string;project_id:string;proposal_id:string;version:number;model:string;reasoning_effort:ReasoningEffort|null;status:AgentJobView['status'];error_code:string|null;created_at:Date;request_hash:string}
 const versionSelect='SELECT v.*,p.purpose,c.content,c.content_hash FROM proposal_versions v JOIN proposals p ON p.project_id=v.project_id AND p.id=v.proposal_id LEFT JOIN proposal_contents c ON c.project_id=v.project_id AND c.proposal_id=v.proposal_id AND c.version=v.version';
 const jobView=(row:JobRow):AgentJobView=>({id:row.id,proposalId:row.proposal_id,version:row.version,model:row.model,reasoningEffort:row.reasoning_effort,status:row.status,errorCode:row.error_code,createdAt:row.created_at.toISOString()});
 const sourceCard=(item:TrelloItem)=>({id:item.id,name:safeText(item.name),state:item.state,due:item.due,start:item.start,wbs:item.planning?.wbs??null});
-export const cardHash=(item:TrelloItem)=>fingerprint({card:sourceCard(item),listId:item.listId,dueComplete:item.dueComplete,archived:item.archived,kind:item.kind,memberIds:[...item.memberIds].sort(),dependencies:item.planning?.dependencies??null});
+export const cardHash=(item:TrelloItem)=>fingerprint({card:sourceCard(item),listId:item.listId,dueComplete:item.dueComplete,archived:item.archived,kind:item.kind,memberIds:[...item.memberIds].sort(),labelNames:[...item.labelNames].sort(),dependencies:item.planning?.dependencies??null});
 const code=(error:unknown)=>error instanceof ProposalError?error.code:providerCode(error);
 
 export class ProposalService {
@@ -41,7 +44,7 @@ export class ProposalService {
     const card=sourceCard(item);
     const destination=(await database.query<{board_id:string;operational_list_ids:string[]}>('SELECT board_id,operational_list_ids FROM trello_connections WHERE project_id=$1',[projectId])).rows[0]!;
     return {schemaVersion:1,projectId,destination:{boardId:destination.board_id,operationalListIds:destination.operational_list_ids},sourceRunId:runId,trelloSnapshotId:run.trello_snapshot_id,policyVersion:run.policy_version,baselineVersion:run.baseline_version,observedAt:snapshot!.observed_at.toISOString(),card,sourceFingerprint:cardHash(item),
-      evidence:Object.entries(card).map(([field,value])=>({id:'card.'+field,field,value})),limitations:['Estado declarado; no acredita aceptación formal.','No se conoce causa del retraso ni duración real restante.','No se han enviado descripciones, perfiles, código ni credenciales.','La fecha solicitada es un objetivo del gestor, no una promesa de finalización.']};
+      evidence:Object.entries({...card,memberIds:item.memberIds,labelNames:item.labelNames.map(label=>safeText(label,100)),dueComplete:item.dueComplete}).map(([field,value])=>({id:'card.'+field,field,value})),limitations:['Estado declarado; no acredita aceptación formal.','No se conoce causa del retraso ni duración real restante.','No se han enviado descripciones, perfiles, código ni credenciales.','La fecha solicitada es un objetivo del gestor, no una promesa de finalización.']};
   }
   private async current(database:AuthDatabase,context:ProposalContext):Promise<boolean> {
     const policy=(await database.query<{version:number;stale_after_minutes:number}>('SELECT version,stale_after_minutes FROM tracking_policy_versions WHERE project_id=$1 ORDER BY version DESC LIMIT 1',[context.projectId])).rows[0];
@@ -59,17 +62,17 @@ export class ProposalService {
     const row=(await this.database.query<VersionRow>(versionSelect+' WHERE v.project_id=$1 AND v.proposal_id=$2 AND v.version=$3',[projectId,proposalId,version])).rows[0];if(!row)return null;
     const messages=await this.database.query('SELECT id,job_id AS "jobId",stage,status,input,output,error_code AS "errorCode",duration_ms AS "durationMs",usage,created_at AS "createdAt" FROM agent_messages WHERE project_id=$1 AND proposal_id=$2 AND version=$3 ORDER BY created_at,id',[projectId,proposalId,version]);
     const decisions=await this.database.query('SELECT id,actor_id AS "actorId",decision,reason,created_at AS "createdAt" FROM proposal_decisions WHERE project_id=$1 AND proposal_id=$2 AND version=$3 ORDER BY created_at,id',[projectId,proposalId,version]);
-    return {proposalId,version,purpose:row.purpose,state:row.state,createdAt:row.created_at.toISOString(),goal:row.goal,requestedDue:row.requested_due.toISOString(),sourceRunId:row.source_run_id,context:row.context as unknown as ProposalVersionView['context'],content:row.content,contentHash:row.content_hash,messages:messages.rows.map(item=>({...item,createdAt:item.createdAt.toISOString()})) as ProposalVersionView['messages'],decisions:decisions.rows.map(item=>({...item,createdAt:item.createdAt.toISOString()})) as ProposalVersionView['decisions']};
+    return {proposalId,version,purpose:row.purpose,state:row.state,createdAt:row.created_at.toISOString(),goal:row.goal,requestedDue:row.requested_due?.toISOString()??null,sourceRunId:row.source_run_id,context:row.context as unknown as ProposalVersionView['context'],content:row.content,contentHash:row.content_hash,messages:messages.rows.map(item=>({...item,createdAt:item.createdAt.toISOString()})) as ProposalVersionView['messages'],decisions:decisions.rows.map(item=>({...item,createdAt:item.createdAt.toISOString()})) as ProposalVersionView['decisions']};
   }
   private launch(binding:ConnectionBinding,actor:AuthUser,job:JobRow) {
     const task=this.pipeline(binding,actor,job).catch(()=>this.onFailure());this.tasks.add(task);void task.then(()=>this.tasks.delete(task));
   }
   async prepare(binding:ConnectionBinding,actor:AuthUser,request:ProposalRequest) {
     await assertManager(this.database,binding.projectId,actor);await this.provider.ensureConnection(binding);
-    const effort=request.reasoningEffort??null,due=new Date(request.requestedDue);
-    if(this.closed||!Number.isFinite(due.getTime())||due.getTime()<=Date.now())throw new ProposalError('INVALID_TARGET_DATE');
+    const effort=request.reasoningEffort??null,due=request.requestedDue?new Date(request.requestedDue):null;
+    if(this.closed||!request.requestedChange&&(!due||!Number.isFinite(due.getTime())||due.getTime()<=Date.now()))throw new ProposalError('INVALID_TARGET_DATE');
     safeText(request.goal);if(!request.goal.trim())throw new ProposalError('INVALID_REQUEST');
-    const {requestKey:ignoredKey,...payload}=request;const hash=fingerprint({...payload,requestedDue:due.toISOString(),reasoningEffort:effort});
+    const {requestKey:ignoredKey,...payload}=request;const hash=fingerprint({...payload,requestedDue:due?.toISOString()??null,reasoningEffort:effort});
     let created=false;
     const job=await this.transaction(async client=>{
       await assertManager(client,binding.projectId,actor);await client.query('SELECT pg_advisory_xact_lock(hashtext($1))',['agent:'+binding.projectId]);
@@ -79,8 +82,7 @@ export class ProposalService {
       if((await client.query("SELECT id FROM agent_jobs WHERE project_id=$1 AND status='running'",[binding.projectId])).rows.length)throw new ProposalError('CONFLICT');
       const context=await this.context(client,binding.projectId,request.sourceRunId,request.cardId);
       if(!await this.current(client,context))throw new ProposalError('SOURCE_CHANGED');
-      assertTargetDate(due.toISOString(),context.card.start);
-      if(context.card.due===due.toISOString())throw new ProposalError('NO_CHANGE');
+      if(request.requestedChange){const snapshot=(await client.query<{data:TrelloSnapshot}>('SELECT data FROM trello_snapshots WHERE project_id=$1 AND id=$2',[binding.projectId,context.trelloSnapshotId])).rows[0]!.data;context.requestedAction=buildAction(snapshot.items.find(item=>item.id===request.cardId)!,snapshot,(await readTrackingPolicy(client,binding.projectId,context.policyVersion))!,request.requestedChange);}else {assertTargetDate(due!.toISOString(),context.card.start);if(context.card.due===due!.toISOString())throw new ProposalError('NO_CHANGE');}
       let proposalId=request.proposalId,version=1;
       if(proposalId){
         const latest=(await client.query<{latest_version:number;purpose:'demonstration'|'live';state:ProposalState}>('SELECT p.latest_version,p.purpose,v.state FROM proposals p JOIN proposal_versions v ON v.proposal_id=p.id AND v.project_id=p.project_id AND v.version=p.latest_version WHERE p.project_id=$1 AND p.id=$2 FOR UPDATE OF p,v',[binding.projectId,proposalId])).rows[0];
@@ -88,7 +90,7 @@ export class ProposalService {
         if(request.purpose&&request.purpose!==latest.purpose)throw new ProposalError('CONFLICT');
         version=latest.latest_version+1;await client.query('UPDATE proposals SET latest_version=$3 WHERE project_id=$1 AND id=$2',[binding.projectId,proposalId,version]);
       }else proposalId=(await client.query<{id:string}>('INSERT INTO proposals (project_id,created_by,purpose) VALUES ($1,$2,$3) RETURNING id',[binding.projectId,actor.id,request.purpose??'demonstration'])).rows[0]!.id;
-      await client.query('INSERT INTO proposal_versions (project_id,proposal_id,version,source_run_id,context,goal,requested_due,created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)',[binding.projectId,proposalId,version,request.sourceRunId,JSON.stringify(context),request.goal,due.toISOString(),actor.id]);
+      await client.query('INSERT INTO proposal_versions (project_id,proposal_id,version,source_run_id,context,goal,requested_due,created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)',[binding.projectId,proposalId,version,request.sourceRunId,JSON.stringify(context),request.goal,due?.toISOString()??null,actor.id]);
       const inserted=(await client.query<JobRow>('INSERT INTO agent_jobs (project_id,proposal_id,version,requested_by,request_key,request_hash,model,reasoning_effort) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *',[binding.projectId,proposalId,version,actor.id,request.requestKey,hash,request.model,effort])).rows[0]!;
       await this.audit(client,binding.projectId,actor.id,'proposal.prepare',proposalId,'requested');created=true;return inserted;
     });
@@ -130,11 +132,11 @@ export class ProposalService {
         await this.stageTransaction(job,actor,async client=>{const changed=await client.query('UPDATE proposal_versions SET state=$4 WHERE project_id=$1 AND proposal_id=$2 AND version=$3 AND state=$5 RETURNING version',[job.project_id,job.proposal_id,job.version,working,expected]);if(!changed.rowCount)throw new ProposalError('CONFLICT');});
         const prior=(await this.database.query("SELECT id,output FROM agent_messages WHERE project_id=$1 AND proposal_id=$2 AND version=$3 AND status='succeeded' ORDER BY created_at DESC,id DESC LIMIT 1",[job.project_id,job.proposal_id,job.version])).rows[0];
         const messageId=randomUUID();
-        input={schemaVersion:1,agentInstructionsVersion:'proposal-agents-v2',workflow:{phase:'preparation',humanApproval:'pending_by_design',externalExecutionEnabled:false},messageId,runId:job.id,createdAt:new Date().toISOString(),correlationId:job.proposal_id,causationId:prior?.id??null,snapshotIds:{trello:row.context.trelloSnapshotId},policyVersion:row.context.policyVersion,producer:'service',recipient:stage,projectId:job.project_id,proposalId:job.proposal_id,version:job.version,jobId:job.id,context:row.context,goal:row.goal,requestedDue:row.requested_due.toISOString(),contentHash:hash,content,priorReview:stage==='approver'?prior?.output??null:null};
+        input={schemaVersion:1,agentInstructionsVersion:'proposal-agents-v2',workflow:{phase:'preparation',humanApproval:'pending_by_design',externalExecutionEnabled:false},messageId,runId:job.id,createdAt:new Date().toISOString(),correlationId:job.proposal_id,causationId:prior?.id??null,snapshotIds:{trello:row.context.trelloSnapshotId},policyVersion:row.context.policyVersion,producer:'service',recipient:stage,projectId:job.project_id,proposalId:job.proposal_id,version:job.version,jobId:job.id,context:row.context,goal:row.goal,requestedDue:row.requested_due?.toISOString()??null,contentHash:hash,content,priorReview:stage==='approver'?prior?.output??null:null};
         const response=await this.provider.generate(binding,actor,job.model,job.reasoning_effort,instructions(stage),JSON.stringify(input));
         if(this.closed||this.provider.connections.credentials(binding,job.model).entry!==initial.entry)throw new ProposalError('CONNECTION_CHANGED');
         let output:unknown,next:ProposalState;
-        if(stage==='executor'){content=parseContent(response.output,row.context,row.requested_due.toISOString());hash=fingerprint({schemaVersion:1,context:row.context,goal:row.goal,requestedDue:row.requested_due.toISOString(),content});output=content;next='pending_review';}
+        if(stage==='executor'){content=parseContent(response.output,row.context,row.requested_due?.toISOString()??null);hash=fingerprint({schemaVersion:1,context:row.context,goal:row.goal,requestedDue:row.requested_due?.toISOString()??null,content});output=content;next='pending_review';}
         else {const verdict=parseVerdict(response.output,stage,hash!);output=verdict;
           if(stage==='reviewer'&&verdict.verdict==='validated'&&content!.unresolvedQuestions.length)throw new ProposalError('BLOCKING_QUESTIONS');
           next=verdict.verdict==='validated'?'pending_policy_check':verdict.verdict==='human_required'?'pending_human_approval':verdict.verdict;

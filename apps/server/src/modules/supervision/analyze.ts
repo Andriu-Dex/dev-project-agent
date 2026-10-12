@@ -47,7 +47,7 @@ export function baselineDeviations(baseline:TrelloSnapshot,current:TrelloSnapsho
     const before=old.get(item.id);
     if(!before) changes.push({itemId:item.id,itemName:item.name,field:'added',before:null,after:{name:item.name,start:item.start,due:item.due},hoursShift:null});
     else {
-      for(const field of ['name','kind','state','start','due','memberIds'] as const) if(!isDeepStrictEqual(before[field],item[field])) {
+      for(const field of ['name','kind','state','labelNames','start','due','memberIds'] as const) if(!isDeepStrictEqual(before[field],item[field])) {
         const a=(field==='start'||field==='due')?time(before[field] as string|null):null,b=(field==='start'||field==='due')?time(item[field] as string|null):null;
         changes.push({itemId:item.id,itemName:item.name,field,before:before[field],after:item[field],hoursShift:a!==null&&b!==null?(b-a)/3_600_000:null});
       }
@@ -65,7 +65,7 @@ export function analyzeSources(trello:TrelloOverview|null,github:GitHubOverview,
   const source=rawSource?{...rawSource,data:{...rawSource.data,items:rawSource.data.items.map(item=>mappedItem(item,evaluationPolicy(configuration)))}}:null;
   const dependencies=source?analyzeDependencies(source.data,now):[];
   const result:SupervisionResult={analysisVersion:'supervision-v1',evaluatedAt:now.toISOString(),trelloSnapshotId:source?.id??null,githubSnapshotId:github.latest?.id??null,baselineVersion:baseline?.version??null,
-    tracking,dependencies,deviations:baseline&&source?baselineDeviations(baseline.data,source.data):[],code:github.latest?.data??null,
+    tracking,dependencies,deviations:baseline&&source?baselineDeviations({...baseline.data,items:baseline.data.items.map(item=>mappedItem(item,evaluationPolicy(configuration)))},source.data):[],code:github.latest?.data??null,
     limitations:['Los hallazgos son deterministas; no se ha realizado una revisión de código por IA.',
       'Las dependencias describen relaciones explícitas. No se calculan ruta crítica, probabilidades ni fechas reales de ejecución.',
       'Los estados y checklists son declaraciones de Trello; no acreditan aceptación formal.']};
