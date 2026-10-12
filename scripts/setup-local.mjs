@@ -1,5 +1,8 @@
 import { randomBytes } from 'node:crypto';
-import { readFile, writeFile } from 'node:fs/promises';
+import { readFile, writeFile, chmod } from 'node:fs/promises';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+import { fileURLToPath } from 'node:url';
 
 const adminPassword = randomBytes(32).toString('hex');
 const appPassword = randomBytes(32).toString('hex');
@@ -17,6 +20,10 @@ const content = [
   'TRELLO_API_KEY=',
   'TRELLO_TOKEN=',
   'GITHUB_TOKEN=',
+  'TRELLO_WRITES_ENABLED=false',
+  'TRELLO_WRITE_TOKEN=',
+  'GITHUB_WRITES_ENABLED=false',
+  'GITHUB_WRITE_TOKEN=',
   '',
 ].join('\n');
 
@@ -36,6 +43,10 @@ try {
       ['TRELLO_API_KEY', ''],
       ['TRELLO_TOKEN', ''],
       ['GITHUB_TOKEN', ''],
+      ['TRELLO_WRITES_ENABLED', 'false'],
+      ['TRELLO_WRITE_TOKEN', ''],
+      ['GITHUB_WRITES_ENABLED', 'false'],
+      ['GITHUB_WRITE_TOKEN', ''],
     ]) {
       if (!new RegExp('^' + key + '=', 'm').test(existing)) additions.push(key + '=' + value);
     }
@@ -45,3 +56,8 @@ try {
     throw error;
   }
 }
+if(process.platform==='win32'){
+  const shellEnvironment=Object.fromEntries(Object.entries(process.env).filter(([key])=>key.toLowerCase()!=='psmodulepath'));
+  await promisify(execFile)('powershell.exe',['-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',fileURLToPath(new URL('./protect-local-config.ps1',import.meta.url))],{windowsHide:true,env:shellEnvironment});
+}else await chmod(new URL('../.env',import.meta.url),0o600);
+console.log('Local credential file permissions restricted to the current user and system administrators.');
