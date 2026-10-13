@@ -58,6 +58,7 @@ describe.skipIf(process.env.RUN_CODE_DB_TESTS!=='true')('PostgreSQL pinned code 
   it('makes local analysis available without provider calls and deduplicates exact requests',async()=>{
     const payload=analyzeRequest(),before=calls.length,analysis=await service.analyze(binding,actor,payload);expect((await service.analyze(binding,actor,payload)).id).toBe(analysis.id);expect(calls.length).toBe(before);expect((await service.analysis(projectId,analysis.id))?.result?.findings[0]?.confidence).toBe('hypothesis');await expect(service.analyze(binding,actor,{...payload,withAi:true})).rejects.toMatchObject({code:'CONFLICT'});
     expect((await app.inject({method:'GET',url:path()+'/analyses/'+analysis.id,headers:viewerHeaders})).statusCode).toBe(200);
+    expect((await client.query("SELECT actor_type,actor_id FROM audit_events WHERE project_id=$1 AND action='code.analysis' AND resource_id=$2",[projectId,analysis.id])).rows).toEqual([{actor_type:'user',actor_id:actor.id}]);
   });
   it('requires explicit consent before sending code and grounds AI findings in exact evidence',async()=>{
     await expect(service.analyze(binding,actor,{...analyzeRequest(),withAi:true,model:'gpt-6.1-sol',reasoningEffort:'high'})).rejects.toMatchObject({code:'CONSENT_REQUIRED'});

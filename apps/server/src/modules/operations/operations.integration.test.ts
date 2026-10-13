@@ -73,6 +73,8 @@ describe.skipIf(process.env.RUN_OPERATIONS_DB_TESTS!=='true')('PostgreSQL schedu
     await service.configure(projectId,actor,{...values,enabled:false,codeEnabled:true,expectedVersion:version});
     const now=new Date();await client.query('UPDATE operation_cursors SET next_code=$2 WHERE project_id=$1',[projectId,now]);expect(await service.tick(now)).toBe(true);
     const analyses=await client.query('SELECT id,model,status FROM code_analyses WHERE project_id=$1',[projectId]);expect(analyses.rows).toHaveLength(1);expect(analyses.rows[0]).toMatchObject({model:null,status:'ready'});
+    expect((await client.query("SELECT actor_type,actor_id FROM audit_events WHERE project_id=$1 AND action='code.analysis' AND resource_id=$2",[projectId,analyses.rows[0]!.id])).rows).toEqual([{actor_type:'system',actor_id:null}]);
+    expect((await client.query('SELECT requested_by FROM code_analyses WHERE id=$1',[analyses.rows[0]!.id])).rows[0]!.requested_by).toBe(actor.id);
     await client.query('UPDATE operation_cursors SET next_code=$2 WHERE project_id=$1',[projectId,new Date(now.getTime()+1)]);await service.tick(new Date(now.getTime()+2));
     expect((await client.query('SELECT id FROM code_analyses WHERE project_id=$1',[projectId])).rows).toHaveLength(1);
   });

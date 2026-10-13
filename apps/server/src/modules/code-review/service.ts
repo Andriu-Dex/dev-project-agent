@@ -82,7 +82,8 @@ export class CodeReviewService {
       const created=(await client.query<{id:string}>('INSERT INTO code_analyses(project_id,requested_by,request_key,request_hash,model,reasoning_effort,status) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id',[binding.projectId,actor.id,request.requestKey,hash,request.withAi?request.model:null,request.withAi?effort:null,request.withAi?'running':'ready'])).rows[0]!;
       await client.query('INSERT INTO code_sources(project_id,analysis_id,source) VALUES($1,$2,$3)',[binding.projectId,created.id,JSON.stringify(source)]);
       if(!request.withAi){await client.query('INSERT INTO code_results(project_id,analysis_id,result) VALUES($1,$2,$3)',[binding.projectId,created.id,JSON.stringify(deterministicAnalysis(source))]);await client.query('UPDATE code_analyses SET finished_at=clock_timestamp() WHERE id=$1',[created.id]);}
-      await this.audit(client,binding.projectId,actor,'code.analysis',created.id,request.withAi?'started':'succeeded');return {...created,created:true};
+      // requested_by retains the manager authorizing an automatic analysis.
+      await this.audit(client,binding.projectId,binding.sessionId==='scheduled:'+binding.projectId?null:actor,'code.analysis',created.id,request.withAi?'started':'succeeded');return {...created,created:true};
     });
     if(row.created&&request.withAi)this.launch(this.analyzeWithModel(binding,actor,row.id,source,request.model!,effort));return {id:row.id};
   }
@@ -93,7 +94,7 @@ export class CodeReviewService {
       const local=deterministicAnalysis(source),inferred=parseAnalysis(response.output,source),result={...local,...inferred};
       result.findings=[...inferred.findings,...local.findings.filter(item=>!inferred.findings.some(value=>value.path===item.path&&value.startLine===item.startLine&&value.category===item.category))].slice(0,20);
       result.limitations=[...new Set([...local.limitations,...inferred.limitations])];
-      await this.transaction(async client=>{await this.lock(client,binding.projectId,actor);const updated=await client.query("UPDATE code_analyses SET status='ready',finished_at=clock_timestamp() WHERE project_id=$1 AND id=$2 AND status='running' RETURNING id",[binding.projectId,id]);if(!updated.rowCount)throw new CodeError('CONFLICT');await client.query('INSERT INTO code_results(project_id,analysis_id,result,usage,duration_ms) VALUES($1,$2,$3,$4,$5)',[binding.projectId,id,JSON.stringify(result),JSON.stringify(response.usage),response.durationMs]);await this.audit(client,binding.projectId,actor,'code.analysis',id,'succeeded');});
+      await this.transaction(async client=>{await this.lock(client,binding.projectId,actor);const updated=await client.query("UPDATE code_analyses SET status='ready',finished_at=clock_timestamp() WHERE project_id=$1 AND id=$2 AND status='running' RETURNING id",[binding.projectId,id]);if(!updated.rowCount)throw new CodeError('CONFLICT');await client.query('INSERT INTO code_results(project_id,analysis_id,result,usage,duration_ms) VALUES($1,$2,$3,$4,$5)',[binding.projectId,id,JSON.stringify(result),JSON.stringify(response.usage),response.durationMs]);await this.audit(client,binding.projectId,binding.sessionId==='scheduled:'+binding.projectId?null:actor,'code.analysis',id,'succeeded');});
     }catch(error){await this.transaction(async client=>{await client.query("UPDATE code_analyses SET status='failed',error_code=$3,finished_at=clock_timestamp() WHERE project_id=$1 AND id=$2 AND status='running'",[binding.projectId,id,errorCode(error)]);await this.audit(client,binding.projectId,null,'code.analysis',id,'failed');});}
   }
   private async fresh(projectId:string,source:CodeSource) {
