@@ -2,7 +2,7 @@
 
 Sesión del 13 de octubre de 2026, America/Guayaquil. Base inicial del agente: `74dd405`, rama `develop`. Este registro complementa la [matriz de 39 criterios](academic-acceptance-matrix.md) y el [manual de operación](first-release-guide.md). Las fuentes académicas y los procedimientos completos de cada AC permanecen en la matriz.
 
-La validación está en curso. Un caso positivo no cierra los demás subcasos del criterio. Se superaron técnicamente los procedimientos AC-3.04, AC-4.02 y AC-7.04 descritos abajo; los otros 36 criterios conservan pendientes. La aceptación académica final no está cerrada. Las pruebas automatizadas y los casos reales se registran por separado.
+La validación está en curso. Un caso positivo no cierra los demás subcasos del criterio. Se superaron técnicamente los procedimientos AC-1.01, AC-2.03, AC-3.04, AC-4.02, AC-7.02 y AC-7.04 descritos abajo; los otros 33 criterios conservan pendientes. La aceptación académica final no está cerrada. Las pruebas automatizadas y los casos reales se registran por separado.
 
 ## Entorno, autoridad y destinos
 
@@ -30,6 +30,14 @@ Las evidencias locales están en `work/acceptance/`, ignorado por Git. PostgreSQ
 | RV-10 | Migraciones comprobadas sin cambios pendientes y rol PostgreSQL/auditoría restringidos. Configuración y evidencias excluidas de Git. Las comprobaciones anteriores de 249 pruebas son históricas; no se atribuyen a esta sesión. | `npm run db:migrate`, `npm run test:db`; exclusiones verificadas con `git check-ignore`. |
 | RV-11 | El gestor autorizó específicamente el diff v2 y su PR. Se registró la decisión y se confirmó la publicación desde su panel por solicitud expresa. Lectura independiente de GitHub: PR abierto/borrador hacia develop, padre original y únicamente api.ts modificado; blob y contenido coinciden con el candidato aprobado. Sin merge. | `verified-github-publication.json`, `github-publication.png`; [PR #11](https://github.com/Andriu-Dex/utaped/pull/11); publicación `5788535e-564f-4ea3-b323-2611cf4d12e1`, commit `24a9c9c7af475c293b880ecb61d8b1eb67d7f17b`. |
 | RV-12 | Desde la alerta de bloqueo de 99.1 se consultaron causa declarada, sucesora 99.3, impacto limitado, cuatro alternativas con ventajas/riesgos y snapshot. Redistribución abrió Propuestas con tarjeta correcta, familia members, objetivo generado y miembros elegibles; no seleccionó responsable ni consintió IA automáticamente. | `risk-recommendations.png`; snapshot `172f26af-175b-4596-817a-670fb29b8640`, política v2. Recorrido leído desde la sesión real del gestor, sin nueva propuesta ni escritura. |
+| RV-13 | Seis solicitudes al servidor real con sesión anónima y CSRF válido recibieron 401: proyecto, propuestas, reporte, decisión Trello, ejecución Trello y publicación GitHub. Los recuentos de decisiones y trabajos externos no cambiaron. Las solicitudes de ejecución/publicación usaron confirmación false sobre versiones ya ejecutadas. | `anonymous-access.json`; no se guardaron cookies ni tokens de sesión. Esto no acredita todavía el recorrido real de un lector. |
+| RV-14 | Reinicio del servicio: la lectura pendiente desde las 14:06 se recuperó a las 17:35:50 mediante un único trabajo actual, completado, sin inventar observaciones históricas. Se retuvieron los 13 IDs de alertas previos; tres avisos distintos entraron al umbral de 72 h. ChatGPT renovó a las 17:36:16, revisión 20, sin nuevo OAuth. | `resumed-observation.json`; operación `f96239ce-f3f1-4717-a9bc-ec9a1f654fc4`, trabajo `f934b499-7ef5-4b46-9cb8-aed366e2ba44`. No se atribuye al reinicio una segunda prueba con navegador cerrado. |
+| RV-15 | Desde Brave autenticado se contrastaron las 35 filas de Planificación contra una lectura directa de Trello y el snapshot: 29 actividades y seis hitos, con identidad/nombre únicos y tipo visible. Fechas nativas, miembros y etiquetas coinciden. Se conserva línea base v1. | `planning-verification.json`, `planning-ui-rows.json`, `planning-real.png`; snapshot `2116b4aa-1d5e-4fdc-b8ed-e798905715b1`, línea base snapshot `5c155ff2-82cf-40d5-9add-d3528c3e23db`. |
+| RV-16 | Comparaciones históricas conservan inicio/vencimiento de 99.2, prioridad de 99.1, asignados de 99.3 y etiquetas de estado de 99.4. Los valores coinciden con las acciones aprobadas y los cambios registrados. Dos lecturas posteriores iguales producen cero diferencias y no duplican alertas equivalentes. | `source-change-verification.json`; pares `52f4a7eb…` → `ee6ce7b2…` y `ee6ce7b2…` → `172f26af…`; IDs completos en la evidencia. |
+| RV-17 | Se registró una nota de seguimiento de 99.1 desde la sesión del gestor durante la validación asistida. Conserva apertura y observaciones previas; no confirma causa ni autoriza escrituras. La alerta de próximo vencimiento de 99.2 conserva apertura, resolución tras reprogramación y reapertura al entrar nuevamente al umbral, con el mismo ID. Los cuatro tipos requeridos están disponibles en el panel. | `alert-history-verification.json`, `alert-follow-up.png`; bloqueo `6760c893-c049-405f-a8bf-e0436b8f6e19`, próximo vencimiento `a053b9c0-e80c-4967-a7d0-4b7e425278bf`. |
+| RV-18 | Se ejecutaron 86 escenarios PostgreSQL adicionales de acceso, Trello, supervisión, propuestas, ejecución, proveedor, renovación y operación. Todos superados tras corregir el aislamiento de una prueba. Son fixtures con rollback y transportes sintéticos: cubren permisos/revocación, fuente obsoleta, denegación, resultado incierto y límites, sin provocar esos fallos en Trello real. El corpus controlado de seis categorías TS/Java volvió a superar 13 pruebas. | `*-db-resumed.log`, `operations-db-isolated.log`, `category-corpus.log`; commit `93052b6`. Total de escenarios PostgreSQL distintos ejecutados el 13/10: 118, incluidos los 32 anteriores. |
+| RV-19 | Nueva propuesta real preparada para 99.4: EN CURSO → PENDIENTE, dueComplete=false. Los tres agentes completaron revisión; se solicitó al gestor comprobar una decisión negativa. No se aprobó ni ejecutó desde la automatización. | `workflow-evidence.json`, `negative-proposal-review.png`; propuesta `29c29605-af4a-447d-9ee6-506e38caad02` v1. La decisión humana sigue pendiente en este corte. |
+| RV-20 | Comparación exacta de las credenciales actuales contra 238 archivos versionados y artefactos/logs locales disponibles, más mensajes de commits: sin coincidencias. Configuración, exportación privada y evidencias siguen ignoradas. | `exposure-scan.json`; no acredita ausencia de secretos antiguos/desconocidos, salidas inaccesibles ni filtraciones futuras. |
 
 Los eventos de ejecución verifican también la conservación del resto de la tarjeta mediante su huella. La lectura independiente contrasta identidad, tablero y los valores aprobados; no sustituye la inspección integral del contenido y calidad del proyecto.
 
@@ -41,17 +49,17 @@ Los datos preparados para los casos incluyen una causa declarada en 99.1 y una d
 
 | AC | Estado | Evidencia y trabajo restante |
 | --- | --- | --- |
-| AC-1.01 | En validación | RV-01: inventario y línea base identificados; completar contraste visual del inventario. |
+| AC-1.01 | Superado | RV-15: 35 filas contrastadas con Trello/snapshot, 29 actividades/seis hitos, fuente y fecha visibles; IDs y línea base v1 conservados. |
 | AC-1.02 | En validación | RV-01, RV-04 a RV-07: campos nativos y ausentes; falta prioridad contradictoria y contraste de la muestra completa. |
 | AC-1.03 | En validación | RV-01/02/07: pendiente, en curso, completada, vencida y bloqueo; completar casos de bloqueo no informado y ambigüedad. |
 | AC-1.04 | En validación | RV-01: cálculo 14/29 y exclusión de hitos; faltan archivadas, referencias y universo vacío. |
 | AC-1.05 | En validación | RV-02: próximos vencimientos y datos ausentes; faltan límites exactos y fuente desactualizada. |
 | AC-2.01 | En validación | RV-01: destino real correcto; faltan denegación controlada y conservación de última lectura. |
 | AC-2.02 | En validación | RV-01, RV-04 a RV-07: lectura y contraste nativo; terminar muestra de los seis grupos de datos. |
-| AC-2.03 | En validación | RV-04 a RV-07: cambios reales disponibles para comparación; verificar las diferencias y repetición sin cambios. |
+| AC-2.03 | Superado | RV-16: cambios aprobados de fechas, miembros, prioridad y estado registrados entre lecturas; repetición igual con cero diferencias y cero alertas equivalentes duplicadas. |
 | AC-2.04 | En validación | RV-04 a RV-07: cuatro familias propuestas y revisadas; faltan destinos, miembros y etiquetas fuera de alcance. |
 | AC-2.05 | En validación | RV-04 a RV-07: cuatro escrituras específicas verificadas; faltan todos los casos negativos y aprobación obsoleta. |
-| AC-3.01 | En validación | RV-02: detección automática con panel cerrado; falta comprobar reinicio y deduplicación del hallazgo. |
+| AC-3.01 | En validación | RV-02/14: detección con pestañas del panel cerradas y recuperación/deduplicación comprobadas; falta observar con todo el navegador cerrado. |
 | AC-3.02 | En validación | RV-01/02: relación y causa declaradas; falta el recorrido de confirmación/análisis causal con y sin evidencia. |
 | AC-3.03 | En validación | RV-12: alternativas generadas desde el hallazgo; completar elegibilidad y aplicabilidad de cada familia y contraste de viabilidad. |
 | AC-3.04 | Superado | RV-12: alerta → causa/impacto, alternativas, snapshot y formulario con recursos disponibles, sin reconstrucción externa. |
@@ -73,13 +81,13 @@ Los datos preparados para los casos incluyen una causa declarada en 99.1 y una d
 | AC-6.03 | En validación | RV-04 a RV-07: dictamen exige gestor; falta comprobar reporte rechazado y ausencia de revisión. |
 | AC-6.04 | En validación | RV-04 a RV-08: secuencia, decisiones y detención por revisión; faltan rechazo humano y aprobación obsoleta. |
 | AC-7.01 | En validación | RV-01: estado, corte y fuentes visibles; falta contraste de un fallo controlado. |
-| AC-7.02 | En validación | RV-02: retraso/bloqueo/dependencia; verificar deduplicación, reconocimiento y resolución conservando historial. |
+| AC-7.02 | Superado | RV-14/17: retraso, bloqueo, riesgo y desviación visibles; sin duplicados equivalentes, seguimiento conserva evidencia y resolución/reapertura conservan el mismo ID e historial. |
 | AC-7.03 | En validación | RV-08/12: motivos, riesgos, fuente y alternativas de planificación; completar contraste de alternativas de recomendaciones de código. |
 | AC-7.04 | Superado | RV-04 a RV-07 y RV-11: cuatro familias Trello y diff GitHub con destino exacto, revisión, decisión y confirmación de escritura separadas del consentimiento IA. |
 | AC-7.05 | En validación | RV-04 a RV-08: aceptación y ajustes del Revisor; faltan rechazo/ajustes humanos y no heredar decisiones. |
 | AC-7.06 | En validación | RV-04 a RV-07: actor, tiempo, motivo y huella registrados; completar prueba de permisos sobre esos registros. |
 | AC-8.01 | En validación | RV-04 a RV-08: casos aprobados y fallos conservados; completar consulta desde panel de caso rechazado/fallido. |
-| AC-8.02 | En validación | RV-10: rol/exclusiones, destinos y credenciales separadas; completar lector/anónimo, revocación y ausencia de secretos en todas las salidas. |
+| AC-8.02 | En validación | RV-10/13/18/20: anónimo real denegado, permisos/revocación en fixtures y escaneo acotado de credenciales sin coincidencias; completar lector real y salidas todavía no inspeccionadas. |
 
 ## Defectos y repetición
 
@@ -91,7 +99,9 @@ En el reporte, la cantidad de bloqueadas estaba congelada correctamente pero no 
 
 Las pruebas nuevas usan proveedores sintéticos y verifican transmisión íntegra de evidencia mayor a 32 KB, rechazo de UTF-8 que supera el límite antes de enviar y distinción de tiempo agotado/cancelación sin reintento automático. No reproducen el fallo funcional CSRF de UTAPED. El build, lint y pruebas de UTAPED siguen pendientes; Java no se compiló.
 
-Verificación del agente en esta sesión: 135 pruebas unitarias, 18 escenarios PostgreSQL de código y 14 de reportes superados; comprobación de tipos, build de los tres workspaces y vista real de los cambios. Las otras 85 pruebas PostgreSQL no se volvieron a ejecutar en este corte. `.env` conserva ACL sin herencia para el usuario actual, SYSTEM y Administradores; no se expusieron valores de credenciales ni se subieron evidencias privadas.
+La suite de operación falló inicialmente al simular horas futuras: su consulta de reclamación podía seleccionar un cursor de otro proyecto, incluido UTAPED. La transacción de prueba se revirtió. Se restringió esa consulta al proyecto del fixture y se añadió un caso que comprueba que otro cursor vencido permanece intacto, sin trabajos ni eventos. Las ocho pruebas de operación y la comprobación de tipos superaron la repetición. La lógica de producción y sus horarios no cambiaron.
+
+Verificación del agente el 13/10: 135 pruebas unitarias y 118 escenarios PostgreSQL distintos superados, 253 en total. Los 13 casos del corpus se repitieron y no se suman de nuevo. Comprobación de tipos, build de los tres workspaces en el corte anterior y vista real de los cambios; tras el cambio exclusivo de aislamiento de prueba se volvió a comprobar tipos. `.env` conserva ACL sin herencia para el usuario actual, SYSTEM y Administradores; no se expusieron valores de credenciales ni se subieron evidencias privadas.
 
 ## Próximos cortes
 
