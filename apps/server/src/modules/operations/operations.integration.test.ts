@@ -21,7 +21,13 @@ describe.skipIf(process.env.RUN_OPERATIONS_DB_TESTS!=='true')('PostgreSQL schedu
   let pool:pg.Pool,client:pg.PoolClient,database:TrelloDatabase,projectId:string,actor:AuthUser,service:OperationService,code:CodeReviewService;
   beforeAll(async()=>{
     pool=new pg.Pool({connectionString:process.env.DATABASE_URL,max:1});client=await pool.connect();await client.query('BEGIN');
-    database={query:client.query.bind(client),connect:async()=>({query:async(sql:string,values?:unknown[])=>{if(sql.startsWith('BEGIN'))return client.query('SAVEPOINT operations_test');if(sql==='COMMIT')return client.query('RELEASE SAVEPOINT operations_test');if(sql==='ROLLBACK'){await client.query('ROLLBACK TO SAVEPOINT operations_test');return client.query('RELEASE SAVEPOINT operations_test');}return client.query(sql,values);},release:()=>{}})} as unknown as TrelloDatabase;
+    // Simulated future ticks must not claim schedules belonging to real projects.
+    const query=async(sql:string,values:unknown[]=[])=>{
+      const candidate='SELECT project_id FROM operation_cursors WHERE (';
+      if(sql.includes(candidate))return client.query(sql.replace(candidate,`SELECT project_id FROM operation_cursors WHERE project_id=$${values.length+1} AND (`),[...values,projectId]);
+      return client.query(sql,values);
+    };
+    database={query,connect:async()=>({query:async(sql:string,values?:unknown[])=>{if(sql.startsWith('BEGIN'))return client.query('SAVEPOINT operations_test');if(sql==='COMMIT')return client.query('RELEASE SAVEPOINT operations_test');if(sql==='ROLLBACK'){await client.query('ROLLBACK TO SAVEPOINT operations_test');return client.query('RELEASE SAVEPOINT operations_test');}return query(sql,values);},release:()=>{}})} as unknown as TrelloDatabase;
     projectId=(await client.query<{id:string}>("INSERT INTO projects(name) VALUES('Scheduled acceptance fixture') RETURNING id")).rows[0]!.id;
     actor=(await client.query<AuthUser>('INSERT INTO users(login,display_name,password_hash) VALUES($1,\'Fixture manager\',\'unusable\') RETURNING *',['ops-'+randomBytes(8).toString('hex')])).rows[0]!;
     await client.query("INSERT INTO project_memberships(project_id,user_id,role) VALUES($1,$2,'manager')",[projectId,actor.id]);
@@ -109,5 +115,15 @@ describe.skipIf(process.env.RUN_OPERATIONS_DB_TESTS!=='true')('PostgreSQL schedu
     await client.query('UPDATE users SET auth_version=auth_version+1 WHERE id=$1',[actor.id]);await client.query('UPDATE operation_cursors SET next_code=clock_timestamp(),lease_until=NULL WHERE project_id=$1',[projectId]);await service.tick(new Date(Date.now()+1000));
     const result=await service.overview(projectId);expect(result.cursor?.last_error).toBe('FORBIDDEN');expect(result.cursor?.next_code).toBeNull();
     expect((await client.query('SELECT id FROM operation_runs WHERE project_id=$1 AND status=\'suspended\' AND detail->>\'errorCode\'=\'FORBIDDEN\'',[projectId])).rows).toHaveLength(1);
+  });
+  it('never claims another project during simulated future ticks',async()=>{
+    const otherId=(await client.query<{id:string}>("INSERT INTO projects(name) VALUES('Untouched scheduling fixture') RETURNING id")).rows[0]!.id;
+    await client.query('INSERT INTO operation_configurations(project_id,version,enabled,interval_minutes,code_enabled,code_hour,max_files,changed_by,auth_version) VALUES($1,1,true,60,false,18,64,$2,$3)',[otherId,actor.id,actor.auth_version]);
+    await client.query("INSERT INTO operation_cursors(project_id,configuration_version,next_sync,updated_at) VALUES($1,1,clock_timestamp(),clock_timestamp()-interval '1 day')",[otherId]);
+    const before=(await client.query('SELECT * FROM operation_cursors WHERE project_id=$1',[otherId])).rows[0];
+    expect(await service.tick(new Date(Date.now()+86_400_000))).toBe(false);
+    expect((await client.query('SELECT * FROM operation_cursors WHERE project_id=$1',[otherId])).rows[0]).toEqual(before);
+    expect((await client.query('SELECT id FROM operation_runs WHERE project_id=$1',[otherId])).rows).toHaveLength(0);
+    expect((await client.query('SELECT id FROM supervision_jobs WHERE project_id=$1',[otherId])).rows).toHaveLength(0);
   });
 });
