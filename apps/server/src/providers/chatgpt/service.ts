@@ -11,7 +11,7 @@ import {CredentialVault} from './vault.js';
 export interface ChatGPTOptions {database:TrelloDatabase;callbackOrigin:string;fetcher?:typeof fetch;identityKey?:JWTVerifyGetKey;credentialKey?:Buffer;onFailure?:()=>void}
 const safeCodes=new Set(['INVALID_STATE','AUTHORIZATION_DENIED','INVALID_CLIENT','MISSING_CODE','NO_PENDING_AUTHORIZATION','INVALID_ID_TOKEN','IDENTITY_MISMATCH','PLAN_PERMISSION_MISSING','NO_AVAILABLE_MODELS','AUTHORIZATION_EXPIRED','USAGE_LIMIT','INFERENCE_FAILED','INCOMPLETE_STREAM','INVALID_STREAM','INVALID_MODEL_OUTPUT','RESPONSE_TOO_LARGE','INFERENCE_UNAVAILABLE','PROVIDER_UNAVAILABLE','INVALID_RESPONSE','CONNECTION_REQUIRED','MODEL_NOT_AVAILABLE','AUTHORIZATION_CANCELLED','INVALID_TOKEN_LIFETIME','CONFLICT','CONNECTION_CAPACITY']);
 export function providerCode(error:unknown) {
-  return error instanceof ProviderValidationError&&(safeCodes.has(error.code)||['UNSUPPORTED_EFFORT','REFRESH_UNCERTAIN','REFRESH_IN_PROGRESS','REFRESH_UNAVAILABLE','REFRESH_REAUTHORIZATION_REQUIRED','CREDENTIAL_STORAGE_UNAVAILABLE'].includes(error.code))?error.code:
+  return error instanceof ProviderValidationError&&(safeCodes.has(error.code)||['INFERENCE_TIMEOUT','INPUT_TOO_LARGE','INVALID_REQUEST','UNSUPPORTED_EFFORT','REFRESH_UNCERTAIN','REFRESH_IN_PROGRESS','REFRESH_UNAVAILABLE','REFRESH_REAUTHORIZATION_REQUIRED','CREDENTIAL_STORAGE_UNAVAILABLE'].includes(error.code))?error.code:
     error&&typeof error==='object'&&'code' in error&&error.code==='FORBIDDEN'?'FORBIDDEN':'PROVIDER_UNAVAILABLE';
 }
 interface Registration {host_id:string;client_id:string|null;subject:string|null}

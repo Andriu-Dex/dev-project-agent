@@ -16,6 +16,7 @@ export function registerChatGPTRoutes(app:FastifyInstance,service:ChatGPTService
   }
   function failure(error:unknown,reply:FastifyReply) {
     const code=providerCode(error);
+    if(code==='INPUT_TOO_LARGE'||code==='INVALID_REQUEST')return reply.code(400).send({code,message:code==='INPUT_TOO_LARGE'?'La evidencia supera el límite de envío. Reduce el alcance de la solicitud.':'La solicitud al proveedor no cumple el formato permitido.'});
     const status=code==='UNSUPPORTED_EFFORT'?400:code==='FORBIDDEN'?403:code==='CONFLICT'?409:['CONNECTION_REQUIRED','MODEL_NOT_AVAILABLE','NO_PENDING_AUTHORIZATION','AUTHORIZATION_EXPIRED'].includes(code)?409:code==='USAGE_LIMIT'?429:503;
     return reply.code(status).send({code,message:code==='UNSUPPORTED_EFFORT'?'El modelo no admite ese nivel de razonamiento.':code==='USAGE_LIMIT'?'ChatGPT alcanzó un límite de uso. Espera antes de volver a evaluar.':code==='CONFLICT'?'Ya hay una evaluación activa o la solicitud cambió. Actualiza el panel.':status===409?'Conecta ChatGPT y selecciona un modelo disponible antes de continuar.':'No se pudo completar la operación con ChatGPT. Puedes volver a intentar.'});
   }

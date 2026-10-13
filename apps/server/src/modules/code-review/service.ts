@@ -154,7 +154,7 @@ export class CodeReviewService {
         await assertManager(this.database,job.project_id,actor);await this.fresh(job.project_id,source);
         if(this.closed||this.provider.connections.credentials(binding,job.model).entry!==credentials.entry)throw new CodeError('CONNECTION_CHANGED');
         const prior=(await this.database.query("SELECT output FROM code_messages WHERE project_id=$1 AND proposal_id=$2 AND version=$3 AND stage='reviewer' AND status='succeeded'",[job.project_id,job.proposal_id,job.version])).rows[0];
-        const input={schemaVersion:1,instructionsVersion:'code-agents-v1',recipient:stage,projectId:job.project_id,proposalId:job.proposal_id,version:job.version,jobId:job.id,source:modelSource(source),findings,goal:row.goal,contentHash:hash,candidate,priorReview:stage==='approver'?prior?.output??null:null,externalExecutionEnabled:false};inputHash=fingerprint(input);
+        const input={schemaVersion:1,instructionsVersion:'code-agents-v2',recipient:stage,projectId:job.project_id,proposalId:job.proposal_id,version:job.version,jobId:job.id,source:modelSource(source),findings,goal:row.goal,contentHash:hash,candidate,priorReview:stage==='approver'?prior?.output??null:null,externalExecutionEnabled:false};inputHash=fingerprint(input);
         const response=await this.provider.generate(binding,actor,job.model,job.reasoning_effort,correctionInstructions(stage),JSON.stringify(input));
         if(this.closed||this.provider.connections.credentials(binding,job.model).entry!==credentials.entry)throw new CodeError('CONNECTION_CHANGED');
         let output:unknown,next:ProposalState;

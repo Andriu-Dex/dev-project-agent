@@ -22,6 +22,8 @@ La lectura usa únicamente GET en `api.github.com`: commit de la rama, árbol Gi
 
 Límites de esta tanda: árbol de 2500 entradas; ocho archivos; 30 000 bytes por archivo y 120 000 bytes de código seleccionado. Se admiten TS/TSX/JS/JSX, variantes CJS/MJS, Java y JSON en rutas regulares de hasta 240 caracteres. No se admiten symlinks, submódulos como archivos editables, binarios, `.github`, `.git`, dependencias, builds ni rutas de credenciales. La detección conservadora de secretos reconocibles puede rechazar archivos legítimos; no garantiza identificar todos los secretos. Revisar los archivos antes de autorizar su envío.
 
+La entrada serializada de cada etapa tiene un límite local de 512 000 bytes, independiente de los 120 000 bytes de código. Incluye fuente, candidato, diff, fragmentos previos/nuevos y dictámenes; no se trunca para continuar. Una entrada mayor se rechaza antes de enviar, con `INPUT_TOO_LARGE` y una indicación de reducir el alcance. Este límite de la aplicación no garantiza disponibilidad ni capacidad de contexto de todos los modelos. El 13 de octubre, un caso real de cuatro archivos produjo 35 029 bytes al llegar al Revisor y detectó el límite anterior incompatible de 32 000 bytes. La corrección conserva las evidencias y requiere continuar explícitamente la etapa pendiente; no repite el Ejecutor.
+
 El análisis local transforma TS/JS de manera aislada con el compilador TypeScript y comprueba JSON. No ejecuta imports, scripts, código ni dependencias del repositorio. Los patrones de ejecución dinámica, composición de consultas y repetición textual producen hipótesis con líneas concretas. Java se marca `not_checked`: no se compila. No se han ejecutado builds, pruebas de UTAPED, comprobaciones de tipos entre módulos ni análisis de toda la aplicación.
 
 Cada hallazgo generado por IA debe citar exactamente un fragmento de hasta veinte líneas del archivo seleccionado. Ruta, rango y evidencia se validan contra el texto guardado. La validación del fragmento prueba su procedencia, no la conclusión del modelo.
@@ -37,6 +39,8 @@ La huella SHA-256 vincula fuente congelada, objetivo, hallazgos seleccionados y 
 Las llamadas a GitHub y las transacciones locales no son una transacción distribuida: la rama podría cambiar después de una lectura. Como esta fase no escribe externamente, esa carrera no produce un cambio en UTAPED. La futura publicación real deberá revalidar las precondiciones en su propio límite de escritura y gestionar resultados inciertos; estas aprobaciones demostrativas no podrán reutilizarse.
 
 Los errores de cuota, desconexión o reinicio no repiten solicitudes automáticamente. «Continuar etapa de código pendiente» requiere una solicitud y consentimiento nuevos y reutiliza el contenido sellado de las etapas ya completadas. Un análisis de IA fallido se conserva y requiere un análisis nuevo. Se recuperan trabajos activos como `interrupted` al iniciar el servicio; esta recuperación supone una sola instancia local del servidor, como el resto de esta entrega.
+
+Las inferencias tienen un máximo local de 180 segundos. Una espera agotada conserva `INFERENCE_TIMEOUT`, separado de una cancelación de autorización o un error de formato. Las instrucciones `code-agents-v2` explicitan propiedades, tipos de listas y límites de texto del dictamen; la validación estricta permanece activa. En la prueba real, el Revisor solicitó ajustes en la versión 1 por cobertura incompleta de invalidación CSRF y no dejó pasar el candidato al Aprobador.
 
 ## Persistencia y API
 

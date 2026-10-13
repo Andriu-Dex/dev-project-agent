@@ -7,6 +7,9 @@ import type {ReasoningEffort} from '@dev-project-agent/contracts';
 export function supportedEfforts(model:string):ReasoningEffort[] {return model==='gpt-6.1-sol'?['low','medium','high','xhigh','max']:[];}
 
 export class ProviderValidationError extends Error {constructor(readonly code:string){super('Provider validation failed.');}}
+// Bound the serialized workflow, including source, sealed edits and review evidence.
+export const inferenceInputBytes=512_000;
+export const inferenceTimeoutMs=180_000;
 export interface SignInAttempt {state:string;nonce:string;verifier:string;redirectUri:string;clientId:string|null;subject:string|null}
 export function authorizationUrl(attempt:SignInAttempt,hostId:string) {
   const url=new URL('https://auth.openai.com/api/accounts/authorize');
@@ -95,36 +98,44 @@ export async function listModels(accessToken:string,fetcher:typeof fetch=fetch) 
 }
 export async function inferJson(accessToken:string,model:string,instructions:string,input:string,fetcher:typeof fetch=fetch,signal?:AbortSignal,effort:ReasoningEffort|null=null) {
   if(effort&&!supportedEfforts(model).includes(effort))throw new ProviderValidationError('UNSUPPORTED_EFFORT');
-  if(!/^[a-zA-Z0-9_.:-]{1,100}$/.test(model)||Buffer.byteLength(input)>32_000||Buffer.byteLength(instructions)>12_000)throw new ProviderValidationError('INVALID_REQUEST');
+  if(!/^[a-zA-Z0-9_.:-]{1,100}$/.test(model)||Buffer.byteLength(instructions)>12_000)throw new ProviderValidationError('INVALID_REQUEST');
+  if(Buffer.byteLength(input)>inferenceInputBytes)throw new ProviderValidationError('INPUT_TOO_LARGE');
   const startedAt=Date.now();
-  const response=await fetcher('https://api.openai.com/v1/responses',{method:'POST',redirect:'error',signal:signal?AbortSignal.any([signal,AbortSignal.timeout(60_000)]):AbortSignal.timeout(60_000),headers:{Authorization:`Bearer ${accessToken}`,'Content-Type':'application/json'},
-    body:JSON.stringify({model,instructions,input:[{role:'user',content:input}],store:false,stream:true,...(effort?{reasoning:{effort}}:{})})});
-  if(response.status===401)throw new ProviderValidationError('AUTHORIZATION_EXPIRED');
-  if(response.status===429)throw new ProviderValidationError('USAGE_LIMIT');
-  if(!response.ok||!response.body)throw new ProviderValidationError('INFERENCE_UNAVAILABLE');
-  const decoder=new TextDecoder();let buffer='',output='',completed=false,size=0,usage:unknown=null;
-  for await(const chunk of response.body){
-    size+=chunk.byteLength;if(size>1_000_000)throw new ProviderValidationError('RESPONSE_TOO_LARGE');buffer=(buffer+decoder.decode(chunk,{stream:true})).replace(/\r\n/g,'\n');
-    let separator:number;
-    while((separator=buffer.indexOf('\n\n'))>=0){
-      const event=buffer.slice(0,separator);buffer=buffer.slice(separator+2);
-      const data=event.split('\n').filter(line=>line.startsWith('data:')).map(line=>line.slice(5).trimStart()).join('\n');
-      if(!data||data==='[DONE]')continue;
-      let value:Record<string,unknown>;try{value=JSON.parse(data);}catch{throw new ProviderValidationError('INVALID_STREAM');}
-      if(['response.failed','response.incomplete','error'].includes(String(value.type))) {
-        const error=(value.response as Record<string,unknown>|undefined)?.error??value.error;
-        const code=error&&typeof error==='object'?(error as Record<string,unknown>).code:null;
-        throw new ProviderValidationError(['subscription_sharing_usage_limit_exceeded','subscription_sharing_usage_unavailable'].includes(String(code))?'USAGE_LIMIT':'INFERENCE_FAILED');
+  const timeout=AbortSignal.timeout(inferenceTimeoutMs),requestSignal=signal?AbortSignal.any([signal,timeout]):timeout;
+  try {
+    const response=await fetcher('https://api.openai.com/v1/responses',{method:'POST',redirect:'error',signal:requestSignal,headers:{Authorization:`Bearer ${accessToken}`,'Content-Type':'application/json'},
+      body:JSON.stringify({model,instructions,input:[{role:'user',content:input}],store:false,stream:true,...(effort?{reasoning:{effort}}:{})})});
+    if(response.status===401)throw new ProviderValidationError('AUTHORIZATION_EXPIRED');
+    if(response.status===429)throw new ProviderValidationError('USAGE_LIMIT');
+    if(!response.ok||!response.body)throw new ProviderValidationError('INFERENCE_UNAVAILABLE');
+    const decoder=new TextDecoder();let buffer='',output='',completed=false,size=0,usage:unknown=null;
+    for await(const chunk of response.body){
+      size+=chunk.byteLength;if(size>1_000_000)throw new ProviderValidationError('RESPONSE_TOO_LARGE');buffer=(buffer+decoder.decode(chunk,{stream:true})).replace(/\r\n/g,'\n');
+      let separator:number;
+      while((separator=buffer.indexOf('\n\n'))>=0){
+        const event=buffer.slice(0,separator);buffer=buffer.slice(separator+2);
+        const data=event.split('\n').filter(line=>line.startsWith('data:')).map(line=>line.slice(5).trimStart()).join('\n');
+        if(!data||data==='[DONE]')continue;
+        let value:Record<string,unknown>;try{value=JSON.parse(data);}catch{throw new ProviderValidationError('INVALID_STREAM');}
+        if(['response.failed','response.incomplete','error'].includes(String(value.type))) {
+          const error=(value.response as Record<string,unknown>|undefined)?.error??value.error;
+          const code=error&&typeof error==='object'?(error as Record<string,unknown>).code:null;
+          throw new ProviderValidationError(['subscription_sharing_usage_limit_exceeded','subscription_sharing_usage_unavailable'].includes(String(code))?'USAGE_LIMIT':'INFERENCE_FAILED');
+        }
+        if(value.type==='response.output_text.delta'&&typeof value.delta==='string')output+=value.delta;
+        if(value.type==='response.completed'){completed=true;usage=(value.response as Record<string,unknown>|undefined)?.usage??null;}
       }
-      if(value.type==='response.output_text.delta'&&typeof value.delta==='string')output+=value.delta;
-      if(value.type==='response.completed'){completed=true;usage=(value.response as Record<string,unknown>|undefined)?.usage??null;}
     }
+    if(!completed)throw new ProviderValidationError('INCOMPLETE_STREAM');
+    let parsed:unknown;try{parsed=JSON.parse(output.trim());}catch{throw new ProviderValidationError('INVALID_MODEL_OUTPUT');}
+    // Retain only numeric aggregate usage, never arbitrary provider metadata or generated text.
+    const observedUsage=usage&&typeof usage==='object'?Object.fromEntries(Object.entries(usage).filter(([key,value])=>['input_tokens','output_tokens','total_tokens'].includes(key)&&typeof value==='number')):null;
+    return {model,durationMs:Date.now()-startedAt,usage:observedUsage,output:parsed};
+  }catch(error){
+    if(signal?.aborted)throw new ProviderValidationError('AUTHORIZATION_CANCELLED');
+    if(timeout.aborted)throw new ProviderValidationError('INFERENCE_TIMEOUT');
+    throw error;
   }
-  if(!completed)throw new ProviderValidationError('INCOMPLETE_STREAM');
-  let parsed:unknown;try{parsed=JSON.parse(output.trim());}catch{throw new ProviderValidationError('INVALID_MODEL_OUTPUT');}
-  // Retain only numeric aggregate usage, never arbitrary provider metadata or generated text.
-  const observedUsage=usage&&typeof usage==='object'?Object.fromEntries(Object.entries(usage).filter(([key,value])=>['input_tokens','output_tokens','total_tokens'].includes(key)&&typeof value==='number')):null;
-  return {model,durationMs:Date.now()-startedAt,usage:observedUsage,output:parsed};
 }
 export async function validateInference(accessToken:string,fetcher:typeof fetch=fetch) {
   const model=(await listModels(accessToken,fetcher))[0]!.slug;

@@ -1,6 +1,7 @@
 import {beforeAll,describe,expect,it,vi} from 'vitest';
 import {createLocalJWKSet,exportJWK,generateKeyPair,SignJWT,type JWTVerifyGetKey} from 'jose';
-import {authorizationUrl,callbackCredentials,exchangeSignIn,inferJson,listModels,newAttempt,validateInference,verifyIdentity} from './validation.js';
+import {authorizationUrl,callbackCredentials,exchangeSignIn,inferJson,inferenceInputBytes,listModels,newAttempt,ProviderValidationError,validateInference,verifyIdentity} from './validation.js';
+import {providerCode} from './service.js';
 let privateKey:CryptoKey,key:JWTVerifyGetKey;
 const clientId='oaiapp_test',nonce='synthetic-nonce';
 async function signed(overrides:Record<string,unknown>={}){
@@ -8,6 +9,33 @@ async function signed(overrides:Record<string,unknown>={}){
 }
 beforeAll(async()=>{const pair=await generateKeyPair('RS256');privateKey=pair.privateKey;key=createLocalJWKSet({keys:[{...await exportJWK(pair.publicKey),kid:'test',alg:'RS256'}]});});
 describe('Official ChatGPT validation contract',()=>{
+  it('distinguishes inference timeout from cancelled authorization without retrying transport',async()=>{
+    const timeout=new AbortController(),cancelled=new AbortController();
+    const timer=vi.spyOn(AbortSignal,'timeout').mockReturnValue(timeout.signal);
+    try{
+      const fetcher=vi.fn<typeof fetch>().mockImplementation(async()=>{timeout.abort(new DOMException('Synthetic timeout','TimeoutError'));throw timeout.signal.reason;});
+      await expect(inferJson('synthetic','gpt-6.1-sol','instructions','{}',fetcher)).rejects.toMatchObject({code:'INFERENCE_TIMEOUT'});
+      expect(fetcher).toHaveBeenCalledTimes(1);
+      expect(providerCode(new ProviderValidationError('INFERENCE_TIMEOUT'))).toBe('INFERENCE_TIMEOUT');
+      cancelled.abort();
+      await expect(inferJson('synthetic','gpt-6.1-sol','instructions','{}',fetcher,cancelled.signal)).rejects.toMatchObject({code:'AUTHORIZATION_CANCELLED'});
+    }finally{timer.mockRestore();}
+  });
+  it('accepts bounded code-review evidence beyond the old 32 KB guard without truncation',async()=>{
+    const input=JSON.stringify({source:{files:[{path:'frontend/src/shared/api.ts',content:'x'.repeat(18_000)}]},candidate:{files:[{content:'y'.repeat(12_000)}],edits:[{before:'a'.repeat(3_000),after:'b'.repeat(3_000)}]},contentHash:'a'.repeat(64)});
+    expect(Buffer.byteLength(input)).toBeGreaterThan(32_000);
+    const fetcher=vi.fn<typeof fetch>().mockResolvedValue(new Response('data: {"type":"response.output_text.delta","delta":"{}"}\n\ndata: {"type":"response.completed"}\n\n'));
+    await inferJson('synthetic','gpt-6.1-sol','instructions',input,fetcher);
+    const request=JSON.parse(String(fetcher.mock.calls[0]![1]!.body));
+    expect(request.input[0].content).toBe(input);expect(request).toMatchObject({store:false,stream:true});
+  });
+  it('rejects oversized UTF-8 input before transport and preserves a safe size error',async()=>{
+    const fetcher=vi.fn<typeof fetch>();
+    await expect(inferJson('synthetic','gpt-6.1-sol','instructions','á'.repeat(inferenceInputBytes/2+1),fetcher)).rejects.toMatchObject({code:'INPUT_TOO_LARGE'});
+    expect(fetcher).not.toHaveBeenCalled();
+    expect(providerCode(new ProviderValidationError('INPUT_TOO_LARGE'))).toBe('INPUT_TOO_LARGE');
+    expect(providerCode(new ProviderValidationError('INVALID_REQUEST'))).toBe('INVALID_REQUEST');
+  });
   it('sends only documented reasoning levels and preserves the provider default',async()=>{
     const fetcher=vi.fn<typeof fetch>().mockImplementation(async()=>new Response('data: {"type":"response.output_text.delta","delta":"{}"}\n\ndata: {"type":"response.completed"}\n\n'));
     await inferJson('synthetic','gpt-6.1-sol','instructions','{}',fetcher,undefined,'xhigh');expect(JSON.parse(String(fetcher.mock.calls[0]![1]!.body)).reasoning).toEqual({effort:'xhigh'});
