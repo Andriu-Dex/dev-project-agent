@@ -240,3 +240,9 @@ Se implementan los seis paquetes de cierre mediante navegación nueva, reglas co
 | AC-8.01, AC-8.02 | Historial común y por módulo, auditoría/evidencia inmutables, CSRF/permisos/revocación, credenciales de escritura separadas, protección NTFS automática de `.env` y acceso ChatGPT cifrado. | Revalidar instalación final, secretos, mínimos permisos y renovación real; no se afirma cifrado en reposo de los tokens locales Trello/GitHub. |
 
 La verificación automatizada y visual se registra en [estado de implementación](implementation-status.md). Las fuentes originales y los 39 criterios se conservan; todos los AC/CLASS/USER permanecen pendientes de aceptación final hasta completar el guion con responsables y evidencias. No se realizaron escrituras externas ni se activaron programaciones reales en esta tanda.
+
+## Validación real iniciada el 13 de octubre
+
+El [registro de validación real](real-acceptance-validation.md) contiene el estado posterior de cada AC, sus casos y pendientes. Se comprobaron cuatro escrituras Trello aprobadas por el gestor, una rama y PR borrador específicamente autorizados, renovación real de ChatGPT, fuentes programadas con pestañas del panel cerradas y un reporte manual con las acciones del periodo. Se superaron técnicamente AC-3.04, AC-4.02 y AC-7.04; los otros 36 conservan pendientes. Este registro prevalece sobre las observaciones históricas de “sin programaciones/escrituras reales”, sin cambiar los requisitos ni declarar aceptada toda la entrega.
+
+Los horarios confirmados por el usuario y activados son lecturas cada 60 minutos, revisión diaria a las 18:00 y reporte los viernes a las 18:00, America/Guayaquil. El corte semanal del 16 de octubre y el análisis programado de dos commits reales todavía requieren evidencia.
