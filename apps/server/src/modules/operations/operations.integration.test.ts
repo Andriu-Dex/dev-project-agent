@@ -113,6 +113,47 @@ describe.skipIf(process.env.RUN_OPERATIONS_DB_TESTS!=='true')('PostgreSQL schedu
     const state=await scheduled.overview(projectId);expect(state.cursor?.next_code).toBeNull();expect(state.runs.some(run=>run.status==='suspended')).toBe(true);
     const {version:currentVersion,...current}=state.configuration;await scheduled.configure(projectId,actor,{...current,expectedVersion:currentVersion});
   });
+  it('excludes sensitive content without blocking safe files or consuming coverage',async()=>{
+    const fixture=codeFixture(),files=Array.from({length:6},(_,index)=>{
+      const content=index===1?'export const token = "synthetic_unusable_fixture";':`export const value = ${index};`;
+      return {path:`src/guarded${index}.ts`,type:'blob',mode:'100644',sha:blobHash(content),size:Buffer.byteLength(content),content};
+    });
+    const fetcher:typeof fetch=async(input)=>{const pathname=new URL(String(input)).pathname;
+      if(pathname.includes('/git/trees/'))return Response.json({sha:fixture.treeSha,truncated:false,tree:files.map(({content:ignored,...entry})=>entry)});
+      if(pathname.includes('/git/blobs/')){const file=files.find(value=>pathname.endsWith(value.sha))!;return Response.json({sha:file.sha,encoding:'base64',size:file.size,content:Buffer.from(file.content).toString('base64')});}
+      return codeSourceFetcher(input);
+    };
+    const guardedCode=new CodeReviewService(database,{} as ChatGPTService,null,fetcher),scheduled=new OperationService(database,{database,trelloCredentials:null,githubToken:null,fetcher},guardedCode);
+    try{
+      const {version,...values}=(await scheduled.overview(projectId)).configuration;
+      await scheduled.configure(projectId,actor,{...values,enabled:false,codeEnabled:true,codeWithAi:false,model:null,consent:false,maxFiles:4,expectedVersion:version});
+      const now=new Date();await client.query('UPDATE operation_cursors SET next_code=$2,lease_until=NULL WHERE project_id=$1',[projectId,now]);await scheduled.tick(now);
+      const run=(await client.query("SELECT status,detail FROM operation_runs WHERE project_id=$1 AND configuration_version=$2 AND kind='code' AND occurrence=$3",[projectId,version+1,now])).rows[0]!;
+      expect(run.status).toBe('partial');expect(run.detail.reviewed).toEqual(['src/guarded0.ts','src/guarded2.ts','src/guarded3.ts']);
+      expect(run.detail.omitted).toContainEqual({path:'src/guarded1.ts',reason:'sensitive_source'});expect(run.detail.deferred).toEqual(['src/guarded4.ts','src/guarded5.ts']);
+      const cursor=(await client.query('SELECT code_inventory,last_error FROM operation_cursors WHERE project_id=$1',[projectId])).rows[0]!;
+      expect(cursor.code_inventory['src/guarded1.ts']).toBeUndefined();expect(cursor.last_error).toBeNull();
+      const sources=(await client.query('SELECT source FROM code_sources WHERE project_id=$1 AND analysis_id=ANY($2::uuid[])',[projectId,run.detail.analyses])).rows;
+      expect(sources).toHaveLength(3);expect(sources.every(value=>value.source.files.every((file:{content:string})=>!file.content.includes('synthetic_unusable_fixture')))).toBe(true);
+    }finally{await guardedCode.close();}
+  });
+  it('reuses pending single-file requests after a sensitive batch fallback',async()=>{
+    const fixture=codeFixture(),inventory=Array.from({length:6},(_,index)=>({...fixture.inventory[0]!,path:`src/retry${index}.ts`}));
+    const fetcher:typeof fetch=async(input,options)=>String(input).includes('/git/trees/')?Response.json({sha:fixture.treeSha,truncated:false,tree:inventory}):codeSourceFetcher(input,options);
+    const requests=new Map<string,{id:string;paths:string[]}>();let pending=true;
+    const fake={validateScheduledProvider:async()=>{},analyze:async(_binding:unknown,_actor:unknown,request:{requestKey:string;paths:string[]})=>{
+      if(request.paths.includes('src/retry1.ts'))throw Object.assign(new Error('Blocked acceptance fixture'),{code:'SENSITIVE_SOURCE'});
+      if(!requests.has(request.requestKey))requests.set(request.requestKey,{id:randomUUID(),paths:request.paths});return requests.get(request.requestKey)!;
+    },analysis:async()=>({status:pending?'running':'ready'})} as unknown as CodeReviewService;
+    const scheduled=new OperationService(database,{database,trelloCredentials:null,githubToken:null,fetcher},fake),{version,...values}=(await service.overview(projectId)).configuration;
+    await scheduled.configure(projectId,actor,{...values,enabled:false,codeEnabled:true,codeWithAi:true,model:'synthetic-model',consent:true,maxFiles:5,expectedVersion:version});
+    const now=new Date();await client.query('UPDATE operation_cursors SET next_code=$2,lease_until=NULL WHERE project_id=$1',[projectId,now]);await scheduled.tick(now);
+    expect(requests.size).toBe(1);expect([...requests.values()][0]!.paths).toEqual(['src/retry0.ts']);
+    pending=false;await client.query('UPDATE operation_cursors SET lease_until=NULL WHERE project_id=$1',[projectId]);await scheduled.tick(new Date(now.getTime()+16*60_000));
+    const run=(await client.query("SELECT status,detail FROM operation_runs WHERE project_id=$1 AND configuration_version=$2 AND kind='code' AND occurrence=$3",[projectId,version+1,now])).rows[0]!;
+    expect(run.status).toBe('partial');expect(run.detail.reviewed).toEqual(['src/retry0.ts','src/retry2.ts','src/retry3.ts','src/retry4.ts']);expect(run.detail.singleFileMode).toBe(true);
+    expect(requests.size).toBe(4);expect(run.detail.exclusions).toHaveLength(1);expect(run.detail.deferred).toEqual(['src/retry5.ts']);
+  });
   it('suspends a schedule when the authorizing manager loses authority',async()=>{
     await client.query('UPDATE users SET auth_version=auth_version+1 WHERE id=$1',[actor.id]);await client.query('UPDATE operation_cursors SET next_code=clock_timestamp(),lease_until=NULL WHERE project_id=$1',[projectId]);await service.tick(new Date(Date.now()+1000));
     const result=await service.overview(projectId);expect(result.cursor?.last_error).toBe('FORBIDDEN');expect(result.cursor?.next_code).toBeNull();

@@ -72,23 +72,40 @@ export class OperationService {
   private async reviewCode(row:ConfigurationRow&{next_code:Date|null;code_inventory:Record<string,string>;lease_token:string},actor:AuthUser,now:Date) {
     const connection=(await this.database.query<{owner:string;repository:string;branch:string}>('SELECT owner,repository,branch FROM github_connections WHERE project_id=$1',[row.project_id])).rows[0];if(!connection)throw new OperationError('NOT_CONFIGURED');
     const catalog=await readCodeCatalog(connection,this.options.githubToken,this.options.fetcher??fetch);
-    const progress=(await this.database.query<{detail:{analyses:string[];reviewed:string[]}}>('SELECT detail FROM operation_runs WHERE project_id=$1 AND configuration_version=$2 AND kind=\'code\' AND occurrence=$3',[row.project_id,row.version,row.next_code])).rows[0]?.detail??{analyses:[],reviewed:[]};
-    const changed=catalog.files.filter(file=>row.code_inventory[file.path]!==file.blobSha),selected=changed.slice(0,Math.max(0,row.max_files-progress.reviewed.length)),completed:Record<string,string>={...row.code_inventory},analyses:string[]=[...progress.analyses],reviewed=[...progress.reviewed];
-    await this.database.query(`INSERT INTO operation_runs(project_id,configuration_version,kind,occurrence,status,detail) VALUES($1,$2,'code',$3,'started',$4) ON CONFLICT DO NOTHING`,[row.project_id,row.version,row.next_code,JSON.stringify({head:catalog.head,analyses,reviewed,withAi:row.code_with_ai})]);
-    for(let index=0;index<selected.length;index+=4){
+    const progress=(await this.database.query<{detail:{analyses:string[];reviewed:string[];exclusions?:{path:string;blobSha:string;reason:string}[];singleFileMode?:boolean}}>('SELECT detail FROM operation_runs WHERE project_id=$1 AND configuration_version=$2 AND kind=\'code\' AND occurrence=$3',[row.project_id,row.version,row.next_code])).rows[0]?.detail??{analyses:[],reviewed:[]};
+    const exclusions=[...(progress.exclusions??[])],changed=catalog.files.filter(file=>row.code_inventory[file.path]!==file.blobSha);
+    const remaining=changed.filter(file=>!exclusions.some(value=>value.path===file.path&&value.blobSha===file.blobSha));
+    const selected=remaining.slice(0,Math.max(0,row.max_files-progress.reviewed.length-exclusions.length)),completed:Record<string,string>={...row.code_inventory},analyses:string[]=[...progress.analyses],reviewed=[...progress.reviewed];
+    let singleFileMode=progress.singleFileMode??false;
+    const detail=()=>JSON.stringify({head:catalog.head,analyses,reviewed,exclusions,singleFileMode,withAi:row.code_with_ai});
+    await this.database.query(`INSERT INTO operation_runs(project_id,configuration_version,kind,occurrence,status,detail) VALUES($1,$2,'code',$3,'started',$4) ON CONFLICT DO NOTHING`,[row.project_id,row.version,row.next_code,detail()]);
+    const saveProgress=async()=>{
+      const client=await this.database.connect();try{await client.query('BEGIN');await assertManager(client,row.project_id,actor);
+        const saved=await client.query('UPDATE operation_cursors SET code_inventory=$3 WHERE project_id=$1 AND lease_token=$2 AND configuration_version=$4 AND lease_until>clock_timestamp() RETURNING project_id',[row.project_id,row.lease_token,JSON.stringify(completed),row.version]);if(!saved.rowCount)throw new OperationError('CONFLICT');
+        await client.query('UPDATE operation_runs SET detail=$4 WHERE project_id=$1 AND configuration_version=$2 AND kind=\'code\' AND occurrence=$3',[row.project_id,row.version,row.next_code,detail()]);await client.query('COMMIT');
+      }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
+    };
+    for(let index=0;index<selected.length;){
       await assertManager(this.database,row.project_id,actor);
       const stillCurrent=(await this.database.query('SELECT project_id FROM operation_cursors WHERE project_id=$1 AND configuration_version=$2 AND lease_token=$3 AND lease_until>clock_timestamp()',[row.project_id,row.version,row.lease_token])).rows.length;if(!stillCurrent)throw new OperationError('CONFLICT');
-      const batch=selected.slice(index,index+4),analysis=await this.codeReview.analyze({projectId:row.project_id,userId:actor.id,authVersion:actor.auth_version,sessionId:'scheduled:'+row.project_id},actor,{paths:batch.map(file=>file.path),expectedHead:catalog.head,mode:'files',withAi:row.code_with_ai,consent:row.consent,...(row.model?{model:row.model}:{}),...(row.reasoning_effort?{reasoningEffort:row.reasoning_effort as 'medium'}:{}),requestKey:occurrenceKey(row.project_id,row.version,'code',row.next_code!,catalog.head+':'+batch.map(file=>file.path+':'+file.blobSha).join('|'))});
+      const batch=selected.slice(index,index+(singleFileMode?1:4));
+      let analysis:{id:string};
+      try{
+        analysis=await this.codeReview.analyze({projectId:row.project_id,userId:actor.id,authVersion:actor.auth_version,sessionId:'scheduled:'+row.project_id},actor,{paths:batch.map(file=>file.path),expectedHead:catalog.head,mode:'files',withAi:row.code_with_ai,consent:row.consent,...(row.model?{model:row.model}:{}),...(row.reasoning_effort?{reasoningEffort:row.reasoning_effort as 'medium'}:{}),requestKey:occurrenceKey(row.project_id,row.version,'code',row.next_code!,catalog.head+':'+batch.map(file=>file.path+':'+file.blobSha).join('|'))});
+      }catch(error){
+        if(!(error&&typeof error==='object'&&'code' in error&&error.code==='SENSITIVE_SOURCE'))throw error;
+        // Keep the fallback mode across retries so a pending single-file request is reused.
+        if(batch.length>1){singleFileMode=true;await saveProgress();continue;}
+        exclusions.push({path:batch[0]!.path,blobSha:batch[0]!.blobSha,reason:'sensitive_source'});
+        await saveProgress();index++;continue;
+      }
       // A running AI analysis is not coverage. Retry the same idempotent request after it completes.
       const outcome=await this.codeReview.analysis(row.project_id,analysis.id);if(outcome?.status!=='ready')throw new OperationError(outcome?.status==='failed'?'CODE_ANALYSIS_FAILED':'CODE_ANALYSIS_PENDING');
       analyses.push(analysis.id);for(const file of batch){completed[file.path]=file.blobSha;reviewed.push(file.path);}
-      const client=await this.database.connect();try{await client.query('BEGIN');await assertManager(client,row.project_id,actor);
-        const saved=await client.query('UPDATE operation_cursors SET code_inventory=$3 WHERE project_id=$1 AND lease_token=$2 AND configuration_version=$4 AND lease_until>clock_timestamp() RETURNING project_id',[row.project_id,row.lease_token,JSON.stringify(completed),row.version]);if(!saved.rowCount)throw new OperationError('CONFLICT');
-        await client.query('UPDATE operation_runs SET detail=$4 WHERE project_id=$1 AND configuration_version=$2 AND kind=\'code\' AND occurrence=$3',[row.project_id,row.version,row.next_code,JSON.stringify({head:catalog.head,analyses,reviewed,withAi:row.code_with_ai})]);await client.query('COMMIT');
-      }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
+      await saveProgress();index+=batch.length;
     }
-    const eligible=new Set(catalog.files.map(file=>file.path)),omitted=catalog.inventory.filter(file=>!eligible.has(file.path)).map(file=>({path:file.path,reason:'unsupported_or_exceeds_source_limits'}));
-    await this.database.query(`UPDATE operation_runs SET status=$4,detail=$5,finished_at=clock_timestamp() WHERE project_id=$1 AND configuration_version=$2 AND kind='code' AND occurrence=$3`,[row.project_id,row.version,row.next_code,changed.length>selected.length?'partial':'succeeded',JSON.stringify({head:catalog.head,analyses,reviewed,deferred:changed.slice(selected.length).map(file=>file.path),omitted,withAi:row.code_with_ai})]);
+    const eligible=new Set(catalog.files.map(file=>file.path)),omitted=[...catalog.inventory.filter(file=>!eligible.has(file.path)).map(file=>({path:file.path,reason:'unsupported_or_exceeds_source_limits'})),...exclusions.map(({path,reason})=>({path,reason}))];
+    await this.database.query(`UPDATE operation_runs SET status=$4,detail=$5,finished_at=clock_timestamp() WHERE project_id=$1 AND configuration_version=$2 AND kind='code' AND occurrence=$3`,[row.project_id,row.version,row.next_code,remaining.length>selected.length?'partial':'succeeded',JSON.stringify({head:catalog.head,analyses,reviewed,exclusions,singleFileMode,deferred:remaining.slice(selected.length).map(file=>file.path),omitted,withAi:row.code_with_ai})]);
     await this.database.query('UPDATE operation_cursors SET code_inventory=$3,next_code=$4,last_error=NULL WHERE project_id=$1 AND lease_token=$2',[row.project_id,row.lease_token,JSON.stringify(completed),nextDaily(now,row.code_hour)]);
   }
 }
