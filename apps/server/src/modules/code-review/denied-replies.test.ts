@@ -1,4 +1,5 @@
 import Fastify from 'fastify';
+import {setImmediate as nextTurn} from 'node:timers/promises';
 import {describe, expect, it, vi} from 'vitest';
 import {AuthRepository, type AuthUser} from '../auth/repository.js';
 import {registerPublicationRoutes} from './publication-routes.js';
@@ -7,8 +8,10 @@ import {PublicationService} from './publication.js';
 describe('Denied publication replies', () => {
   it.each([401, 403, 404])('preserves the JSON denial with an asynchronous response hook (%i)', async status => {
     const app = Fastify();
+    let sendCalls = 0;
     app.decorate('csrfProtection', async () => {});
     app.addHook('onSend', (_request, _reply, payload, done) => {
+      sendCalls++;
       setImmediate(() => done(null, payload));
     });
     const repository = new AuthRepository({query: vi.fn()} as never);
@@ -31,6 +34,8 @@ describe('Denied publication replies', () => {
       }});
       expect(response.statusCode).toBe(status);
       expect(response.json()).toMatchObject({code: status === 401 ? 'UNAUTHENTICATED' : status === 403 ? 'FORBIDDEN' : 'NOT_FOUND'});
+      await nextTurn();
+      expect(sendCalls).toBe(1);
       expect(requestPublication).not.toHaveBeenCalled();
     } finally {
       await app.close();
