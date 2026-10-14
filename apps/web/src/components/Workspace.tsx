@@ -1,3 +1,4 @@
+import {confirmDiscardSettings} from '../hooks/useUnsavedChanges';
 import {useEffect,useRef,useState,type ReactNode} from 'react';
 import type {ProjectAccess,SessionResponse} from '@dev-project-agent/contracts';
 
@@ -8,7 +9,7 @@ export function navigate(page:WorkspacePage){window.location.hash=page;}
 const selected=():WorkspacePage=>Object.hasOwn(pages,window.location.hash.slice(1))?window.location.hash.slice(1) as WorkspacePage:'overview';
 export function Workspace({session,logout,render}:{session:Extract<SessionResponse,{authenticated:true}>;logout:()=>void;render:(page:WorkspacePage,project:ProjectAccess)=>ReactNode}) {
   const [page,setPage]=useState(selected),[menu,setMenu]=useState(false),heading=useRef<HTMLHeadingElement>(null);
-  useEffect(()=>{const change=()=>{setPage(selected());setMenu(false);};window.addEventListener('hashchange',change);return()=>window.removeEventListener('hashchange',change);},[]);
+  useEffect(()=>{const change=()=>{const next=selected();if(page==='settings'&&next!=='settings'&&!confirmDiscardSettings()){window.location.hash='settings';return;}setPage(next);setMenu(false);};window.addEventListener('hashchange',change);return()=>window.removeEventListener('hashchange',change);},[page]);
   useEffect(()=>{document.title=pages[page].title+' · Dev Project Agent';heading.current?.focus();window.scrollTo({top:0});},[page]);
   if(!session.project)return null;
   const project=session.project;
@@ -20,7 +21,7 @@ export function Workspace({session,logout,render}:{session:Extract<SessionRespon
       <nav id="workspace-navigation" aria-label="Navegación principal">{(Object.keys(pages) as WorkspacePage[]).map(key=><a key={key} href={'#'+key} aria-current={page===key?'page':undefined}><Icon path={pages[key].icon}/><span>{pages[key].title}</span></a>)}</nav>
       <div className="sidebar-note"><span className="status-dot"/> Control humano<p>Las modificaciones requieren tu aprobación.</p></div>
       <div className="workspace-profile"><span className="profile-avatar">{session.user.displayName.split(' ').slice(0,2).map(value=>value[0]).join('')}</span><div><strong>{session.user.displayName}</strong><small>{project.canManageProject?'Gestor del proyecto':'Acceso de consulta'}</small></div></div>
-      <button className="logout-button" onClick={logout}>Cerrar sesión</button>
+      <button className="logout-button" onClick={()=>{if(page!=='settings'||confirmDiscardSettings())logout();}}>Cerrar sesión</button>
     </aside>
     {menu&&<button aria-label="Cerrar navegación" className="menu-overlay" onClick={()=>setMenu(false)}/>}
     <div className="workspace-body"><div className="workspace-topbar"><button className="menu-button" aria-expanded={menu} aria-controls="workspace-navigation" onClick={()=>setMenu(!menu)} aria-label="Abrir navegación"><Icon path="M3 6h18 M3 12h18 M3 18h18"/></button><p><span className="muted">Proyecto</span><span className="breadcrumb">/</span>{project.name}<span className="breadcrumb">/</span>{pages[page].title}</p><span className="badge">{project.canManageProject?'Gestor':'Consulta'}</span></div>

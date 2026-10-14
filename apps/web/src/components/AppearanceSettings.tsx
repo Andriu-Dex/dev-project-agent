@@ -1,0 +1,2 @@
+import {useTheme} from '../hooks/useTheme';
+export function AppearanceSettings(){const {theme,chooseTheme}=useTheme();return <section><p className="eyebrow">TU ESPACIO DE TRABAJO</p><h2>Apariencia</h2><p>Azul para las acciones y grises neutros para el contenido. La preferencia se guarda en este navegador.</p><div className="appearance-options"><button type="button" aria-pressed={theme==='light'} onClick={()=>chooseTheme('light')}>Modo claro</button><button type="button" aria-pressed={theme==='dark'} onClick={()=>chooseTheme('dark')}>Modo oscuro</button></div></section>;}

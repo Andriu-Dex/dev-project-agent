@@ -104,7 +104,7 @@ export function ProposalPanel({project,csrfToken,sourceRevision}:{project:Projec
     <h3>Propuestas guardadas</h3>{overview&&!overview.proposals.length&&<p>Aún no hay propuestas.</p>}
     <div className="work-items">{overview?.proposals.map(proposal=><article key={proposal.id} className="work-item"><h4>{proposal.cardName} · Versión {proposal.version}</h4><p>{states[proposal.state]} · {proposal.purpose==='demonstration'?'Demostración':'Uso real'}</p><p>{proposal.goal}</p><button onClick={()=>{setSelection({id:proposal.id,version:proposal.version});setConsent(false);}}>Abrir propuesta</button></article>)}</div>
     {detail&&<article className="proposal-detail">
-      <h3>Detalle de propuesta · Versión {detail.version}</h3>
+      <h3>Detalle de propuesta · Versión {detail.version}</h3><ol className="proposal-journey" aria-label="Recorrido de la propuesta"><li>Cambio solicitado</li><li>Evidencia</li><li>Dictámenes</li><li>Decisión del gestor</li><li>Ejecución y resultado</li></ol><p className="muted">Estado actual: <strong>{states[detail.state]}</strong>. Revisa los apartados en este orden. La aprobación y la ejecución son pasos separados.</p>
       <label htmlFor="proposal-version">Versión conservada</label><select id="proposal-version" value={detail.version} onChange={event=>setSelection({id:detail.proposalId,version:Number(event.target.value)})}>{Array.from({length:latest?.version??detail.version},(_,index)=><option key={index+1} value={index+1}>Versión {index+1}</option>)}</select>
       <p role="status"><strong>{states[detail.state]}</strong></p><p>{detail.context.card.name} · {date(detail.createdAt)}</p>
       {detail.state==='authorized'&&<p>El gestor autorizó esta versión. Ninguna acción se ha ejecutado en Trello.</p>}

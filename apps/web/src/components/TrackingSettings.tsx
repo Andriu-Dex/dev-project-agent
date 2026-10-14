@@ -1,3 +1,4 @@
+import {useUnsavedChanges} from '../hooks/useUnsavedChanges';
 import { useEffect, useState, type FormEvent } from 'react';
 import type { TrackingPolicyResponse } from '@dev-project-agent/contracts';
 
@@ -18,6 +19,8 @@ export function TrackingSettings({ projectId, canManage, csrfToken, onSaved }: {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
+  const dirty=!!configuration&&(dueHours!==String(configuration.dueSoonHours)||staleMinutes!==String(configuration.staleAfterMinutes)||priority!==encode(configuration.priorityLabels??{})||blocked!==(configuration.blockedLabels??[]).join('\n')||states!==encode(configuration.stateLabels??{}));
+  useUnsavedChanges(dirty,'Seguimiento');
   const path = `/api/v1/projects/${projectId}/tracking-policy`;
   useEffect(() => {
     const controller = new AbortController();
@@ -48,7 +51,7 @@ export function TrackingSettings({ projectId, canManage, csrfToken, onSaved }: {
     } catch (failure) { setError(failure instanceof Error && failure.message.startsWith('Cada línea') ? failure.message : 'No se pudo confirmar el guardado. Recarga la configuración antes de volver a intentar.'); }
     finally { setBusy(false); }
   }
-  return <details className="tracking-settings">
+  return <details open className="tracking-settings">
     <summary>Configuración del seguimiento</summary>
     {error && <p role="alert" className="form-error">{error}</p>}
     {message && <p role="status">{message}</p>}

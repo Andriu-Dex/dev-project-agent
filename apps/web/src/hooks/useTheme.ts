@@ -26,9 +26,9 @@ export function useTheme() {
     }
   }, [theme]);
 
-  const toggleTheme = () => {
-    setTheme(prev => (prev === 'light' ? 'dark' : 'light'));
-  };
+  useEffect(()=>{const sync=(event:Event)=>setTheme((event as CustomEvent<Theme>).detail);window.addEventListener('theme-changed',sync);return()=>window.removeEventListener('theme-changed',sync);},[]);
+  const chooseTheme=(next:Theme)=>{setTheme(next);window.dispatchEvent(new CustomEvent('theme-changed',{detail:next}));};
+  const toggleTheme = () => chooseTheme(theme==='light'?'dark':'light');
 
-  return { theme, toggleTheme };
+  return { theme, toggleTheme, chooseTheme };
 }

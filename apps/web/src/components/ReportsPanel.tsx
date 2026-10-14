@@ -1,11 +1,17 @@
+import {useUnsavedChanges} from '../hooks/useUnsavedChanges';
 import {useCallback,useEffect,useRef,useState} from 'react';
 import type {ProjectAccess,ReportDetail,ReportsOverview} from '@dev-project-agent/contracts';
 const date=(value:string)=>new Date(value).toLocaleString('es-EC',{timeZone:'America/Guayaquil'});
 const statuses={queued:'En cola',published:'Publicado · validación automática',draft:'Borrador · requiere evidencia',failed:'No generado'};
 const weekdays=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
-export function ReportsPanel({project,csrfToken}:{project:ProjectAccess;csrfToken:string}) {
+export function ReportsPanel({project,csrfToken,configurationOnly=false}:{project:ProjectAccess;csrfToken:string;configurationOnly?:boolean}) {
   const [data,setData]=useState<ReportsOverview|null>(null),[detail,setDetail]=useState<ReportDetail|null>(null),[selected,setSelected]=useState<string|null>(null);
   const [error,setError]=useState(''),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false),[enabled,setEnabled]=useState(false),[weekday,setWeekday]=useState(5),[time,setTime]=useState('18:00');
+  const savedTime=data?String(data.schedule.hour).padStart(2,'0')+':'+String(data.schedule.minute).padStart(2,'0'):'';
+  const dirty=!!data&&(enabled!==data.schedule.enabled||weekday!==data.schedule.weekday||time!==savedTime);
+  useUnsavedChanges(dirty,'Reportes');
+  const [filter,setFilter]=useState('all'),[fromDate,setFromDate]=useState(''),[toDate,setToDate]=useState('');
+  const visibleReports=data?.reports.filter(report=>(filter==='all'||report.status===filter)&&(!fromDate||new Date(report.cutoff)>=new Date(fromDate+'T00:00:00-05:00'))&&(!toDate||new Date(report.cutoff)<=new Date(toDate+'T23:59:59.999-05:00')))??[];
   const requestKey=useRef<{revisionOf:string|null;key:string}|null>(null),settingsVersion=useRef<number|null>(null);
   const prefix=`/api/v1/projects/${project.id}/reports`;
   const load=useCallback(async(signal?:AbortSignal)=>{
@@ -28,23 +34,25 @@ export function ReportsPanel({project,csrfToken}:{project:ProjectAccess;csrfToke
   async function save(){if(!data||busy)return;setBusy(true);setError('');setNotice('');try{const [hour,minute]=time.split(':').map(Number);const response=await fetch(prefix+'/schedule',{method:'PUT',headers:{'Content-Type':'application/json','x-csrf-token':csrfToken},body:JSON.stringify({expectedVersion:data.schedule.version,enabled,weekday,hour,minute})});const body=await response.json();if(!response.ok){setError(body.message??'No se pudo guardar la programación.');return;}setNotice('Programación guardada. El servicio recuperará los cortes pendientes cuando esté encendido.');await load();}catch{setError('No se pudo confirmar la programación. Actualiza el panel.');}finally{setBusy(false);}}
   return <section aria-labelledby="reports-title" className="reports-panel">
     <div className="section-heading"><h2 id="reports-title">Reportes semanales</h2><button disabled={busy} onClick={()=>{setError('');void load().catch(()=>setError('No se pudieron actualizar los reportes.'));}}>Actualizar reportes</button></div>
-    <p className="muted">Avance, desviaciones, riesgos, calidad de código y decisiones en una versión guardada. Preparación, revisión y publicación mediante reglas deterministas. No consume ChatGPT ni envía mensajes externos.</p>
+    <p className="muted">Avance, desviaciones, riesgos, calidad de código y decisiones en una versión guardada. Preparación, revisión y publicación mediante reglas deterministas. No consume ChatGPT. El aviso por correo se configura por separado.</p>
     {error&&<p role="alert" className="form-error">{error}</p>}{notice&&<p role="status">{notice}</p>}
     {!data?<p>Consultando reportes…</p>:<>
       <p>Programación: <strong>{data.schedule.enabled?`${weekdays[data.schedule.weekday]} a las ${String(data.schedule.hour).padStart(2,'0')}:${String(data.schedule.minute).padStart(2,'0')}`:'Sin activar'}</strong> · America/Guayaquil.{data.schedule.nextCutoff&&` Próximo corte: ${date(data.schedule.nextCutoff)}.`}</p>
       {data.schedule.errorCode&&<p role="alert" className="form-error">Programación suspendida porque cambió la autoridad del gestor que la activó. Un gestor vigente debe guardar nuevamente la configuración.</p>}
       {project.canManageProject&&<>
-        <details className="report-settings"><summary>Configurar programación semanal</summary><div className="report-schedule-form">
+        {configurationOnly&&<details className="report-settings" open={configurationOnly}><summary>Configurar programación semanal</summary><div className="report-schedule-form">
           <label className="confirmation"><input type="checkbox" checked={enabled} onChange={event=>setEnabled(event.target.checked)} disabled={busy}/>Activar generación semanal en este equipo</label>
           <label htmlFor="report-weekday">Día del reporte</label><select id="report-weekday" value={weekday} onChange={event=>setWeekday(Number(event.target.value))} disabled={busy}>{weekdays.map((name,index)=><option key={name} value={index}>{name}</option>)}</select>
           <label htmlFor="report-time">Hora del reporte (Ecuador)</label><input id="report-time" type="time" required value={time} onChange={event=>setTime(event.target.value)} disabled={busy}/>
           <p className="muted">Valor acordado: viernes 18:00. El equipo y el servicio deben estar encendidos. Tras un apagado se recuperan los cortes originales; una lectura posterior se identifica expresamente.</p>
-          <button onClick={()=>void save()} disabled={busy||!time}>Guardar programación</button>
-        </div></details>
-        <button disabled={busy||queued} onClick={()=>void generate()}>{queued?'Preparando reporte…':'Generar reporte ahora'}</button>
+          <p className="muted" role="status">{dirty?'Cambios sin guardar':'Programación guardada'}</p><button onClick={()=>void save()} disabled={busy||!time}>Guardar programación</button>
+        </div></details>}
+        {!configurationOnly&&<p><a href="#settings">Cambiar horario en Configuración → Automatización</a></p>}
+        {!configurationOnly&&<button disabled={busy||queued} onClick={()=>void generate()}>{queued?'Preparando reporte…':'Generar reporte ahora'}</button>}
       </>}
+      {!configurationOnly&&<>
       {!data.reports.length&&<p>Aún no hay reportes guardados.</p>}
-      <div className="work-items">{data.reports.map(report=><article className="work-item" key={report.id}><h3>{date(report.cutoff)} · Versión {report.version}</h3><p>{statuses[report.status]} · {report.kind==='scheduled'?'Programado':'Manual'}</p><button disabled={busy} onClick={()=>{setSelected(report.id);setDetail(null);}}>Abrir reporte</button></article>)}</div>
+      <div className="table-toolbar report-filters"><label>Estado del reporte<select value={filter} onChange={event=>setFilter(event.target.value)}><option value="all">Todos</option><option value="published">Publicados</option><option value="draft">Borradores</option><option value="queued">En cola</option><option value="failed">Fallidos</option></select></label><label>Desde<input type="date" value={fromDate} onChange={event=>setFromDate(event.target.value)}/></label><label>Hasta<input type="date" value={toDate} min={fromDate} onChange={event=>setToDate(event.target.value)}/></label><button className="text-button" onClick={()=>{setFilter('all');setFromDate('');setToDate('');}}>Limpiar filtros</button></div><p className="muted" role="status">{visibleReports.length} reportes en el historial consultado</p><div className="work-items report-history-list">{visibleReports.map(report=><article className="work-item" key={report.id}><h3>{date(report.cutoff)} · Versión {report.version}</h3><p>{statuses[report.status]} · {report.kind==='scheduled'?'Programado':'Manual'}</p><button disabled={busy} onClick={()=>{setSelected(report.id);setDetail(null);}}>Abrir reporte</button></article>)}</div>
       {selected&&<div className="report-detail"><h3>Detalle del reporte{detail&&` · Versión ${detail.version}`}</h3>{!detail?<p>Cargando reporte…</p>:<>
         <p><strong>{statuses[detail.status]}</strong>. Periodo: {date(detail.periodStart)} — {date(detail.cutoff)}.</p>
         {detail.errorCode&&<p className="form-error">{detail.errorCode==='FORBIDDEN'?'La autoridad del gestor cambió; la generación se detuvo.':'La generación falló. Puedes solicitar otra versión y conservar este registro.'}</p>}
@@ -55,6 +63,7 @@ export function ReportsPanel({project,csrfToken}:{project:ProjectAccess;csrfToke
         </>}
         {project.canManageProject&&detail.status!=='queued'&&<button disabled={busy||queued} onClick={()=>void generate(detail.id)}>Preparar nueva versión del mismo periodo</button>}
       </>}</div>}
+      </>}
     </>}
   </section>;
 }
