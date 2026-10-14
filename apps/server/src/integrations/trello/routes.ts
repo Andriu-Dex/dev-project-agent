@@ -26,13 +26,13 @@ export function registerTrelloRoutes(app: FastifyInstance, options: TrelloOption
   }
   app.get<{ Params: { projectId: string } }>('/projects/:projectId/trello', { schema }, async (request, reply) => {
     const context = await access(request, reply, false);
-    if (!context) return;
+    if (!context) return reply;
     const result = await overview(options.database, context.project.id, Boolean(options.credentials));
     return result ?? reply.code(404).send({ code: 'NOT_CONFIGURED', message: 'Este proyecto no tiene un tablero configurado.' });
   });
   app.get<{ Params: { projectId: string } }>('/projects/:projectId/tracking', { schema }, async (request, reply) => {
     const context = await access(request, reply, false);
-    if (!context) return;
+    if (!context) return reply;
     const source = await overview(options.database, context.project.id, Boolean(options.credentials));
     if (!source) return reply.code(404).send({ code: 'NOT_CONFIGURED', message: 'Este proyecto no tiene un tablero configurado.' });
     const configuration = await readTrackingPolicy(options.database, context.project.id);
@@ -41,7 +41,7 @@ export function registerTrelloRoutes(app: FastifyInstance, options: TrelloOption
   });
   app.get<{ Params: { projectId: string } }>('/projects/:projectId/tracking-policy', { schema }, async (request, reply) => {
     const context = await access(request, reply, false);
-    if (!context) return;
+    if (!context) return reply;
     return await readTrackingPolicy(options.database, context.project.id) ?? reply.code(404).send({ code: 'POLICY_NOT_CONFIGURED', message: 'Este proyecto no tiene configuración de seguimiento.' });
   });
   app.put<{ Params: { projectId: string }; Body: { expectedVersion: number; dueSoonHours: number; staleAfterMinutes: number } & Pick<TrackingPolicyResponse, 'priorityLabels' | 'blockedLabels' | 'stateLabels'> }>('/projects/:projectId/tracking-policy', {
@@ -51,7 +51,7 @@ export function registerTrelloRoutes(app: FastifyInstance, options: TrelloOption
     } } }, onRequest: [app.csrfProtection],
   }, async (request, reply) => {
     const context = await access(request, reply, true, 'tracking.policy.update');
-    if (!context) return;
+    if (!context) return reply;
     try { return await changeTrackingPolicy(options.database, context.project.id, context.user, request.body); }
     catch (error) {
       if (!(error instanceof TrackingPolicyError)) throw error;
@@ -63,7 +63,7 @@ export function registerTrelloRoutes(app: FastifyInstance, options: TrelloOption
     schema, onRequest: [app.csrfProtection], config: { rateLimit: { max: 3, timeWindow: '1 minute' } },
   }, async (request, reply) => {
     const context = await access(request, reply, true);
-    if (!context) return;
+    if (!context) return reply;
     try {
       return await synchronize(options.database, context.project.id, context.user.id, 'api', async boardId => {
         if (!options.credentials) throw new TrelloError('CREDENTIALS_REQUIRED');

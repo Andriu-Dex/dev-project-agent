@@ -26,11 +26,11 @@ export function registerSupervisionRoutes(app:FastifyInstance,options:Supervisio
     return reply.code(status).send({code:error.code,message:status===409?'La información cambió o hay un trabajo activo. Actualiza el panel antes de continuar.':status===403?'Tu cuenta ya no tiene permisos para esta operación.':error.code==='NO_DATA'?'No hay una lectura válida para esta operación.':'No se pudo completar la operación.'});
   }
   app.get<{Params:{projectId:string}}>('/projects/:projectId/github',{schema:{params}},async(request,reply)=>{
-    const context=await access(request,reply);if(!context)return;
+    const context=await access(request,reply);if(!context)return reply;
     return githubOverview(options.database,context.project.id);
   });
   app.get<{Params:{projectId:string}}>('/projects/:projectId/baseline',{schema:{params}},async(request,reply)=>{
-    const context=await access(request,reply);if(!context)return;
+    const context=await access(request,reply);if(!context)return reply;
     const baseline=await latestBaseline(options.database,context.project.id);
     const source=await overview(options.database,context.project.id,Boolean(options.trelloCredentials));
     const latest=source?.latest;const items=latest?.data.items.filter(item=>!item.archived&&item.kind!=='reference')??[];
@@ -40,27 +40,27 @@ export function registerSupervisionRoutes(app:FastifyInstance,options:Supervisio
   app.post<{Params:{projectId:string};Body:{expectedVersion:number;snapshotId:string}}>('/projects/:projectId/baseline-versions',{
     schema:{params,body:{type:'object',additionalProperties:false,required:['expectedVersion','snapshotId'],properties:{expectedVersion:{type:'integer',minimum:0},snapshotId:{type:'string',format:'uuid'}}}},onRequest:[app.csrfProtection],
   },async(request,reply)=>{
-    const context=await access(request,reply,true);if(!context)return;
+    const context=await access(request,reply,true);if(!context)return reply;
     try{const baseline=await confirmBaseline(options.database,context.project.id,context.user,request.body.expectedVersion,request.body.snapshotId);
       return reply.code(201).send({version:baseline.version,snapshotId:baseline.snapshotId,confirmedAt:baseline.confirmedAt,confirmedBy:baseline.confirmedBy});}
     catch(error){return failure(error,reply);}
   });
   app.get<{Params:{projectId:string}}>('/projects/:projectId/supervision',{schema:{params}},async(request,reply)=>{
-    const context=await access(request,reply);if(!context)return;
+    const context=await access(request,reply);if(!context)return reply;
     return supervisionOverview(options.database,context.project.id);
   });
   app.post<{Params:{projectId:string};Body:{kind:SupervisionJobKind;requestKey:string}}>('/projects/:projectId/supervision/jobs',{
     schema:{params,body:{type:'object',additionalProperties:false,required:['kind','requestKey'],properties:{kind:{type:'string',enum:['trello_sync','github_sync','analysis','full']},requestKey:{type:'string',format:'uuid'}}}},
     onRequest:[app.csrfProtection],config:{rateLimit:{max:10,timeWindow:'1 minute'}},
   },async(request,reply)=>{
-    const context=await access(request,reply,true);if(!context)return;
+    const context=await access(request,reply,true);if(!context)return reply;
     try{return reply.code(202).send(await enqueueJob(options.database,context.project.id,context.user,request.body.kind,request.body.requestKey));}
     catch(error){return failure(error,reply);}
   });
   for(const resource of ['jobs','runs'] as const) app.get<{Params:{projectId:string;resourceId:string}}>(`/projects/:projectId/supervision/${resource}/:resourceId`,{
     schema:{params:{...params,required:['projectId','resourceId'],properties:{...params.properties,resourceId:{type:'string',format:'uuid'}}}},
   },async(request,reply)=>{
-    const context=await access(request,reply);if(!context)return;
+    const context=await access(request,reply);if(!context)return reply;
     const result=resource==='jobs'?await getJob(options.database,context.project.id,request.params.resourceId):await getRun(options.database,context.project.id,request.params.resourceId);
     return result??reply.code(404).send({code:'NOT_FOUND',message:'No se encontró el registro.'});
   });

@@ -150,7 +150,7 @@ export async function registerAuth(app: FastifyInstance, options: AuthOptions) {
 
   app.get('/projects/current', async (request, reply) => {
     const user = await requireUser(request, reply);
-    if (!user) return;
+    if (!user) return reply;
     const project = await repository.projectForUser(user.id);
     if (!project) return reply.code(403).send({ code: 'NO_MEMBERSHIP', message: 'No tienes acceso a este proyecto.', requestId: request.id });
     return project;
@@ -160,7 +160,7 @@ export async function registerAuth(app: FastifyInstance, options: AuthOptions) {
     schema: { params: { type: 'object', required: ['projectId'], properties: { projectId: { type: 'string', format: 'uuid' } } } },
   }, async (request, reply) => {
     const user = await requireUser(request, reply);
-    if (!user) return;
+    if (!user) return reply;
     const project = await repository.projectForUser(user.id, request.params.projectId);
     if (!project) return reply.code(404).send({ code: 'NOT_FOUND', message: 'No se encontró el recurso solicitado.', requestId: request.id });
     if (project.role !== 'manager') {
