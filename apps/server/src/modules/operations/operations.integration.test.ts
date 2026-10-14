@@ -169,4 +169,14 @@ describe.skipIf(process.env.RUN_OPERATIONS_DB_TESTS!=='true')('PostgreSQL schedu
     expect((await client.query('SELECT id FROM operation_runs WHERE project_id=$1',[otherId])).rows).toHaveLength(0);
     expect((await client.query('SELECT id FROM supervision_jobs WHERE project_id=$1',[otherId])).rows).toHaveLength(0);
   });
+  it('persists configurable weekdays and minutes without accepting invalid schedules',async()=>{
+    const current=(await service.overview(projectId)).configuration;
+    const freshActor=(await client.query<AuthUser>('SELECT * FROM users WHERE id=$1',[actor.id])).rows[0]!;
+    await expect(service.configure(projectId,freshActor,{...current,expectedVersion:current.version,codeDays:[]})).rejects.toMatchObject({code:'INVALID_REQUEST'});
+    await expect(service.configure(projectId,freshActor,{...current,expectedVersion:current.version,codeMinute:60})).rejects.toMatchObject({code:'INVALID_REQUEST'});
+    const saved=await service.configure(projectId,freshActor,{...current,expectedVersion:current.version,enabled:false,codeEnabled:true,codeHour:18,codeMinute:37,codeDays:[1,5],codeWithAi:false,consent:false});
+    expect(saved.configuration).toMatchObject({codeMinute:37,codeDays:[1,5]});
+    const instant=new Date(saved.cursor!.next_code as string);expect(instant.getUTCMinutes()).toBe(37);expect([1,5]).toContain(new Date(instant.getTime()-5*3600000).getUTCDay());
+  });
+
 });

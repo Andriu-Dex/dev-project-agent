@@ -1,3 +1,5 @@
+import type {NotificationService} from '../notifications/service.js';
+import {registerNotificationRoutes} from '../notifications/routes.js';
 import { randomBytes } from 'node:crypto';
 import cookie from '@fastify/cookie';
 import session from '@fastify/session';
@@ -29,7 +31,7 @@ import {registerOperationRoutes} from '../operations/routes.js';
 import type {PublicationService} from '../code-review/publication.js';
 import {registerPublicationRoutes} from '../code-review/publication-routes.js';
 
-export interface AuthOptions extends AuthConfig { database: AuthDatabase; trello?: TrelloOptions; supervision?:SupervisionOptions; chatgpt?:ChatGPTService; proposals?:ProposalService; executions?:ExecutionService; codeReview?:CodeReviewService; reports?:ReportService; operations?:OperationService; publications?:PublicationService }
+export interface AuthOptions extends AuthConfig { database: AuthDatabase; trello?: TrelloOptions; supervision?:SupervisionOptions; chatgpt?:ChatGPTService; proposals?:ProposalService; executions?:ExecutionService; codeReview?:CodeReviewService; reports?:ReportService; operations?:OperationService; publications?:PublicationService; notifications?:NotificationService }
 
 export async function registerAuth(app: FastifyInstance, options: AuthOptions) {
   const repository = new AuthRepository(options.database);
@@ -95,6 +97,7 @@ export async function registerAuth(app: FastifyInstance, options: AuthOptions) {
     return user;
   }
 
+  if(options.notifications)registerNotificationRoutes(app,options.notifications,requireUser,repository);
   if (options.trello) registerTrelloRoutes(app, options.trello, requireUser, repository);
   if (options.supervision) registerSupervisionRoutes(app, options.supervision, requireUser, repository);
   if (options.chatgpt) registerChatGPTRoutes(app, options.chatgpt, requireUser, repository);

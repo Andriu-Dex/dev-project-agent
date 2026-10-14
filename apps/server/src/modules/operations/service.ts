@@ -9,14 +9,18 @@ import {assertManager} from '../supervision/access.js';
 import {OperationError} from './errors.js';
 export {OperationError} from './errors.js';
 
-export interface OperationConfiguration {version:number;enabled:boolean;intervalMinutes:number;codeEnabled:boolean;codeHour:number;codeWithAi:boolean;model:string|null;reasoningEffort:string|null;consent:boolean;maxFiles:number}
-interface ConfigurationRow {project_id:string;version:number;enabled:boolean;interval_minutes:number;code_enabled:boolean;code_hour:number;code_with_ai:boolean;model:string|null;reasoning_effort:string|null;consent:boolean;max_files:number;changed_by:string;auth_version:number}
-const view=(row:ConfigurationRow):OperationConfiguration=>({version:row.version,enabled:row.enabled,intervalMinutes:row.interval_minutes,codeEnabled:row.code_enabled,codeHour:row.code_hour,codeWithAi:row.code_with_ai,model:row.model,reasoningEffort:row.reasoning_effort,consent:row.consent,maxFiles:row.max_files});
-export const initialOperations:OperationConfiguration={version:0,enabled:false,intervalMinutes:60,codeEnabled:false,codeHour:18,codeWithAi:false,model:null,reasoningEffort:null,consent:false,maxFiles:64};
-export function nextDaily(now:Date,hour:number) {
-  // Ecuador has a fixed UTC-05 offset. The configured wall-clock hour is converted explicitly.
-  const candidate=new Date(now.getTime()-5*3_600_000);candidate.setUTCHours(hour+5,0,0,0);
-  if(candidate<=now)candidate.setUTCDate(candidate.getUTCDate()+1);return candidate;
+export interface OperationConfiguration {version:number;enabled:boolean;intervalMinutes:number;codeEnabled:boolean;codeHour:number;codeMinute?:number;codeDays?:number[];codeWithAi:boolean;model:string|null;reasoningEffort:string|null;consent:boolean;maxFiles:number}
+interface ConfigurationRow {project_id:string;version:number;enabled:boolean;interval_minutes:number;code_enabled:boolean;code_hour:number;code_minute:number;code_days:number[];code_with_ai:boolean;model:string|null;reasoning_effort:string|null;consent:boolean;max_files:number;changed_by:string;auth_version:number}
+const view=(row:ConfigurationRow):OperationConfiguration=>({version:row.version,enabled:row.enabled,intervalMinutes:row.interval_minutes,codeEnabled:row.code_enabled,codeHour:row.code_hour,codeMinute:row.code_minute,codeDays:row.code_days,codeWithAi:row.code_with_ai,model:row.model,reasoningEffort:row.reasoning_effort,consent:row.consent,maxFiles:row.max_files});
+export const initialOperations:OperationConfiguration={version:0,enabled:false,intervalMinutes:60,codeEnabled:false,codeHour:18,codeMinute:0,codeDays:[0,1,2,3,4,5,6],codeWithAi:false,model:null,reasoningEffort:null,consent:false,maxFiles:64};
+export function nextDaily(now:Date,hour:number,minute=0,days:number[]=[0,1,2,3,4,5,6]) {
+  for(let offset=0;offset<=7;offset++){
+    const local=new Date(now.getTime()-5*3600000);local.setUTCDate(local.getUTCDate()+offset);
+    if(!days.includes(local.getUTCDay()))continue;
+    local.setUTCHours(hour,minute,0,0);const candidate=new Date(local.getTime()+5*3600000);
+    if(candidate>now)return candidate;
+  }
+  throw new OperationError('INVALID_REQUEST');
 }
 export function occurrenceKey(projectId:string,version:number,kind:string,instant:Date,batch='') {
   const hash=createHash('sha256').update(`${projectId}:${version}:${kind}:${instant.toISOString()}:${batch}`).digest('hex');
@@ -32,12 +36,14 @@ export class OperationService {
   }
   async configure(projectId:string,actor:AuthUser,values:Omit<OperationConfiguration,'version'>&{expectedVersion:number}) {
     if(!Number.isInteger(values.intervalMinutes)||values.intervalMinutes<5||values.intervalMinutes>10080||!Number.isInteger(values.codeHour)||values.codeHour<0||values.codeHour>23||!Number.isInteger(values.maxFiles)||values.maxFiles<1||values.maxFiles>100||values.codeWithAi&&(!values.consent||!values.model)||values.model&& !/^[a-zA-Z0-9._-]{1,100}$/.test(values.model)||values.reasoningEffort&&!['low','medium','high','xhigh','max'].includes(values.reasoningEffort))throw new OperationError('INVALID_REQUEST');
+    const codeMinute=values.codeMinute??0,codeDays=values.codeDays??[0,1,2,3,4,5,6];
+    if(!Number.isInteger(codeMinute)||codeMinute<0||codeMinute>59||!Array.isArray(codeDays)||!codeDays.length||codeDays.length>7||new Set(codeDays).size!==codeDays.length||codeDays.some(day=>!Number.isInteger(day)||day<0||day>6))throw new OperationError('INVALID_REQUEST');
     if(values.codeWithAi)await this.codeReview.validateScheduledProvider({projectId,userId:actor.id,authVersion:actor.auth_version,sessionId:'scheduled:'+projectId},values.model!,values.reasoningEffort as 'medium'|null);
     const client=await this.database.connect();try{await client.query('BEGIN');await client.query('SELECT pg_advisory_xact_lock(hashtext($1))',['operations:'+projectId]);await assertManager(client,projectId,actor);
       const previous=(await client.query<ConfigurationRow>('SELECT * FROM operation_configurations WHERE project_id=$1 ORDER BY version DESC LIMIT 1',[projectId])).rows[0];if((previous?.version??0)!==values.expectedVersion)throw new OperationError('CONFLICT');
       const version=(previous?.version??0)+1;
-      await client.query('INSERT INTO operation_configurations(project_id,version,enabled,interval_minutes,code_enabled,code_hour,code_with_ai,model,reasoning_effort,consent,max_files,changed_by,auth_version) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)',[projectId,version,values.enabled,values.intervalMinutes,values.codeEnabled,values.codeHour,values.codeWithAi,values.model,values.reasoningEffort,values.consent,values.maxFiles,actor.id,actor.auth_version]);
-      const now=new Date();await client.query(`INSERT INTO operation_cursors(project_id,configuration_version,next_sync,next_code) VALUES($1,$2,$3,$4) ON CONFLICT(project_id) DO UPDATE SET configuration_version=$2,next_sync=$3,next_code=$4,lease_token=NULL,lease_until=NULL,last_error=NULL,updated_at=clock_timestamp()`,[projectId,version,values.enabled?now:null,values.codeEnabled?nextDaily(now,values.codeHour):null]);
+      await client.query('INSERT INTO operation_configurations(project_id,version,enabled,interval_minutes,code_enabled,code_hour,code_with_ai,model,reasoning_effort,consent,max_files,changed_by,auth_version,code_minute,code_days) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)',[projectId,version,values.enabled,values.intervalMinutes,values.codeEnabled,values.codeHour,values.codeWithAi,values.model,values.reasoningEffort,values.consent,values.maxFiles,actor.id,actor.auth_version,codeMinute,codeDays]);
+      const now=new Date();await client.query(`INSERT INTO operation_cursors(project_id,configuration_version,next_sync,next_code) VALUES($1,$2,$3,$4) ON CONFLICT(project_id) DO UPDATE SET configuration_version=$2,next_sync=$3,next_code=$4,lease_token=NULL,lease_until=NULL,last_error=NULL,updated_at=clock_timestamp()`,[projectId,version,values.enabled?now:null,values.codeEnabled?nextDaily(now,values.codeHour,codeMinute,codeDays):null]);
       await client.query('INSERT INTO audit_events(project_id,actor_type,actor_id,action,resource_type,resource_id,outcome) VALUES($1,\'user\',$2,\'operations.configure\',\'operation_configuration\',$3,\'succeeded\')',[projectId,actor.id,`${projectId}:v${version}`]);await client.query('COMMIT');return this.overview(projectId);
     }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
   }
@@ -106,7 +112,7 @@ export class OperationService {
     }
     const eligible=new Set(catalog.files.map(file=>file.path)),omitted=[...catalog.inventory.filter(file=>!eligible.has(file.path)).map(file=>({path:file.path,reason:'unsupported_or_exceeds_source_limits'})),...exclusions.map(({path,reason})=>({path,reason}))];
     await this.database.query(`UPDATE operation_runs SET status=$4,detail=$5,finished_at=clock_timestamp() WHERE project_id=$1 AND configuration_version=$2 AND kind='code' AND occurrence=$3`,[row.project_id,row.version,row.next_code,remaining.length>selected.length?'partial':'succeeded',JSON.stringify({head:catalog.head,analyses,reviewed,exclusions,singleFileMode,deferred:remaining.slice(selected.length).map(file=>file.path),omitted,withAi:row.code_with_ai})]);
-    await this.database.query('UPDATE operation_cursors SET code_inventory=$3,next_code=$4,last_error=NULL WHERE project_id=$1 AND lease_token=$2',[row.project_id,row.lease_token,JSON.stringify(completed),nextDaily(now,row.code_hour)]);
+    await this.database.query('UPDATE operation_cursors SET code_inventory=$3,next_code=$4,last_error=NULL WHERE project_id=$1 AND lease_token=$2',[row.project_id,row.lease_token,JSON.stringify(completed),nextDaily(now,row.code_hour,row.code_minute,row.code_days)]);
   }
 }
 export function startOperationWorker(service:OperationService,onError:()=>void){let stopped=false,pending:Promise<unknown>|null=null;const tick=()=>{if(stopped||pending)return;pending=service.tick().catch(onError).finally(()=>{pending=null;});};const timer=setInterval(tick,10_000);tick();return {close:async()=>{stopped=true;clearInterval(timer);await pending;}};}
