@@ -97,3 +97,7 @@ Al confirmar una causa, el sistema la liga a la evidencia de la tarjeta que se r
 Ejecutar `npm run typecheck`, `npm test`, `npm run build`, `npm run test:db`, las diez suites PostgreSQL documentadas en README y `npm run test:ui`. Los fixtures usan transporte sintético y rollback. Las capturas/PDF de prueba quedan en `work/ui/`, ignorado por Git.
 
 Después, realizar el guion de los 39 AC de la matriz con datos representativos, confirmar programación sin navegador, observar renovación real y preparar recursos de escritura autorizados con nuevas decisiones específicas. Registrar commit, configuración, resultado esperado/observado, evidencia y responsable por criterio. No marcar la entrega como aprobada solo por pasar pruebas automatizadas.
+
+## Correo y configuración del 14 de octubre
+
+En **Configuración**, usar Integraciones, Seguimiento, Automatización, Notificaciones, Apariencia y Equipo. Día/hora/minuto del reporte y días/hora/minuto de código se cambian en Automatización; los intervalos y umbrales se mantienen configurables. El historial de ejecución permanece en Operación. Consultar [puesta en marcha de SMTP, consentimiento y recuperación](notifications.md) antes de activar avisos. Las credenciales permanecen en .env; no se comparten en el chat. El primer correo de prueba real fue recibido por el gestor; los avisos automáticos siguen desactivados hasta que guarde su activación.

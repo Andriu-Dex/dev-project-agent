@@ -187,6 +187,8 @@ Estas condiciones se incluyen en la entrega por decisión del proyecto; no se at
 | USER-05 | Español en interfaz/reportes y documentación personal; inglés técnico. | Revisar mensajes, archivos, identificadores, commits y PRs. Documentación de `docs/` puede permanecer en español. |
 | USER-06 | Evidencias, manual y cierre de entrega. | Manual de instalación/operación, guion reproducible, matriz evaluada y ejemplos saneados. Normas de referencia orientan criterios, sin declarar certificación. |
 | USER-07 | La aprobación demostrativa anterior no puede modificar Trello. | Mantener propósito demostrativo e invalidación; incluir caso negativo y comprobar cero ejecuciones. Las pruebas reales futuras usan recursos y nuevas autorizaciones específicas. |
+| USER-08 | Correos al gestor, añadidos por el usuario el 14/10. | Destinatario y eventos configurables, resumen/avisos/recordatorios/silencio, cola durable, deduplicación, permisos, historial y prueba real. Véase [correo y configuración](notifications.md); confirmar además un aviso automático real tras activación. |
+| USER-09 | Usabilidad y paleta azul/gris neutro, elegida el 14/10. | Configuración por secciones, horarios comprensibles, cambios sin guardar, historial filtrable y temas claro/oscuro; revisión visual y móvil. |
 
 Frecuencias de lectura Trello 30 minutos, GitHub 60 minutos y análisis diario 17:00 son valores iniciales propuestos en [reportes y operación](reports-and-operations.md), no plazos del profesor ni activaciones ya realizadas. La siguiente implementación los hará configurables y no enviará código/datos a IA automáticamente sin configuración explícita del gestor. Con el equipo apagado no hay servicio: al reiniciar se recupera lectura actual y reportes pendientes, sin simular observaciones históricas.
 
@@ -203,7 +205,7 @@ Una tanda grande puede implementar estos paquetes en secuencia y conservar commi
 | CLOSE-05 | Alertas persistentes, historial correlacionado y consolidación/revisión de reportes. | AC-4.02 a AC-4.05, AC-7.01 a AC-7.06, AC-8.01. Integra CLOSE-01 a CLOSE-04. |
 | CLOSE-06 | Seguridad transversal, verificación esencial durante desarrollo, manual y validación integral final. | AC-8.02 y todos los AC/CLASS/USER. Los controles de autorización y secretos se aplican desde cada paquete, no al final. |
 
-No se requiere cambiar PostgreSQL, Fastify, React ni la coordinación propia para cubrir la matriz. Nuevas herramientas de análisis se escogerán según lenguaje y estándar verificable, antes de instalar dependencias. No se incluye entrenamiento, multiempresa, alojamiento 24/7, email externo ni certificación ISO como condición académica.
+No se requiere cambiar PostgreSQL, Fastify, React ni la coordinación propia para cubrir la matriz. Nuevas herramientas de análisis se escogerán según lenguaje y estándar verificable, antes de instalar dependencias. No se incluye entrenamiento, multiempresa, alojamiento 24/7, email externo ni certificación ISO como condición académica; el correo sí se incorpora por decisión posterior del usuario en USER-08.
 
 ## Registro de aceptación y condición de terminado
 
@@ -215,7 +217,7 @@ El guion integral debe cubrir planificación/avance; cambios entre fuentes; prio
 
 Las pruebas reales de escritura requieren acordar recurso de prueba, cambio exacto y autorización vigente. Crear esta matriz no concede esa autorización ni activa las escrituras. Los casos sintéticos prueban mecanismos, pero no sustituyen la evidencia de conectividad y operación real exigida en los recorridos integrados.
 
-**Condición de terminado:** los 39 AC, las ocho aclaraciones CLASS y las siete condiciones USER tienen evidencia de cierre; los once REQ quedan evaluados sin brechas pendientes; errores bloqueantes resueltos; manual y demostración reproducibles. No se promete ausencia absoluta de defectos ni cobertura de todo código futuro.
+**Condición de terminado:** los 39 AC, las ocho aclaraciones CLASS y las nueve condiciones USER tienen evidencia de cierre; los once REQ quedan evaluados sin brechas pendientes; errores bloqueantes resueltos; manual y demostración reproducibles. No se promete ausencia absoluta de defectos ni cobertura de todo código futuro.
 
 La revisión inicial del 11 de octubre solo leyó fuentes y preparó esta matriz. El desarrollo posterior autorizado se registra a continuación, manteniendo la aceptación final pendiente.
 
@@ -246,3 +248,7 @@ La verificación automatizada y visual se registra en [estado de implementación
 El [registro de validación real](real-acceptance-validation.md) contiene el estado posterior de cada AC, sus casos y pendientes. Se comprobaron cuatro escrituras Trello aprobadas por el gestor, una rama y PR borrador específicamente autorizados, renovación real de ChatGPT, fuentes programadas con pestañas del panel cerradas, recuperación tras reinicio, inventario y diferencias contra Trello, historial de alertas y un reporte manual con las acciones del periodo. Al 14 de octubre se superaron técnicamente 11 procedimientos: AC-1.01, AC-2.01, AC-2.03, AC-3.02, AC-3.04, AC-3.05, AC-4.02, AC-7.01, AC-7.02, AC-7.04 y AC-7.05; los otros 28 conservan subcasos pendientes. Se añadieron cortes automáticos reales, recuperación de un corte perdido, rechazo/ajustes asistidos por delegación del usuario y prueba HTTP real del lector. Este registro prevalece sobre las observaciones históricas de “sin programaciones/escrituras reales”, sin cambiar los requisitos ni declarar aceptada toda la entrega.
 
 Los horarios confirmados por el usuario y activados son lecturas cada 60 minutos, revisión diaria a las 18:00 y reporte los viernes a las 18:00, America/Guayaquil. El corte semanal del 16 de octubre y el análisis programado de dos commits reales todavía requieren evidencia.
+
+## Actualización del 14 de octubre: correo y usabilidad
+
+Se implementa [notificación SMTP](notifications.md), configuración por pestañas, días/minutos de revisión de código, filtros de reportes y paleta azul/gris. La prueba de correo tuvo aceptación SMTP y recepción confirmada por el usuario. Esto añade USER-08/09 y amplía USER-03; no convierte los 28 AC con subcasos pendientes en superados.
