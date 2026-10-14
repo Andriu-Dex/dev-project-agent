@@ -32,7 +32,7 @@ function ResultView({run}:{run:SupervisionRun}) {
       <strong>{deviation.itemName}</strong><p>{fields[deviation.field]??deviation.field}{deviation.hoursShift!==null&&` · Desplazamiento de ${deviation.hoursShift.toLocaleString('es-EC')} horas`}</p>
       <details><summary>Ver comparación</summary><p>Antes: {value(deviation.before)}</p><p>En este corte: {value(deviation.after)}</p></details>
     </article>)}</div>
-    {result.code&&<p>GitHub: rama {result.code.branch} · revisión <code>{result.code.head.slice(0,12)}</code> · {result.code.files.length} archivos en la comparación delimitada. Revisión de calidad del código: pendiente.</p>}
+    {result.code&&<p>GitHub: rama {result.code.branch} · revisión <code>{result.code.head.slice(0,12)}</code> · {result.code.files.length} archivos en la comparación delimitada. <a href="#code">Consultar los análisis de calidad y su alcance en Código.</a></p>}
     <details><summary>Fuentes, reglas y límites</summary>
       <p>Lectura Trello: {result.trelloSnapshotId??'No disponible'}<br/>Lectura GitHub: {result.githubSnapshotId??'No disponible'}<br/>Análisis: {result.analysisVersion}<br/>Reglas: {result.tracking?.policy.version??'No disponible'}</p>
       <ul>{[...result.limitations,...(result.tracking?.limitations??[])].map((entry,index)=><li key={index}>{entry}</li>)}</ul>
