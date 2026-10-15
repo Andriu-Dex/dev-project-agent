@@ -83,7 +83,7 @@ Los casos RV-32 a RV-38 se describen con identificadores, horarios y límites en
 | AC-1.04 | Superado | RV-15/36: universo real de 29 actividades; fixtures excluyen hitos, archivadas y referencias y tratan universo vacío como no disponible. |
 | AC-1.05 | Superado | RV-02/36: fechas reales y límites exactos, zona horaria y fuentes antiguas comprobados con fixtures. |
 | AC-2.01 | Superado | RV-01/23: lectura autorizada del tablero, denegación real controlada, conservación del snapshot y recuperación con credencial válida. |
-| AC-2.02 | En validación | RV-15/35: lectura real repetida y contraste de tarjetas, miembros, fechas y etiquetas; falta anexar contraste explícito completo de listas y checklists frente a la fuente. |
+| AC-2.02 | Superado | RV-39: contraste independiente de los seis grupos: siete listas, cinco miembros, 76 tarjetas totales, 67 checklists/602 elementos; coincide snapshot a22706a3…; universo operativo 29 actividades/seis hitos. |
 | AC-2.03 | Superado | RV-16: cambios aprobados de fechas, miembros, prioridad y estado registrados entre lecturas; repetición igual con cero diferencias y cero alertas equivalentes duplicadas. |
 | AC-2.04 | Superado | RV-04 a RV-07/36: cuatro familias reales; destinos arbitrarios, miembros no elegibles y valores inválidos rechazados en pruebas aisladas. |
 | AC-2.05 | Superado | RV-04 a RV-07/36: escrituras reales aprobadas; fixtures cubren aprobación/fuente obsoletas, revocación, permisos y confirmación separada. |
@@ -97,12 +97,12 @@ Los casos RV-32 a RV-38 se describen con identificadores, horarios y límites en
 | AC-4.02 | Superado | RV-09: 13 + 2 + 14 = 29; 14/29 = 48,28 %. Bloqueo/retraso de la misma tarjeta no alteran el total; fechas y asignación nativa ausentes se indican. |
 | AC-4.03 | Superado | RV-09/16/36: desviaciones reales y fixtures sin línea base/confirmación posterior al corte; referencia preservada. |
 | AC-4.04 | Superado | RV-09/11/35/36: acciones reales según periodo; fixture de reporte diferencia versiones, aprobación, rechazo y publicación fallida sin inventar éxito. El fallo de escritura es aislado. |
-| AC-4.05 | En validación | RV-35/36: recomendaciones vinculan responsable/fecha observados sin crear compromisos; falta revisión humana final del contenido del reporte. |
+| AC-4.05 | Superado | RV-40: diez secciones revisadas y reporte 76116202… v1 aceptado por el gestor con sus limitaciones; recomendaciones vinculan responsable/fecha observados sin crear compromisos. |
 | AC-5.01 | Superado | RV-08/34/36: commits/blobs reales fijos; árboles truncados, bytes corruptos y fuente cambiada rechazados en fixtures. |
 | AC-5.02 | Superado | RV-27/35: dos HEAD reales, continuación por presupuesto/exclusión y corte sin cambios de las 07:45 con cero análisis nuevos; límites de cobertura explícitos. |
 | AC-5.03 | Superado | RV-08/34/36: análisis real TS/Java y corpus controlado de seis categorías con positivos y contraejemplos. No implica compilación Java ni ausencia de defectos en todo UTAPED. |
 | AC-5.04 | Superado | RV-08/36: catálogo utaped-review-v1 vinculado a evidencia y corpus conforme/incumplidor por categoría; sin afirmar certificación ISO. |
-| AC-5.05 | En validación | RV-34/36: recomendaciones concretas por categoría y v3 validada por tres agentes; pruebas funcionales/compilación del candidato en UTAPED siguen pendientes. |
+| AC-5.05 | Superado | RV-41: dos candidatos exactos en copias aisladas, tipos/lint/build de ambos frontends y 28 comprobaciones funcionales del módulo cliente superadas. No implica E2E del backend ni autorización para integrar. |
 | AC-5.06 | Superado | RV-08/11/34/36: PR real autorizado exacto; rechazo, demostración, fuente cambiada y controles negativos aislados bloquean publicación. Ningún PR nuevo en esta tanda. |
 | AC-6.01 | Superado | RV-12/32/34/35: evidencia y salidas de tres roles en propuestas/código; reportes con tres etapas deterministas explícitas. |
 | AC-6.02 | Superado | RV-33/34: dos entradas adversas reales rechazadas por Revisor; v2 detectó regresión NaN/0n; v3 repitió tres etapas y quedó pendiente de gestor. |
@@ -113,8 +113,8 @@ Los casos RV-32 a RV-38 se describen con identificadores, horarios y límites en
 | AC-7.03 | Superado | RV-12/34: alternativas de planificación y conservar código actual explícitas en v3, con riesgos, fuente y pruebas pendientes. |
 | AC-7.04 | Superado | RV-04 a RV-07 y RV-11: cuatro familias Trello y diff GitHub con destino exacto, revisión, decisión y confirmación de escritura separadas del consentimiento IA. |
 | AC-7.05 | Superado | RV-04 a RV-07, RV-24/25: aceptación, rechazo y ajustes; dos versiones conservadas, seis dictámenes en orden y nueva versión sin decisión heredada. |
-| AC-7.06 | En validación | RV-29/36: motivos obligatorios para todas las decisiones nuevas y evidencia inmutable. Persiste una aprobación histórica sin motivo; excepción no subsanada retrospectivamente. |
-| AC-8.01 | En validación | RV-24/28/37: rechazo y reportes consultados en Brave; fallos preservados y comprobados previamente. Falta cerrar recorrido de consulta de fallo antiguo con el rediseño actual. |
+| AC-7.06 | Cerrado con excepción histórica | RV-42 / EX-01: control actual requiere motivo y conserva inmutabilidad. Una aprobación ejecutada de 99.4 del 13/10 mantiene motivo vacío; dato histórico documentado, no reparado ni dispensado. |
+| AC-8.01 | Superado | RV-43: gestor consultó github.sync fallido del 15/10 09:05 desde Operación → Historial → Fallidas → Ver acción en la interfaz nueva; rechazo y reportes ya consultados. Listado limitado a últimos 200 eventos, explícito. |
 | AC-8.02 | Superado | RV-13/20/21/26/29/37/38: denegaciones HTTP, lector real en Brave, cuenta temporal desactivada, ACL y escaneo acotado sin secretos actuales conocidos. Límites del escaneo explícitos. |
 
 ## Defectos y repetición
@@ -142,3 +142,9 @@ Observar la revisión diaria real a las 18:00 y el corte semanal del viernes 16 
 Completar los subcasos restantes de la tabla, incluidos fuente obsoleta y aprobación obsoleta con fallos aislados, revisión de salidas y recorridos pendientes. La rama/PR autorizados ya existen; no se repetirá su publicación. No introducir defectos ni commits ficticios en UTAPED para provocar resultados. Al cerrar, trasladar a REQ/CLASS/USER únicamente los AC completamente comprobados y conservar cualquier pendiente.
 
 Actualización del 15/10: **34 procedimientos superados y 5 en validación**, según la tabla actual. Las pruebas adversas aisladas no se presentan como escrituras externas reales. La aceptación humana del contenido y la preparación de entrega siguen separadas.
+
+## Cierre de comprobaciones del 15 de octubre
+
+Véase [acta de cierre y límites del paquete local](validation-closeout.md). RV-39: contraste completo Trello; RV-40: revisión técnica y aceptación interna expresa del gestor del reporte 07:40; RV-41: 28 pruebas funcionales del cliente UTAPED y dos builds/tipos/lint aislados; RV-42: EX-01 documentada sin alterar la decisión; RV-43: fallo histórico consultado en el panel nuevo. Evidencia en work/acceptance/closure-oct15/.
+
+Estado actual: **39 procedimientos revisados: 38 superados y uno cerrado con excepción histórica (AC-7.06)**. No equivale a 39 registros históricos conformes ni a dispensa del requisito académico. La entrega final permanece diferida. El paquete local no contiene credenciales, sesiones, base de datos ni exportaciones privadas. No hubo nuevas escrituras en Trello/GitHub.

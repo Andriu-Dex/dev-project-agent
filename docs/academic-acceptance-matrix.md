@@ -256,3 +256,7 @@ Se implementa [notificación SMTP](notifications.md), configuración por pestañ
 ## Validación técnica del 15 de octubre
 
 La [tabla actual de los 39 criterios](real-acceptance-validation.md) registra 34 procedimientos superados y 5 en validación. [El informe de esta tanda](chatgpt-validation-oct15.md) distingue ejecución real, fixtures y revisión humana pendiente. Prevalece sobre los recuentos históricos anteriores, sin cambiar la fuente académica ni declarar aceptación final.
+
+## Cierre de comprobaciones y candidato local — 15 de octubre
+
+[El acta de cierre](validation-closeout.md) registra contraste completo de listas/checklists, aceptación interna del reporte por el gestor, 28 pruebas funcionales aisladas de dos candidatos y consulta de un fallo histórico en la interfaz nueva. Estado actual: 38 procedimientos superados y AC-7.06 cerrado con excepción histórica EX-01 documentada, sin alterar la aprobación antigua ni declarar cumplimiento retrospectivo. El paquete es local, incluye cambios visuales del árbol de trabajo y conserva manifiesto de hashes; no constituye entrega final, publicación, despliegue ni permiso de cambios externos. Tipos/build del agente y 186 unitarias superados; 142 casos de integración omitidos en ese comando se informan como omitidos.
