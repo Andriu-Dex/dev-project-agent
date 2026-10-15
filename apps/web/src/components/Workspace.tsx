@@ -41,7 +41,7 @@ export const pages = {
   settings: {
     title: 'Configuración',
     description: 'Conexiones, reglas y permisos adaptados a tu proyecto.',
-    icon: 'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8 M12 2v3 M12 19v3 M2 12h3 M19 12h3 M5 5l2 2 M17 17l2 2 M5 19l2-2 M17 7l2-2',
+    icon: 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z',
   },
 } as const;
 
@@ -241,16 +241,6 @@ export function Workspace({
               </a>
             ))}
           </nav>
-
-          {!collapsed && (
-            <div className="sidebar-note">
-              <span className="status-dot" />
-              <div className="sidebar-note-content">
-                <strong>Control humano</strong>
-                <p>Las modificaciones requieren tu aprobación explícita.</p>
-              </div>
-            </div>
-          )}
         </div>
 
         <div className="sidebar-footer">
@@ -274,16 +264,6 @@ export function Workspace({
           >
             <Icon path="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4 M16 17l5-5-5-5 M21 12H9" />
             {!collapsed && <span>Cerrar sesión</span>}
-          </button>
-          <button
-            type="button"
-            className="sidebar-rail-toggle"
-            onClick={toggleCollapsed}
-            aria-label={collapsed ? 'Expandir barra lateral (Ctrl+B)' : 'Contraer barra lateral (Ctrl+B)'}
-            title={collapsed ? 'Expandir barra lateral (Ctrl+B)' : 'Contraer barra lateral (Ctrl+B)'}
-          >
-            <Icon path={collapsed ? 'M9 5l7 7-7 7' : 'M15 19l-7-7 7-7'} />
-            {!collapsed && <span>Contraer barra</span>}
           </button>
         </div>
       </aside>

@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import type { SessionResponse, ProjectRole } from '@dev-project-agent/contracts';
-import {Workspace} from './Workspace';
+import {Workspace, Icon} from './Workspace';
 import {OverviewPage} from './OverviewPage';
 import {PlanningPage} from './PlanningPage';
 import {AlertsPage} from './AlertsPage';
@@ -8,14 +8,13 @@ import {SettingsPage} from './SettingsPage';
 import {NotificationSettings} from './NotificationSettings';
 import {AppearanceSettings} from './AppearanceSettings';
 import {OperationsSettings} from './OperationsSettings';
-import {HistoryPanel} from './HistoryPanel';
 import {TrackingSettings} from './TrackingSettings';
-import { SupervisionPanel } from './SupervisionPanel';
 import { ProviderPanel } from './ProviderPanel';
 import { OllamaPanel } from './OllamaPanel';
 import {CodeReviewPanel} from './CodeReviewPanel';
 import {ReportsPanel} from './ReportsPanel';
 import { ProposalPanel } from './ProposalPanel';
+import { OperationsPage } from './OperationsPage';
 
 interface Member { id: string; displayName: string; role: ProjectRole }
 
@@ -95,8 +94,89 @@ export function SessionPanel() {
     if(page==='proposals')return <ProposalPanel {...props} sourceRevision={sourceRevision}/>;
     if(page==='code')return <CodeReviewPanel {...props}/>;
     if(page==='reports')return <ReportsPanel {...props}/>;
-    if(page==='operations')return <><OperationsSettings {...props} mode="history"/><SupervisionPanel {...props} onCompleted={()=>setSourceRevision(value=>value+1)}/><HistoryPanel projectId={project.id}/></>;
-    return <SettingsPage>{{integrations:<><ProviderPanel {...props}/><OllamaPanel {...props}/></>,tracking:<section><h2>Reglas del proyecto</h2><TrackingSettings projectId={project.id} canManage={project.canManageProject} csrfToken={session.csrfToken} onSaved={()=>setSourceRevision(value=>value+1)}/></section>,automation:<><OperationsSettings {...props} mode="configuration"/><ReportsPanel {...props} configurationOnly/></>,notifications:<NotificationSettings {...props}/>,appearance:<AppearanceSettings/>,team:<section><h2>Equipo con acceso</h2>{memberError&&<p role="alert">{memberError}</p>}{members?<div className="member-grid">{members.map(member=><div className="member-card" key={member.id}><span className="profile-avatar">{member.displayName.slice(0,1)}</span><div><strong>{member.displayName}</strong><p className="muted">{member.role==='manager'?'Gestor':'Consulta'}</p></div></div>)}</div>:<p className="muted">{project.canManageProject?'Cargando equipo…':'La administración del equipo corresponde al gestor.'}</p>}</section>}}</SettingsPage>;
+    if(page==='operations')return <OperationsPage {...props} onCompleted={()=>setSourceRevision(value=>value+1)}/>;
+    return (
+      <SettingsPage>
+        {{
+          integrations: (
+            <>
+              <ProviderPanel {...props} />
+              <OllamaPanel {...props} />
+            </>
+          ),
+          tracking: (
+            <div className="proposal-editor-card">
+              <header className="editor-card-header">
+                <div className="editor-header-title">
+                  <div className="editor-icon-badge">
+                    <Icon path="M4 21v-7 M4 10V3 M12 21v-9 M12 8V3 M20 21v-5 M20 12V3 M1 14h6 M9 8h6 M17 16h6" />
+                  </div>
+                  <div>
+                    <h3>Políticas y Reglas del Proyecto</h3>
+                    <p>
+                      Configura los umbrales de vencimiento, frescura de lecturas y equivalencias de etiquetas de Trello.
+                    </p>
+                  </div>
+                </div>
+              </header>
+              <div className="editor-card-body">
+                <TrackingSettings
+                  projectId={project.id}
+                  canManage={project.canManageProject}
+                  csrfToken={session.csrfToken}
+                  onSaved={() => setSourceRevision(value => value + 1)}
+                />
+              </div>
+            </div>
+          ),
+          automation: (
+            <>
+              <OperationsSettings {...props} mode="configuration" />
+              <ReportsPanel {...props} configurationOnly />
+            </>
+          ),
+          notifications: <NotificationSettings {...props} />,
+          appearance: <AppearanceSettings />,
+          team: (
+            <div className="proposal-editor-card">
+              <header className="editor-card-header">
+                <div className="editor-header-title">
+                  <div className="editor-icon-badge">
+                    <Icon path="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2 M9 7a4 4 0 1 0 0-8 4 4 0 0 0 0 8z M23 21v-2a4 4 0 0 0-3-3.87 M16 3.13a4 4 0 0 1 0 7.75" />
+                  </div>
+                  <div>
+                    <h3>Equipo con Acceso al Proyecto</h3>
+                    <p>Personas registradas con permisos de supervisión, consulta o gestión del proyecto.</p>
+                  </div>
+                </div>
+              </header>
+              <div className="editor-card-body">
+                {memberError && <p role="alert" className="form-error">{memberError}</p>}
+                {members ? (
+                  <div className="member-grid">
+                    {members.map(member => (
+                      <div className="member-card" key={member.id}>
+                        <span className="profile-avatar">{member.displayName.slice(0, 1).toUpperCase()}</span>
+                        <div className="member-info">
+                          <strong>{member.displayName}</strong>
+                          <span className={`member-role-badge ${member.role === 'manager' ? 'is-manager' : 'is-viewer'}`}>
+                            {member.role === 'manager' ? 'Gestor' : 'Consulta'}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="muted">
+                    {project.canManageProject ? 'Cargando equipo…' : 'La administración del equipo corresponde al gestor.'}
+                  </p>
+                )}
+              </div>
+            </div>
+          ),
+        }}
+      </SettingsPage>
+    );
   }}/>{error&&<div className="global-notice" role="alert">{error}</div>}</>;
   return <main className="login-layout"><div className="login-story"><a className="workspace-brand" href="#overview"><img src="/favicon.jpg" alt="Dev Project Agent" className="brand-mark"/><span>Dev Project Agent</span></a><div><p className="eyebrow">CLARIDAD PARA DECIDIR</p><h1>Tu proyecto,<br/>bajo control.</h1><p>Comprende el avance, anticipa los riesgos y revisa cada propuesta con evidencia.</p><div className="login-points"><p>01 <span>Planificación conectada con Trello</span></p><p>02 <span>Revisión de código y recomendaciones</span></p><p>03 <span>Decisiones humanas, trazabilidad completa</span></p></div></div><small>Dev Project Agent · Seguimiento de proyectos de software</small></div><div className="login-content"><section aria-labelledby="session-title">
     <h2 id="session-title">{session?.authenticated ? 'Tu proyecto' : 'Iniciar sesión'}</h2>

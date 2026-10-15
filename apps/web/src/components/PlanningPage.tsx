@@ -20,6 +20,19 @@ const stateIcons: Record<string, string> = {
 const getStateIcon = (state: string): string =>
   stateIcons[state] ?? stateIcons.unknown ?? 'M12 8v4 M12 16h.01 M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z';
 
+function getPaginationRange(current: number, total: number): (number | 'ellipsis')[] {
+  if (total <= 7) {
+    return Array.from({ length: total }, (_, i) => i + 1);
+  }
+  if (current <= 4) {
+    return [1, 2, 3, 4, 5, 'ellipsis', total];
+  }
+  if (current >= total - 3) {
+    return [1, 'ellipsis', total - 4, total - 3, total - 2, total - 1, total];
+  }
+  return [1, 'ellipsis', current - 1, current, current + 1, 'ellipsis', total];
+}
+
 export function PlanningPage({ project }: { project: ProjectAccess }) {
   const [data, setData] = useState<{ trello: TrelloOverview; tracking: TrackingResponse } | null>(null);
   const [error, setError] = useState('');
@@ -27,7 +40,16 @@ export function PlanningPage({ project }: { project: ProjectAccess }) {
   const [filter, setFilter] = useState<string>('all');
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
   const [memberFilter, setMemberFilter] = useState<string>('all');
+  const [urgencyFilter, setUrgencyFilter] = useState<string>('all');
+  const [sortOrder, setSortOrder] = useState<string>('default');
   const [selected, setSelected] = useState<string>('');
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(10);
+
+  // Reset pagination when search or filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, filter, priorityFilter, memberFilter, urgencyFilter, sortOrder, pageSize]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -113,8 +135,77 @@ export function PlanningPage({ project }: { project: ProjectAccess }) {
     // Member filter
     if (memberFilter !== 'all' && !item.memberIds.includes(memberFilter)) return false;
 
+    // Urgency & Deadline filter
+    if (urgencyFilter === 'overdue' && tracking?.schedule !== 'overdue') return false;
+    if (urgencyFilter === 'due_soon') {
+      const isDueSoon =
+        tracking?.schedule === 'due_soon' ||
+        (Boolean(item.due) &&
+          itemState !== 'completed' &&
+          new Date(item.due!).getTime() - Date.now() <= 7 * 86400000 &&
+          new Date(item.due!).getTime() >= Date.now());
+      if (!isDueSoon) return false;
+    }
+    if (urgencyFilter === 'due_14') {
+      const isDue14 =
+        Boolean(item.due) &&
+        itemState !== 'completed' &&
+        new Date(item.due!).getTime() - Date.now() <= 14 * 86400000 &&
+        new Date(item.due!).getTime() >= Date.now();
+      if (!isDue14) return false;
+    }
+    if (urgencyFilter === 'with_deviations') {
+      const hasDeviation =
+        tracking?.schedule === 'overdue' ||
+        tracking?.blocked === true ||
+        (tracking?.qualityIssues?.length ?? 0) > 0 ||
+        tracking?.attention === 'immediate' ||
+        tracking?.attention === 'upcoming';
+      if (!hasDeviation) return false;
+    }
+
     return true;
+  })
+  .sort((a, b) => {
+    if (sortOrder === 'due_asc') {
+      if (!a.due) return 1;
+      if (!b.due) return -1;
+      return new Date(a.due).getTime() - new Date(b.due).getTime();
+    }
+    if (sortOrder === 'due_desc') {
+      if (!a.due) return 1;
+      if (!b.due) return -1;
+      return new Date(b.due).getTime() - new Date(a.due).getTime();
+    }
+    if (sortOrder === 'overdue_desc') {
+      const trA = statuses.get(a.id);
+      const trB = statuses.get(b.id);
+      const hoursA = trA?.overdueHours ?? 0;
+      const hoursB = trB?.overdueHours ?? 0;
+      if (hoursA !== hoursB) return hoursB - hoursA;
+      return 0;
+    }
+    if (sortOrder === 'name_asc') {
+      return a.name.localeCompare(b.name, 'es');
+    }
+    // Default: natural WBS sorting
+    const wbsA = a.planning?.wbs ?? '';
+    const wbsB = b.planning?.wbs ?? '';
+    if (wbsA && wbsB) {
+      return wbsA.localeCompare(wbsB, undefined, { numeric: true });
+    }
+    if (wbsA) return -1;
+    if (wbsB) return 1;
+    return 0;
   });
+
+  // Pagination calculations
+  const totalPages = Math.max(1, Math.ceil(visible.length / pageSize));
+  const safePage = Math.min(Math.max(1, currentPage), totalPages);
+  const startIndex = visible.length === 0 ? 0 : (safePage - 1) * pageSize;
+  const endIndex = Math.min(startIndex + pageSize, visible.length);
+  const paginatedItems = visible.slice(startIndex, endIndex);
+  const pageRange = getPaginationRange(safePage, totalPages);
 
   const detail: TrelloItem | undefined = items.find(item => item.id === selected);
   const detailTracking = detail ? statuses.get(detail.id) : undefined;
@@ -293,6 +384,32 @@ export function PlanningPage({ project }: { project: ProjectAccess }) {
 
           <div className="planning-select-group">
             <select
+              value={sortOrder}
+              onChange={e => setSortOrder(e.target.value)}
+              aria-label="Ordenar actividades"
+              className="planning-select"
+            >
+              <option value="default">Orden: Plan / WBS</option>
+              <option value="due_asc">Vencimiento (más próximo)</option>
+              <option value="due_desc">Vencimiento (más lejano)</option>
+              <option value="overdue_desc">Mayor retraso (horas)</option>
+              <option value="name_asc">Nombre (A–Z)</option>
+            </select>
+
+            <select
+              value={urgencyFilter}
+              onChange={e => setUrgencyFilter(e.target.value)}
+              aria-label="Filtrar por plazo o desvío"
+              className="planning-select"
+            >
+              <option value="all">Cualquier plazo</option>
+              <option value="overdue">Solo vencidas</option>
+              <option value="due_soon">Vencen en 7 días</option>
+              <option value="due_14">Vencen en 14 días</option>
+              <option value="with_deviations">Con desvíos u observaciones</option>
+            </select>
+
+            <select
               value={priorityFilter}
               onChange={e => setPriorityFilter(e.target.value)}
               aria-label="Filtrar por prioridad"
@@ -346,7 +463,7 @@ export function PlanningPage({ project }: { project: ProjectAccess }) {
         <div className="planning-table-container">
           <div className="table-header-bar">
             <span className="table-count-label">
-              Mostrando <strong>{visible.length}</strong> de {items.length} actividades e hitos
+              Total de actividades e hitos: <strong>{visible.length}</strong> {visible.length !== items.length ? `(de ${items.length} en el tablero)` : ''}
             </span>
           </div>
 
@@ -362,7 +479,7 @@ export function PlanningPage({ project }: { project: ProjectAccess }) {
                 </tr>
               </thead>
               <tbody>
-                {visible.map(item => {
+                {paginatedItems.map(item => {
                   const tracking = statuses.get(item.id);
                   const state = tracking?.declaredState ?? item.state;
                   const isOverdue = tracking?.schedule === 'overdue';
@@ -493,6 +610,8 @@ export function PlanningPage({ project }: { project: ProjectAccess }) {
                     setFilter('all');
                     setPriorityFilter('all');
                     setMemberFilter('all');
+                    setUrgencyFilter('all');
+                    setSortOrder('default');
                   }}
                 >
                   Restablecer filtros
@@ -500,6 +619,75 @@ export function PlanningPage({ project }: { project: ProjectAccess }) {
               </div>
             )}
           </div>
+
+          {visible.length > 0 && (
+            <footer className="planning-pagination-bar">
+              <div className="pagination-summary">
+                <span>{startIndex + 1}–{endIndex} de <strong>{visible.length}</strong></span>
+              </div>
+
+              <nav className="pagination-pages-nav" aria-label="Páginas">
+                <button
+                  type="button"
+                  className="pagination-arrow-btn"
+                  disabled={safePage <= 1}
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  aria-label="Página anterior"
+                  title="Página anterior"
+                >
+                  <Icon path="M15 19l-7-7 7-7" />
+                </button>
+
+                {pageRange.map((pageItem, idx) => {
+                  if (pageItem === 'ellipsis') {
+                    return (
+                      <span key={`ellipsis-${idx}`} className="pagination-ellipsis" aria-hidden="true">
+                        …
+                      </span>
+                    );
+                  }
+                  const isCurrent = pageItem === safePage;
+                  return (
+                    <button
+                      key={pageItem}
+                      type="button"
+                      className={'pagination-number-btn' + (isCurrent ? ' is-active' : '')}
+                      onClick={() => setCurrentPage(pageItem)}
+                      aria-label={`Página ${pageItem}`}
+                      aria-current={isCurrent ? 'page' : undefined}
+                    >
+                      {pageItem}
+                    </button>
+                  );
+                })}
+
+                <button
+                  type="button"
+                  className="pagination-arrow-btn"
+                  disabled={safePage >= totalPages}
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  aria-label="Página siguiente"
+                  title="Página siguiente"
+                >
+                  <Icon path="M9 5l7 7-7 7" />
+                </button>
+              </nav>
+
+              <div className="pagination-size-container">
+                <select
+                  id="planning-page-size"
+                  className="pagination-pagesize-select"
+                  value={pageSize}
+                  onChange={e => setPageSize(Number(e.target.value))}
+                  aria-label="Cantidad de filas por página"
+                >
+                  <option value={10}>10 / pág</option>
+                  <option value={20}>20 / pág</option>
+                  <option value={50}>50 / pág</option>
+                </select>
+              </div>
+            </footer>
+          )}
         </div>
       )}
 
@@ -538,11 +726,12 @@ export function PlanningPage({ project }: { project: ProjectAccess }) {
               </button>
             </header>
 
-            <div className="drawer-title-area">
-              <h3 id="drawer-detail-title">{detail.name}</h3>
-            </div>
+            <div className="drawer-scroll-body">
+              <div className="drawer-title-area">
+                <h3 id="drawer-detail-title">{detail.name}</h3>
+              </div>
 
-            <div className="drawer-body">
+              <div className="drawer-content-flow">
               {/* Quick Status / Health Cards */}
               <div className="drawer-card-meta-grid">
                 <div className="drawer-meta-box">
@@ -694,7 +883,8 @@ export function PlanningPage({ project }: { project: ProjectAccess }) {
                 </div>
               </div>
             </div>
-          </aside>
+          </div>
+        </aside>
         </div>
       )}
     </div>
