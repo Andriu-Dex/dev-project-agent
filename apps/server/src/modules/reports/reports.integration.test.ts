@@ -50,6 +50,13 @@ describe.skipIf(process.env.RUN_REPORTS_DB_TESTS!=='true')('PostgreSQL weekly re
   it('keeps missing planning evidence in a draft rather than publishing invented progress',async()=>{
     const report=await generate();expect(report.status).toBe('draft');expect(report.data!.tracking).toBeNull();expect(report.data!.stages.find(stage=>stage.stage==='reviewer')!.outcome).toBe('fail');expect(report.data!.executiveSummary).toContain('No hay evidencia');
   });
+  it('links risk recommendations to observed assignees and dates without assigning new commitments',async()=>{
+    await snapshot();const report=await generate();
+    const recommendation=report.data!.recommendations.find(value=>value.startsWith('Actividad sintética:'));
+    expect(recommendation).toContain('Responsable registrado: Test member.');
+    expect(recommendation).toContain('Vencimiento observado (Ecuador):');
+    expect(recommendation).toContain('no asignan ni comprometen una nueva fecha');
+  });
   it('deduplicates manual requests and creates another immutable version on correction',async()=>{
     await snapshot();const key=randomUUID(),first=await service.request(projectId,actor,key),duplicate=await service.request(projectId,actor,key);expect(duplicate.id).toBe(first.id);while(await service.processNext()){}
     const original=(await service.detail(projectId,first.id))!,revision=await service.request(projectId,actor,randomUUID(),first.id);expect(revision.version).toBe(2);expect(revision.cutoff).toBe(first.cutoff);while(await service.processNext()){}expect(await service.detail(projectId,first.id)).toEqual(original);
@@ -82,6 +89,23 @@ describe.skipIf(process.env.RUN_REPORTS_DB_TESTS!=='true')('PostgreSQL weekly re
   it('does not reconstruct a historical baseline from a confirmation after the cutoff',async()=>{
     const id=await snapshot();await client.query("INSERT INTO baseline_versions(project_id,version,snapshot_id,confirmed_by,confirmed_at) VALUES($1,1,$2,$3,'2026-10-05T12:00:00Z')",[projectId,id,actor.id]);await historicalSchedule();await service.enqueueScheduled(new Date('2026-10-03T00:00:00Z'));while(await service.processNext()){}
     const report=(await service.detail(projectId,(await service.overview(projectId)).reports[0]!.id))!;expect(report.data!.baselineVersion).toBeNull();expect(report.data!.deviations).toEqual([]);
+  });
+  it('keeps proposals, decisions and a failed publication distinct inside the report period',async()=>{
+    await snapshot();
+    const analysisId=(await client.query("INSERT INTO code_analyses(project_id,requested_by,request_key,request_hash,status) VALUES($1,$2,$3,'fixture','ready') RETURNING id",[projectId,actor.id,randomUUID()])).rows[0].id;
+    const proposalId=(await client.query("INSERT INTO code_proposals(project_id,created_by,purpose) VALUES($1,$2,'live') RETURNING id",[projectId,actor.id])).rows[0].id;
+    for(const version of [1,2])await client.query("INSERT INTO code_versions(project_id,proposal_id,version,analysis_id,goal,finding_ids,created_at) VALUES($1,$2,$3,$4,'Report fixture','[]','2026-10-01T12:00:00Z')",[projectId,proposalId,version,analysisId]);
+    const approval=(await client.query("INSERT INTO code_decisions(project_id,proposal_id,version,actor_id,auth_version,request_key,content_hash,decision,reason,created_at) VALUES($1,$2,1,$3,1,$4,$5,'approved','Bounded fixture approval','2026-10-01T13:00:00Z') RETURNING id",[projectId,proposalId,actor.id,randomUUID(),'0'.repeat(64)])).rows[0].id;
+    await client.query("INSERT INTO code_decisions(project_id,proposal_id,version,actor_id,auth_version,request_key,content_hash,decision,reason,created_at) VALUES($1,$2,2,$3,1,$4,$5,'rejected','Preserve existing implementation','2026-10-01T14:00:00Z')",[projectId,proposalId,actor.id,randomUUID(),'1'.repeat(64)]);
+    const job=(await client.query("INSERT INTO github_publication_jobs(project_id,proposal_id,version,content_hash,requested_by,auth_version,request_key,approval_id,plan,status,error_code) VALUES($1,$2,1,$3,$4,1,$5,$6,'{}','failed','REMOTE_REJECTED') RETURNING id",[projectId,proposalId,'0'.repeat(64),actor.id,randomUUID(),approval])).rows[0].id;
+    await client.query("INSERT INTO github_publication_events(project_id,job_id,stage,outcome,detail,created_at) VALUES($1,$2,'write','failed',$3,'2026-10-01T15:00:00Z')",[projectId,job,JSON.stringify({actorId:actor.id})]);
+    await historicalSchedule();await service.enqueueScheduled(new Date('2026-10-03T00:00:00Z'));while(await service.processNext()){}
+    const report=(await service.detail(projectId,(await service.overview(projectId)).reports[0]!.id))!;
+    expect(report.data!.actions.filter(action=>action.action==='proposed')).toHaveLength(2);
+    expect(report.data!.actions.some(action=>action.action==='approved'&&action.version===1)).toBe(true);
+    expect(report.data!.actions.some(action=>action.action==='rejected'&&action.version===2)).toBe(true);
+    expect(report.data!.actions.find(action=>action.action==='publication.write')).toMatchObject({outcome:'failed',purpose:'live',target:'code',actor:'Gestor sintético'});
+    expect(report.data!.actions.some(action=>action.outcome==='succeeded')).toBe(false);
   });
   it('halts pending generation when manager membership is revoked',async()=>{
     await snapshot();const job=await service.request(projectId,actor,randomUUID());await client.query('UPDATE project_memberships SET active=false WHERE project_id=$1 AND user_id=$2',[projectId,actor.id]);while(await service.processNext()){}expect(await service.detail(projectId,job.id)).toMatchObject({status:'failed',errorCode:'FORBIDDEN',data:null});

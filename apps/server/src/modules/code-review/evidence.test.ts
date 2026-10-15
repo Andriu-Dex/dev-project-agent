@@ -28,6 +28,11 @@ describe('Pinned and bounded GitHub code sources',()=>{
   it('blocks recognizable secrets before storage or inference',()=>{for(const text of ['const token = "ghp_'+'a'.repeat(30)+'";','-----BEGIN RSA PRIVATE KEY-----','const password = "abcdefghijklmnop";','https://user:password@example.com'])expect(()=>assertSafeCode(text)).toThrow();});
 });
 describe('Evidence and bounded corrections',()=>{
+  it('rejects a scalar limitations response without coercing provider evidence',()=>{
+    const source=codeFixture();
+    expect(()=>parseAnalysis({summary:'Revisión limitada.',findings:[],limitations:'No se ejecutaron pruebas.'},source)).toThrow();
+    expect(parseAnalysis({summary:'Revisión limitada.',findings:[],limitations:['No se ejecutaron pruebas.']},source).limitations).toEqual(['No se ejecutaron pruebas.']);
+  });
   it('labels patterns as hypotheses and does not report unexecuted project tests as passed',()=>{
     const result=deterministicAnalysis(codeFixture());expect(result.findings[0]).toMatchObject({startLine:2,endLine:2,confidence:'hypothesis',evidence:'  return eval(input);'});
     expect(result.limitations.join(' ')).toContain('No se ejecutaron');const file={...codeFixture().files[0]!,path:'src/Main.java'};expect(syntaxChecks([file])[0]?.status).toBe('not_checked');

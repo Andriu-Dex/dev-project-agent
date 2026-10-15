@@ -9,7 +9,7 @@ import {MailError,mailFailure,type MailTransport} from './smtp.js';
 
 interface Configuration {project_id:string;version:number;settings:NotificationSettings;changed_by:string;auth_version:number;changed_at:Date}
 interface Delivery {id:string;project_id:string;configuration_version:number;recipient:string;kind:string;event_ids:string[];attempt_count:number;next_attempt:Date}
-const names:Record<string,string>={overdue:'Actividad vencida',blocked:'Bloqueo informado',due_soon:'PrÃ³ximo vencimiento',baseline_deviation:'DesviaciÃ³n de planificaciÃ³n',dependency_risk:'Riesgo de dependencia'};
+const names:Record<string,string>={overdue:'Actividad vencida',blocked:'Bloqueo informado',due_soon:'Próximo vencimiento',baseline_deviation:'Desviación de planificación',dependency_risk:'Riesgo de dependencia'};
 export class NotificationService {
   constructor(readonly database:TrelloDatabase,readonly transport:MailTransport|null,readonly smtpStatus:string,readonly baseUrl='http://127.0.0.1:5174',private sensitiveValues:string[]=[]){}
   private protect(value:string){for(const secret of this.sensitiveValues)if(secret.length>=8)value=value.split(secret).join('[dato protegido]');return reportText(value);}
@@ -64,11 +64,11 @@ export class NotificationService {
     }
     if(config.settings.events.includes('source_failure')){
       const rows=(await db.query<{id:string;error_code:string;finished_at:Date}>("SELECT id,error_code,finished_at FROM supervision_jobs WHERE project_id=$1 AND status IN ('failed','partial') AND error_code IS NOT NULL AND finished_at>=$2 AND NOT EXISTS(SELECT 1 FROM notification_events e WHERE e.project_id=supervision_jobs.project_id AND e.event_key='source:'||supervision_jobs.id::text) ORDER BY finished_at LIMIT 200",[config.project_id,config.changed_at])).rows;
-      for(const row of rows)await this.addEvent(db,config,'source:'+row.id,'source_failure',row.id,'La actualizaciÃ³n de fuentes necesita atenciÃ³n. Consulta el trabajo '+row.id+' en OperaciÃ³n; se conserva la Ãºltima lectura disponible.',row.finished_at);
+      for(const row of rows)await this.addEvent(db,config,'source:'+row.id,'source_failure',row.id,'La actualización de fuentes necesita atención. Consulta el trabajo '+row.id+' en Operación; se conserva la última lectura disponible.',row.finished_at);
     }
     if(config.settings.reminderHours>0&&now.getTime()-config.changed_at.getTime()>=config.settings.reminderHours*3600000){
       const rows=(await db.query<{id:string;code:string;payload:{finding:{itemName:string}};last_seen:Date}>(`SELECT a.* FROM project_alerts a WHERE a.project_id=$1 AND a.status='open' AND a.code=ANY($2::text[]) AND EXISTS(SELECT 1 FROM notification_events previous WHERE previous.project_id=a.project_id AND previous.source_id=a.id::text AND previous.created_at>=$4) AND NOT EXISTS(SELECT 1 FROM notification_events e WHERE e.project_id=a.project_id AND e.source_id=a.id::text AND e.created_at>$3) LIMIT 100`,[config.project_id,config.settings.events,new Date(now.getTime()-config.settings.reminderHours*3600000),config.changed_at])).rows;
-      for(const row of rows)await this.addEvent(db,config,'reminder:'+row.id+':'+Math.floor((now.getTime()-config.changed_at.getTime())/(config.settings.reminderHours*3600000)),row.code,row.id,`Recordatorio: ${names[row.code]} Â· ${row.payload.finding.itemName}. Ãšltima evidencia: ${row.last_seen.toISOString()}. Comprueba su vigencia en el panel.`,now);
+      for(const row of rows)await this.addEvent(db,config,'reminder:'+row.id+':'+Math.floor((now.getTime()-config.changed_at.getTime())/(config.settings.reminderHours*3600000)),row.code,row.id,`Recordatorio: ${names[row.code]} · ${row.payload.finding.itemName}. Última evidencia: ${row.last_seen.toISOString()}. Comprueba su vigencia en el panel.`,now);
     }
     const events=(await db.query<{id:string}>(`SELECT e.id FROM notification_events e WHERE e.project_id=$1 AND e.created_at>=$2 AND NOT EXISTS(SELECT 1 FROM notification_deliveries d WHERE d.project_id=e.project_id AND e.id=ANY(d.event_ids)) ORDER BY e.occurred_at LIMIT 50`,[config.project_id,config.changed_at])).rows;
     const queued=(await db.query<{id:string}>("SELECT id FROM notification_deliveries WHERE project_id=$1 AND configuration_version=$2 AND kind='notification' AND status='queued' AND cardinality(event_ids)<500 ORDER BY created_at LIMIT 1",[config.project_id,config.version])).rows[0];

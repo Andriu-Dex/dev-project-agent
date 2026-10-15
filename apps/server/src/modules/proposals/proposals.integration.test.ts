@@ -81,6 +81,11 @@ describe.skipIf(process.env.RUN_PROPOSALS_DB_TESTS!=='true')('PostgreSQL three-a
     const first=await prepare(),base=path()+`/${first.job.proposalId}/versions/1/decisions`,payload={contentHash:first.detail.contentHash!,decision:'changes_requested',reason:'Ajustar el objetivo.',requestKey:randomUUID()};
     expect((await app.inject({method:'POST',url:base,headers:viewerHeaders,payload})).statusCode).toBe(403);
     expect((await app.inject({method:'POST',url:base,headers,payload:{...payload,reason:''}})).statusCode).toBe(400);
+    for(const reason of ['', '   ']){
+      const response=await app.inject({method:'POST',url:base,headers,payload:{...payload,decision:'approved',reason,requestKey:randomUUID()}});
+      expect(response.statusCode).toBe(400);expect(response.json().code).toBe('REASON_REQUIRED');
+    }
+    expect((await service.version(projectId,first.job.proposalId,1))!.decisions).toHaveLength(0);
     expect((await app.inject({method:'POST',url:base,headers,payload})).json().state).toBe('changes_requested');
     const second=await prepare({proposalId:first.job.proposalId,expectedVersion:1});const decision=await service.decide(projectId,actor,second.job.proposalId,2,second.detail.contentHash!,'rejected','Fuera de plazo.',randomUUID());expect(decision.state).toBe('rejected');
     await expect(service.prepare(binding,actor,{...request(),proposalId:second.job.proposalId,expectedVersion:2})).rejects.toMatchObject({code:'CONFLICT'});
@@ -92,7 +97,7 @@ describe.skipIf(process.env.RUN_PROPOSALS_DB_TESTS!=='true')('PostgreSQL three-a
     await service.resume(binding,actor,quota.job.proposalId,1,'gpt-6.1-sol','high',randomUUID());await service.waitForIdle();const resumed=(await service.version(projectId,quota.job.proposalId,1))!;expect(calls).toEqual(['reviewer','approver']);expect(resumed.contentHash).toBe(hash);expect(resumed.state).toBe('pending_human_approval');
   });
   it('invalidates a stale source before authorization and requires a new frozen context',async()=>{
-    const first=await prepare();board.cards[0]!.due='2026-10-12T22:00:00.000Z';await refresh();const decision=await service.decide(projectId,actor,first.job.proposalId,1,first.detail.contentHash!,'approved','',randomUUID());expect(decision).toMatchObject({state:'invalidated',invalidated:true});expect((await service.version(projectId,first.job.proposalId,1))!.decisions).toEqual([]);
+    const first=await prepare();board.cards[0]!.due='2026-10-12T22:00:00.000Z';await refresh();const decision=await service.decide(projectId,actor,first.job.proposalId,1,first.detail.contentHash!,'approved','Reviewed source.',randomUUID());expect(decision).toMatchObject({state:'invalidated',invalidated:true});expect((await service.version(projectId,first.job.proposalId,1))!.decisions).toEqual([]);
     const second=await prepare({proposalId:first.job.proposalId,expectedVersion:1});expect(second.detail.content?.actions[0]?.expectedDue).toBe(board.cards[0]!.due);expect(second.detail.contentHash).not.toBe(first.detail.contentHash);
     await client.query('INSERT INTO tracking_policy_versions (project_id,version,due_soon_hours,stale_after_minutes,confirmed) VALUES ($1,2,24,60,false)',[projectId]);expect((await service.recheck(projectId,actor,second.job.proposalId,2)).state).toBe('invalidated');await refresh();
   });
@@ -106,7 +111,7 @@ describe.skipIf(process.env.RUN_PROPOSALS_DB_TESTS!=='true')('PostgreSQL three-a
     await client.query("UPDATE agent_jobs SET status='running' WHERE id=$1",[job.id]);const before=calls.length;await service.initialize();expect(calls.length).toBe(before);expect((await service.overview(projectId)).jobs.find(value=>value.id===job.id)).toMatchObject({status:'interrupted',errorCode:'SERVICE_RESTARTED'});
   });
   it('runs the complete authorization workflow with the restricted runtime database role',async()=>{
-    await client.query('SET LOCAL ROLE dev_project_agent_app');try{const proposal=await prepare();expect(proposal.detail.state).toBe('pending_human_approval');expect((await service.decide(projectId,actor,proposal.job.proposalId,1,proposal.detail.contentHash!,'approved','',randomUUID())).state).toBe('authorized');}finally{await client.query('RESET ROLE');}
+    await client.query('SET LOCAL ROLE dev_project_agent_app');try{const proposal=await prepare();expect(proposal.detail.state).toBe('pending_human_approval');expect((await service.decide(projectId,actor,proposal.job.proposalId,1,proposal.detail.contentHash!,'approved','Reviewed scope.',randomUUID())).state).toBe('authorized');}finally{await client.query('RESET ROLE');}
   });
   it('restricts runtime updates to lifecycle fields and keeps evidence and decisions immutable',async()=>{
     const grants=await client.query("SELECT has_column_privilege('dev_project_agent_app','proposal_versions','state','UPDATE') AS state,has_column_privilege('dev_project_agent_app','proposal_versions','context','UPDATE') AS context,has_table_privilege('dev_project_agent_app','proposal_contents','UPDATE') AS content,has_table_privilege('dev_project_agent_app','agent_messages','DELETE') AS messages,has_table_privilege('dev_project_agent_app','proposal_decisions','UPDATE') AS decisions");expect(grants.rows[0]).toEqual({state:true,context:false,content:false,messages:false,decisions:false});

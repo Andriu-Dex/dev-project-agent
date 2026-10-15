@@ -28,7 +28,7 @@ PostgreSQL conserva versiones, contenido sellado, solicitudes idempotentes, mens
 
 ## Decisión y corrección
 
-La decisión exige la última versión en `pending_human_approval`, su huella exacta, dictamen válido de Revisor y resultado `human_required` de Aprobador. Aprobar requiere confirmación explícita del gestor; rechazo o solicitud de ajuste requiere motivo. La decisión se anexa una sola vez y conserva actor, instante, versión, huella y motivo. Otra solicitud sobre esa misma versión no puede reemplazarla. Repetir la misma clave UUID devuelve la decisión original.
+La decisión exige la última versión en `pending_human_approval`, su huella exacta, dictamen válido de Revisor y resultado `human_required` de Aprobador. Aprobar requiere confirmación explícita del gestor; toda decisión nueva, incluida la aprobación, requiere un motivo no vacío. Los registros históricos permanecen intactos, incluso si conservan un motivo vacío permitido anteriormente. La decisión se anexa una sola vez y conserva actor, instante, versión, huella y motivo. Otra solicitud sobre esa misma versión no puede reemplazarla. Repetir la misma clave UUID devuelve la decisión original.
 
 Un ajuste deja la versión en `changes_requested`. El botón **Usar esta propuesta como base del ajuste** carga sus valores en el formulario; el gestor cambia el objetivo o la fecha y solicita una versión nueva. Esta versión congela una supervisión vigente y repite las tres etapas sin heredar autorización. `invalidated` también permite una versión nueva. `rejected` es definitivo para esa propuesta; una alternativa requiere otra propuesta.
 

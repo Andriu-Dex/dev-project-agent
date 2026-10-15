@@ -171,7 +171,7 @@ export class ProposalService {
     });
   }
   async decide(projectId:string,actor:AuthUser,proposalId:string,version:number,hash:string,decision:'approved'|'rejected'|'changes_requested',reason:string,requestKey:string) {
-    safeText(reason);if(decision!=='approved'&&!reason.trim())throw new ProposalError('REASON_REQUIRED');
+    safeText(reason);
     return this.transaction(async client=>{
       await assertManager(client,projectId,actor);await client.query('SELECT pg_advisory_xact_lock(hashtext($1))',['agent:'+projectId]);await client.query('SELECT pg_advisory_xact_lock(hashtext($1))',['trello:'+projectId]);
       const row=(await client.query<VersionRow>(versionSelect+' WHERE v.project_id=$1 AND v.proposal_id=$2 AND v.version=$3 FOR UPDATE OF v',[projectId,proposalId,version])).rows[0];if(!row)throw new ProposalError('NOT_FOUND');
@@ -179,6 +179,7 @@ export class ProposalService {
       if(previous){if(previous.proposal_id!==proposalId||previous.version!==version||previous.content_hash!==hash||previous.decision!==decision||previous.reason!==reason)throw new ProposalError('CONFLICT');return {state:row.state,decisionId:previous.id,invalidated:false};}
       const latest=(await client.query<{latest_version:number}>('SELECT latest_version FROM proposals WHERE project_id=$1 AND id=$2',[projectId,proposalId])).rows[0];
       if(latest?.latest_version!==version||row.state!=='pending_human_approval'||row.content_hash!==hash)throw new ProposalError('CONFLICT');
+      if(!reason.trim())throw new ProposalError('REASON_REQUIRED');
       if(!await this.current(client,row.context)){await client.query("UPDATE proposal_versions SET state='invalidated' WHERE project_id=$1 AND proposal_id=$2 AND version=$3",[projectId,proposalId,version]);await this.audit(client,projectId,actor.id,'proposal.invalidate',proposalId,'succeeded');return {state:'invalidated' as const,decisionId:null,invalidated:true};}
       const messages=(await client.query("SELECT stage,output FROM agent_messages WHERE project_id=$1 AND proposal_id=$2 AND version=$3 AND status='succeeded'",[projectId,proposalId,version])).rows;
       if(!messages.some(message=>message.stage==='reviewer'&&message.output.verdict==='validated')||!messages.some(message=>message.stage==='approver'&&message.output.verdict==='human_required'))throw new ProposalError('MISSING_REVIEW');
