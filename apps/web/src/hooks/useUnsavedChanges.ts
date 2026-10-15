@@ -5,4 +5,19 @@ export function useUnsavedChanges(dirty:boolean,label:string){
   useEffect(()=>{if(dirty)pending.set(id,label);else pending.delete(id);return()=>{pending.delete(id);};},[id,dirty,label]);
   useEffect(()=>{const warn=(event:BeforeUnloadEvent)=>{if(dirty)event.preventDefault();};window.addEventListener('beforeunload',warn);return()=>window.removeEventListener('beforeunload',warn);},[dirty]);
 }
-export function confirmDiscardSettings(){return !pending.size||window.confirm('Hay cambios sin guardar en '+[...new Set(pending.values())].join(', ')+'. ¿Quieres salir y descartarlos?');}
+export function hasUnsavedChanges(): boolean {
+  return pending.size > 0;
+}
+
+export function getUnsavedSections(): string {
+  return [...new Set(pending.values())].join(', ');
+}
+
+export function discardUnsavedChanges(): void {
+  pending.clear();
+}
+
+export function confirmDiscardSettings(): boolean {
+  // Return true if no pending changes, otherwise return false so caller can show UI modal
+  return !pending.size;
+}
