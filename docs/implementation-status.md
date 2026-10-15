@@ -145,3 +145,10 @@ AC-1.01, AC-2.03, AC-3.04, AC-4.02, AC-7.02 y AC-7.04 superaron los procedimient
 ## Tanda del 14 de octubre: correo, horarios y usabilidad
 
 Se añade [SMTP y cola durable](notifications.md), rutas solo de gestor, preferencias versionadas, resumen/aviso, recordatorios, silencio y presupuesto. Se comprueba un correo real desde el panel y el usuario confirma recepción; se conserva la configuración automática desactivada. La interfaz usa azul y grises, configuración por pestañas, filtros de reportes y guardas de cambios sin guardar. La revisión de código permite días y minutos; las configuraciones existentes conservan su comportamiento. Validación del agente: 147 pruebas unitarias y 132 escenarios PostgreSQL distintos (279 total), ejecutados en suites separadas; tipos y build verificados. Los controles nuevos no equivalen al cierre de los 39 criterios académicos.
+
+
+## Selección de proveedor para los agentes
+
+El gestor autorizó elegir ChatGPT u Ollama. Se incorpora [selección conservada por solicitud y programación](agent-providers.md), con consentimiento explícito, sin cambio automático de proveedor y conservando revisión y aprobación humana. El flujo completo de propuestas y de correcciones se verificó con PostgreSQL y transportes simulados. La inferencia local real con qwen2.5-coder:7b funcionó, pero solo superó 3 de 6 casos sintéticos: no se declara validada su calidad. Se comprobó la interfaz de Propuestas, Código y Automatización desde Brave. La revisión diaria estaba suspendida por errores previos de GitHub; el catálogo volvió a leerse y se guardó de nuevo la programación existente, sin activar IA automática ni cambiar la periodicidad. El correo automático permanece desactivado.
+
+Verificación de esta tanda: 160 pruebas unitarias y 140 escenarios PostgreSQL distintos superados (300 en total), mediante suites separadas; tipos y build superados. Los seis casos reales del modelo local se reportan aparte: 3 superados, 3 fallidos.
