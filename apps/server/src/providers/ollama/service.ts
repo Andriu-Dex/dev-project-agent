@@ -1,13 +1,33 @@
+import {generationOptions,OLLAMA_TIMEOUT_MS} from './generation.js';
 import type {OllamaModel,OllamaOverview,ProviderCaseResult,ProviderEvaluation} from '@dev-project-agent/contracts';
 import type {AuthUser} from '../../modules/auth/repository.js';
 import type {TrelloDatabase} from '../../integrations/trello/service.js';
 import {assertManager} from '../../modules/supervision/access.js';
 import {caseInput,evaluationCases,evaluationInstructions,gradeCase,SUITE_VERSION} from '../chatgpt/evaluation.js';
+import {
+  caseInputV2,
+  evaluationCasesV2,
+  evaluationInstructionsV2,
+  gradeCaseV2,
+  SUITE_VERSION_V2,
+  trackingCaseSchemaV2,
+} from '../evaluation-v2.js';
+
+export const SUITE_VERSION_V1 = SUITE_VERSION;
 
 export class OllamaError extends Error {
   constructor(readonly code:string,message?:string){
     super(message??`Ollama error: ${code}`);
   }
+}
+
+export interface OllamaGenerateOptions {
+  signal?: AbortSignal | undefined;
+  format?: 'json' | Record<string, unknown> | undefined;
+  temperature?: number | undefined;
+  seed?: number | undefined;
+  numCtx?: number | undefined;
+  numPredict?: number | undefined;
 }
 
 export interface OllamaOptions {
@@ -85,12 +105,20 @@ export class OllamaService {
     }
   }
 
-  async generate(model:string,instructions:string,input:string,signal?:AbortSignal):Promise<{model:string;durationMs:number;usage:Record<string,number>|null;output:unknown}> {
+  async generate(
+    model:string,
+    instructions:string,
+    input:string,
+    optionsOrSignal?:AbortSignal|OllamaGenerateOptions
+  ):Promise<{model:string;durationMs:number;usage:Record<string,number>|null;output:unknown}> {
     if(this.closed)throw new OllamaError('OLLAMA_UNAVAILABLE');
     if(!model||!/^[a-zA-Z0-9_.:/-]{1,120}$/.test(model))throw new OllamaError('INVALID_MODEL');
+    const opts:OllamaGenerateOptions=optionsOrSignal instanceof AbortSignal
+      ? {signal:optionsOrSignal}
+      : (optionsOrSignal??{});
     const startedAt=Date.now();
-    const timeout=AbortSignal.timeout(300_000);
-    const requestSignal=AbortSignal.any([timeout,this.shutdown.signal,...(signal?[signal]:[])]);
+    const timeout=AbortSignal.timeout(OLLAMA_TIMEOUT_MS);
+    const requestSignal=AbortSignal.any([timeout,this.shutdown.signal,...(opts.signal?[opts.signal]:[])]);
 
     try {
       const response=await this.fetcher(`${this.baseUrl}/api/chat`,{
@@ -103,12 +131,9 @@ export class OllamaService {
             {role:'system',content:instructions},
             {role:'user',content:input},
           ],
-          format:'json',
+          format:opts.format??'json',
           stream:false,
-          options:{
-            temperature:0.1,
-            num_ctx:8192,
-          },
+          options:generationOptions(opts),
         }),
       });
 
@@ -152,7 +177,7 @@ export class OllamaService {
       };
     } catch(error) {
       if(this.shutdown.signal.aborted)throw new OllamaError('PROVIDER_UNAVAILABLE');
-      if(signal?.aborted)throw new OllamaError('OPERATION_CANCELLED');
+      if(opts.signal?.aborted)throw new OllamaError('OPERATION_CANCELLED');
       if(timeout.aborted)throw new OllamaError('INFERENCE_TIMEOUT');
       if(error instanceof OllamaError)throw error;
       throw new OllamaError('INFERENCE_FAILED');
@@ -188,12 +213,13 @@ export class OllamaService {
     };
   }
 
-  async evaluate(projectId:string,actor:AuthUser,model:string,requestKey:string):Promise<ProviderEvaluation> {
+  async evaluate(projectId:string,actor:AuthUser,model:string,requestKey:string,suiteVersion?:string):Promise<ProviderEvaluation> {
     if(this.closed)throw new OllamaError('OLLAMA_UNAVAILABLE');
     const database=this.options.database;
     const client=await database.connect();
     let row:ProviderEvaluation;
     let created=false;
+    const effectiveSuite=suiteVersion??SUITE_VERSION_V2;
 
     try {
       await client.query('BEGIN');
@@ -206,7 +232,7 @@ export class OllamaService {
       );
 
       if(previous.rows[0]) {
-        if(previous.rows[0].provider!=='ollama'||previous.rows[0].model!==model)throw new OllamaError('CONFLICT');
+        if(previous.rows[0].provider!=='ollama'||previous.rows[0].model!==model||previous.rows[0].suiteVersion!==effectiveSuite)throw new OllamaError('CONFLICT');
         row=previous.rows[0];
       } else {
         const active=await client.query("SELECT id FROM provider_evaluations WHERE project_id=$1 AND status='running'",[projectId]);
@@ -214,7 +240,7 @@ export class OllamaService {
 
         const inserted=await client.query<{id:string}>(
           "INSERT INTO provider_evaluations (project_id,requested_by,request_key,model,suite_version,status,reasoning_effort,provider) VALUES ($1,$2,$3,$4,$5,'running',NULL,'ollama') RETURNING id",
-          [projectId,actor.id,requestKey,model,SUITE_VERSION]
+          [projectId,actor.id,requestKey,model,effectiveSuite]
         );
         row=(await client.query<ProviderEvaluation>(selection+' WHERE e.id=$1',[inserted.rows[0]!.id])).rows[0]!;
         await client.query("INSERT INTO audit_events (project_id,actor_type,actor_id,action,resource_type,resource_id,outcome) VALUES ($1,'user',$2,'ollama.evaluate','ollama',$3,'requested')",[projectId,actor.id,row.id]);
@@ -229,7 +255,7 @@ export class OllamaService {
     }
 
     if(created) {
-      const task=this.runEvaluation(projectId,actor,row!.id,model).catch(()=>{
+      const task=this.runEvaluation(projectId,actor,row!.id,model,effectiveSuite).catch(()=>{
         this.options.onFailure?.();
       });
       this.tasks.add(task);
@@ -239,16 +265,22 @@ export class OllamaService {
     return view(row!);
   }
 
-  private async runEvaluation(projectId:string,actor:AuthUser,id:string,model:string) {
+  private async runEvaluation(projectId:string,actor:AuthUser,id:string,model:string,suiteVersion=SUITE_VERSION) {
     const cases:ProviderCaseResult[]=[];
     let errorCode:string|null=null;
+    const isV2=suiteVersion===SUITE_VERSION_V2;
+    const tests=isV2?evaluationCasesV2:evaluationCases;
+    const instructions=isV2?evaluationInstructionsV2:evaluationInstructions;
+    const format=isV2?trackingCaseSchemaV2:'json';
+    const grader=isV2?gradeCaseV2:gradeCase;
 
     try {
-      for(const test of evaluationCases) {
+      for(const test of tests) {
         await assertManager(this.options.database,projectId,actor);
-        const response=await this.generate(model,evaluationInstructions,caseInput(test));
+        const inputStr=isV2?caseInputV2(test as any):caseInput(test as any);
+        const response=await this.generate(model,instructions,inputStr,{format});
         await assertManager(this.options.database,projectId,actor);
-        cases.push(gradeCase(test,response.output,response.durationMs,response.usage));
+        cases.push(grader(test as any,response.output,response.durationMs,response.usage));
       }
     } catch(error) {
       errorCode=error instanceof OllamaError?error.code:'INFERENCE_FAILED';
@@ -257,13 +289,13 @@ export class OllamaService {
     const result={
       cases,
       passed:cases.filter(v=>v.passed).length,
-      total:evaluationCases.length,
+      total:tests.length,
       requiresHumanReview:true as const,
       productionReady:false as const,
     };
 
     if(this.closed)errorCode='SERVICE_STOPPED';
-    const status=this.closed?'interrupted':!errorCode&&cases.length===evaluationCases.length&&cases.every(v=>v.passed)?'passed':'failed';
+    const status=this.closed?'interrupted':!errorCode&&cases.length===tests.length&&cases.every(v=>v.passed)?'passed':'failed';
 
     const client=await this.options.database.connect();
     try {

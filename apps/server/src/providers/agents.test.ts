@@ -34,7 +34,7 @@ describe('Explicit agent provider routing',()=>{
   });
   it('rejects unsupported effort and oversized evidence before inference',async()=>{
     const test=setup();await expect(test.router.generate(binding,actor,'ollama:org/model:7b','high','instructions','{}')).rejects.toMatchObject({code:'UNSUPPORTED_EFFORT'});
-    await expect(test.router.generate(binding,actor,'ollama:org/model:7b',null,'instructions','x'.repeat(120001))).rejects.toMatchObject({code:'INPUT_TOO_LARGE'});expect(test.calls).toHaveLength(0);
+    await expect(test.router.generate(binding,actor,'ollama:org/model:7b',null,'instructions','x'.repeat(24001))).rejects.toMatchObject({code:'INPUT_TOO_LARGE'});expect(test.calls).toHaveLength(0);
   });
   it('retains stable authorization identity until the installed model changes',async()=>{
     const test=setup(),model='ollama:org/model:7b';await test.router.ensureConnection(binding,model);const before=test.router.connections.credentials(binding,model).entry;

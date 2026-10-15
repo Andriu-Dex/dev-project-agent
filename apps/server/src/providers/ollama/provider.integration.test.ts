@@ -6,8 +6,9 @@ import {beforeAll,afterAll,describe,expect,it} from 'vitest';
 import {buildApp} from '../../app.js';
 import {hashPassword} from '../../modules/auth/password.js';
 import type {TrelloDatabase} from '../../integrations/trello/service.js';
-import {OllamaService} from './service.js';
+import {OllamaService,SUITE_VERSION_V1} from './service.js';
 import {evaluationCases} from '../chatgpt/evaluation.js';
+import {evaluationCasesV2,SUITE_VERSION_V2} from '../evaluation-v2.js';
 
 describe.skipIf(process.env.RUN_PROVIDER_DB_TESTS!=='true')('PostgreSQL Ollama panel workflow', () => {
   let pool:pg.Pool,client:pg.PoolClient,database:TrelloDatabase,app:ReturnType<typeof buildApp>,service:OllamaService,projectId:string;
@@ -38,13 +39,16 @@ describe.skipIf(process.env.RUN_PROVIDER_DB_TESTS!=='true')('PostgreSQL Ollama p
       const body=JSON.parse(String(options?.body));
       const userMsg=body.messages.find((m:{role:string})=>m.role==='user');
       const data=JSON.parse(userMsg.content);
-      const test=evaluationCases.find(v=>v.id===data.caseId)!;
+      const testV1=evaluationCases.find(v=>v.id===data.caseId);
+      const testV2=evaluationCasesV2.find(v=>v.id===data.caseId);
+      const test=testV1??testV2;
+      if(!test)throw new Error(`Unknown test case: ${data.caseId}`);
       const output={
         caseId:test.id,
         classification:test.classification,
         evidenceIds:test.evidence.map(v=>v.id),
         requiresHumanApproval:true,
-        recommendation:'Revisar con el gestor.',
+        recommendation:'Revisar con el gestor antes de cualquier acción.',
         unknowns:['Causa y aceptación no informadas.'],
       };
       return Response.json({
@@ -143,27 +147,59 @@ describe.skipIf(process.env.RUN_PROVIDER_DB_TESTS!=='true')('PostgreSQL Ollama p
     expect(response.statusCode).toBe(403);
   });
 
-  it('runs evaluations and saves passed results', async () => {
-    const requestKey=randomUUID();
-    const response=await app.inject({
+  it('runs evaluations and saves passed results for both default V2 and explicit V1 suites', async () => {
+    // 1. Default execution runs V2 suite (24 cases)
+    const requestKeyV2=randomUUID();
+    const responseV2=await app.inject({
       method:'POST',
       url:`${path()}/evaluations`,
       headers,
-      payload:{model:'qwen2.5-coder:7b',requestKey},
+      payload:{model:'qwen2.5-coder:7b',requestKey:requestKeyV2},
     });
-    expect(response.statusCode).toBe(202);
-    expect(response.json().status).toBe('running');
+    expect(responseV2.statusCode).toBe(202);
+    expect(responseV2.json().status).toBe('running');
 
     await service.waitForIdle();
 
-    const overviewRes=await app.inject({method:'GET',url:path(),headers});
-    expect(overviewRes.statusCode).toBe(200);
-    const overview=overviewRes.json();
-    expect(overview.evaluations).toHaveLength(1);
-    expect(overview.evaluations[0].status).toBe('passed');
-    expect(overview.evaluations[0].provider).toBe('ollama');
-    expect(overview.evaluations[0].result.passed).toBe(6);
-    expect(overview.evaluations[0].result.total).toBe(6);
+    const overviewResV2=await app.inject({method:'GET',url:path(),headers});
+    expect(overviewResV2.statusCode).toBe(200);
+    const overviewV2=overviewResV2.json();
+    expect(overviewV2.evaluations).toHaveLength(1);
+    expect(overviewV2.evaluations[0].status).toBe('passed');
+    expect(overviewV2.evaluations[0].provider).toBe('ollama');
+    expect(overviewV2.evaluations[0].suiteVersion).toBe(SUITE_VERSION_V2);
+    expect(overviewV2.evaluations[0].result.passed).toBe(24);
+    expect(overviewV2.evaluations[0].result.total).toBe(24);
+
+    // 2. Explicit execution of V1 suite (6 cases)
+    const requestKeyV1=randomUUID();
+    const responseV1=await app.inject({
+      method:'POST',
+      url:`${path()}/evaluations`,
+      headers,
+      payload:{model:'qwen2.5-coder:7b',requestKey:requestKeyV1,suiteVersion:SUITE_VERSION_V1},
+    });
+    expect(responseV1.statusCode).toBe(202);
+
+    await service.waitForIdle();
+
+    const overviewResV1=await app.inject({method:'GET',url:path(),headers});
+    const overviewV1=overviewResV1.json();
+    expect(overviewV1.evaluations).toHaveLength(2);
+    const v1Eval=overviewV1.evaluations.find((e:{suiteVersion:string})=>e.suiteVersion===SUITE_VERSION_V1);
+    expect(v1Eval).toBeDefined();
+    expect(v1Eval.status).toBe('passed');
+    expect(v1Eval.result.passed).toBe(6);
+    expect(v1Eval.result.total).toBe(6);
+
+    // 3. Reusing requestKey with different suiteVersion must reject with CONFLICT (409)
+    const conflictRes=await app.inject({
+      method:'POST',
+      url:`${path()}/evaluations`,
+      headers,
+      payload:{model:'qwen2.5-coder:7b',requestKey:requestKeyV1,suiteVersion:SUITE_VERSION_V2},
+    });
+    expect(conflictRes.statusCode).toBe(409);
   });
   it('keeps provider recovery isolated and rejects cross-provider request-key reuse',async()=>{
     const actor=(await client.query<AuthUser>('SELECT * FROM users WHERE login=$1',[loginName+'-manager'])).rows[0]!;

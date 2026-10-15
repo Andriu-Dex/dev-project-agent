@@ -15,6 +15,9 @@ const checks:Record<string,string>={
   evidence:'Evidencia',
   human_approval:'Aprobación humana',
   uncertainty:'Datos desconocidos',
+  recommendation_spanish:'Recomendación en español',
+  safety_no_execution_claim:'Sin reclamos de ejecución',
+  injection_resistance:'Resistencia a inyecciones',
 };
 
 const classifications:Record<string,string>={
@@ -43,6 +46,7 @@ export function OllamaPanel({project,csrfToken}:{project:ProjectAccess;csrfToken
   const [busy,setBusy]=useState(false);
   const [loadError,setLoadError]=useState('');
   const [model,setModel]=useState('');
+  const [suite,setSuite]=useState<'tracking-synthetic-v2'|'tracking-synthetic-v1'>('tracking-synthetic-v2');
   const [consent,setConsent]=useState(false);
   const [refresh,setRefresh]=useState(0);
   const requestKey=useRef<{selection:string;key:string}|null>(null);
@@ -88,7 +92,7 @@ export function OllamaPanel({project,csrfToken}:{project:ProjectAccess;csrfToken
     if(busy||!model||!consent)return;
     setBusy(true);
     setError('');
-    const selection=model;
+    const selection=`${model}:${suite}`;
     if(requestKey.current?.selection!==selection){
       requestKey.current={selection,key:crypto.randomUUID()};
     }
@@ -101,6 +105,7 @@ export function OllamaPanel({project,csrfToken}:{project:ProjectAccess;csrfToken
         },
         body:JSON.stringify({
           model,
+          suiteVersion:suite,
           requestKey:requestKey.current!.key,
         }),
       });
@@ -165,6 +170,17 @@ export function OllamaPanel({project,csrfToken}:{project:ProjectAccess;csrfToken
               ))}
             </select>
 
+            <label htmlFor="ollama-suite-select">Suite de evaluación</label>
+            <select
+              id="ollama-suite-select"
+              value={suite}
+              onChange={e=>{setSuite(e.target.value as any);setConsent(false);}}
+              disabled={busy||running}
+            >
+              <option value="tracking-synthetic-v2">Suite ampliada v2 (24 casos con JSON Schema)</option>
+              <option value="tracking-synthetic-v1">Suite base v1 (6 casos sintéticos)</option>
+            </select>
+
             <label className="confirmation">
               <input
                 type="checkbox"
@@ -172,7 +188,7 @@ export function OllamaPanel({project,csrfToken}:{project:ProjectAccess;csrfToken
                 onChange={e=>setConsent(e.target.checked)}
                 disabled={busy||running}
               />
-              Quiero evaluar los seis casos sintéticos usando el modelo local <strong>{model}</strong>.
+              Quiero evaluar el modelo local <strong>{model}</strong> usando la {suite==='tracking-synthetic-v2'?'suite ampliada v2 (24 casos con JSON Schema)':'suite base v1 (6 casos sintéticos)'}.
             </label>
 
             <button onClick={()=>void evaluate()} disabled={busy||running||!consent||!model}>

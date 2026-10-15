@@ -11,7 +11,7 @@ import {assertManager} from '../supervision/access.js';
 import {providerCode} from '../../providers/chatgpt/service.js';
 import type {ConnectionBinding} from '../../providers/chatgpt/connection.js';
 import {supportedEfforts} from '../../providers/chatgpt/validation.js';
-import {assertTargetDate,fingerprint,instructions,parseContent,parseVerdict,ProposalError,safeText,type ProposalContext} from './contracts.js';
+import {assertTargetDate,fingerprint,instructions,parseContent,parseVerdict,ProposalError,safeText,stageSchema,type ProposalContext} from './contracts.js';
 
 export interface ProposalRequest {sourceRunId:string;cardId:string;requestedDue?:string;requestedChange?:RequestedTrelloChange;goal:string;model:string;reasoningEffort?:ReasoningEffort;requestKey:string;purpose?:'demonstration'|'live';proposalId?:string;expectedVersion?:number}
 interface VersionRow {project_id:string;proposal_id:string;version:number;purpose:'demonstration'|'live';state:ProposalState;source_run_id:string;context:ProposalContext;goal:string;requested_due:Date|null;created_at:Date;content:ProposalContent|null;content_hash:string|null}
@@ -134,7 +134,7 @@ export class ProposalService {
         const prior=(await this.database.query("SELECT id,output FROM agent_messages WHERE project_id=$1 AND proposal_id=$2 AND version=$3 AND status='succeeded' ORDER BY created_at DESC,id DESC LIMIT 1",[job.project_id,job.proposal_id,job.version])).rows[0];
         const messageId=randomUUID();
         input={schemaVersion:1,agentInstructionsVersion:'proposal-agents-v2',workflow:{phase:'preparation',humanApproval:'pending_by_design',externalExecutionEnabled:false},messageId,runId:job.id,createdAt:new Date().toISOString(),correlationId:job.proposal_id,causationId:prior?.id??null,snapshotIds:{trello:row.context.trelloSnapshotId},policyVersion:row.context.policyVersion,producer:'service',recipient:stage,projectId:job.project_id,proposalId:job.proposal_id,version:job.version,jobId:job.id,context:row.context,goal:row.goal,requestedDue:row.requested_due?.toISOString()??null,contentHash:hash,content,priorReview:stage==='approver'?prior?.output??null:null};
-        const response=await this.provider.generate(binding,actor,job.model,job.reasoning_effort,instructions(stage),JSON.stringify(input));
+        const response=await this.provider.generate(binding,actor,job.model,job.reasoning_effort,instructions(stage),JSON.stringify(input),{schema:stageSchema(stage,row.context.requestedAction)});
         if(this.closed||this.provider.connections.credentials(binding,job.model).entry!==initial.entry)throw new ProposalError('CONNECTION_CHANGED');
         let output:unknown,next:ProposalState;
         if(stage==='executor'){content=parseContent(response.output,row.context,row.requested_due?.toISOString()??null);hash=fingerprint({schemaVersion:1,context:row.context,goal:row.goal,requestedDue:row.requested_due?.toISOString()??null,content});output=content;next='pending_review';}

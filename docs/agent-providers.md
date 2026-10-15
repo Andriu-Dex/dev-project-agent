@@ -18,7 +18,7 @@ El panel de integraciones permite evaluar seis casos sintéticos con cada provee
 - Una continuación explícita puede elegir otro proveedor y queda registrada como un nuevo trabajo; las etapas ya completadas no se repiten automáticamente.
 - Ollama no recibe credenciales de ChatGPT. El gestor se verifica antes y después de inferir; las respuestas pasan por los validadores de alcance, evidencia y dictámenes existentes.
 - Los modelos locales usan su razonamiento predeterminado. No se traducen artificialmente los niveles de ChatGPT. La API rechaza un nivel explícito no soportado.
-- Se limita la evidencia local a 120 000 bytes y la respuesta a 2 000 000 bytes. El plazo de inferencia es de 300 segundos. Un fallo no provoca reintento ni cambio automático a ChatGPT.
+- La entrada local se limita heurísticamente a 24 000 bytes y la respuesta a 2 000 000 bytes. El límite de entrada no equivale a un conteo de tokens ni garantiza que el contexto esté completo. El plazo de inferencia es de 300 segundos. La configuración compartida utiliza contexto 8192 y generación máxima 2048; los benchmarks registran cualquier variante explícita. Un fallo no provoca reintento ni cambio automático a ChatGPT.
 - Cambiar el modelo instalado durante el trabajo invalida su identidad conservada. El cierre del servicio cancela las solicitudes Ollama activas.
 
 La privacidad depende de la ubicación del servidor y del modelo. Una URL remota o un modelo conectado a servicios externos no equivale a procesamiento privado local. Ningún proveedor garantiza respuestas correctas ni una latencia fija.
@@ -30,3 +30,5 @@ Referencia del transporte: [API oficial de chat de Ollama](https://docs.ollama.c
 El 14 de octubre se comprobó inferencia real local con `qwen2.5-coder:7b`: el contrato sintético mínimo respondió correctamente en 5 812 ms. En la batería real de seis casos superó **3 de 6**; fallaron dos comprobaciones de aprobación humana y una clasificación ante instrucciones inyectadas. No se considera validado para uso fiable por ese resultado. La evidencia local se conserva en `work/provider-validation/ollama-result.json` y `ollama-suite.json`, excluidos de Git.
 
 Las pruebas automatizadas con transporte simulado y PostgreSQL verifican el flujo completo de los tres agentes, análisis y corrección de código, conservación de la decisión humana pendiente, persistencia del proveedor programado y ausencia de cambio automático. Estas pruebas verifican la integración; no sustituyen la calidad del modelo real ni cierran los 39 criterios académicos.
+
+La auditoría reproducible de resultados y los pendientes de evaluación final se describen en la [corrección del informe Ollama](ollama-improvement-report.md#12-correcciones-y-reconciliación-de-evidencia--15-de-octubre). `npm run ollama:audit-evidence` cuenta los resultados almacenados sin reescribir ni volver a calificar los originales.

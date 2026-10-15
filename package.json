@@ -42,7 +42,11 @@
     "test:operations-db": "node --env-file=.env scripts/test-operations.mjs",
     "test:notifications-db": "node --env-file=.env scripts/test-notifications.mjs",
     "test:ollama-db": "node --env-file=.env scripts/test-ollama.mjs",
-    "ollama:validate": "node --env-file=.env --import tsx scripts/validate-ollama.ts"
+    "ollama:validate": "node --env-file=.env --import tsx scripts/validate-ollama.ts",
+    "ollama:audit-evidence": "node --import tsx scripts/audit-ollama-evidence.ts",
+    "ollama:benchmark": "node --env-file=.env --import tsx scripts/benchmark-ollama.ts",
+    "ollama:benchmark-v2": "node --env-file=.env --import tsx scripts/benchmark-v2.ts",
+    "workflow:real": "node --env-file=.env --import tsx scripts/test-agent-workflow.ts"
   },
   "devDependencies": {
     "@inquirer/prompts": "8.7.3",

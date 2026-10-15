@@ -60,7 +60,7 @@ export function registerOllamaRoutes(
     return service.healthCheck();
   });
 
-  app.post<{Params:{projectId:string};Body:{model:string;requestKey:string}}>(
+  app.post<{Params:{projectId:string};Body:{model:string;requestKey:string;suiteVersion?:string}}>(
     '/projects/:projectId/ollama/evaluations',
     {
       schema:{
@@ -72,6 +72,7 @@ export function registerOllamaRoutes(
           properties:{
             model:{type:'string',minLength:1,maxLength:120,pattern:'^[a-zA-Z0-9_.:/-]+$'},
             requestKey:{type:'string',format:'uuid'},
+            suiteVersion:{type:'string',enum:['tracking-synthetic-v1','tracking-synthetic-v2']},
           },
         },
       },
@@ -86,7 +87,8 @@ export function registerOllamaRoutes(
           context.project.id,
           context.actor,
           request.body.model,
-          request.body.requestKey
+          request.body.requestKey,
+          request.body.suiteVersion
         );
         return reply.code(202).send(evaluation);
       } catch(error) {

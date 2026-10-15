@@ -103,3 +103,111 @@ export function correctionInstructions(stage:'executor'|'reviewer'|'approver') {
   if(stage==='executor')return common+' Prepare a small correction for the selected finding IDs and goal. Return exactly {objective,justification,impact,risks,verificationPlan,recoveryPlan,unresolvedQuestions,findingIds,edits}. Text fields are strings; risks/questions/IDs are arrays of strings. findingIds must equal the supplied selection. At most 3 edits, one per existing selected file, each {path,expectedBlob,startLine,endLine,before,after}. Use the supplied original blob SHA. Select at most 40 original lines overlapping a selected finding. before is the exact inclusive range joined with LF; after is its replacement joined with LF, at most 60 lines, no carriage returns. Every selected finding must intersect an edit. Do not create/delete/rename files or alter other paths. Unknown project context belongs in risks; genuinely blocking preparation questions belong in unresolvedQuestions. Human approval and fresh source verification happen later and are not blocking preparation questions. verificationPlan must describe static checks actually supplied, additional project checks not yet run, and future branch/commit/PR verification. Recovery needs another authorization and must not reset branches automatically.';
   return common+` Review the exact sealed candidate and its source. Return exactly {"contentHash":"the supplied hash","verdict":"allowed verdict","summary":"explanation","issues":[],"checks":[{"code":"required code","status":"pass or fail or not_checked","reason":"explanation"}]}; echo the hash. issues is an array of at most 12 nonempty explanation strings, or [] when there are no issues. checks is an array with exactly one object containing only code, status and reason for each of ${codeChecks[stage].join(', ')}; status is pass, fail or not_checked. ${stage==='reviewer'?'verdict is validated, changes_requested or rejected. Verify grounding, bounded diff, exact original blobs, risks and verification; do not pass failed static checks or unresolved preparation questions. A plausible correction is not proof of behavior; project tests are pending by design and must be disclosed.':'verdict is human_required, changes_requested or rejected. For a GitHub publication always require the HUMAN MANAGER, never grant automatic permission. Verify at most three selected files, no executed action and exclusively human integration.'} Positive verdicts require all required checks pass; negative verdicts require nonempty issues. Pending human approval is not a failure during preparation.`;
 }
+
+export const codeAnalysisSchema: Record<string, unknown> = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['summary', 'findings', 'limitations'],
+  properties: {
+    summary: {type: 'string'},
+    limitations: {
+      type: 'array',
+      items: {type: 'string'},
+    },
+    findings: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['path', 'startLine', 'endLine', 'category', 'severity', 'title', 'explanation', 'evidence', 'recommendation'],
+        properties: {
+          path: {type: 'string'},
+          startLine: {type: 'integer'},
+          endLine: {type: 'integer'},
+          category: {
+            type: 'string',
+            enum: ['correctness', 'security', 'duplication', 'maintainability', 'complexity', 'performance'],
+          },
+          severity: {
+            type: 'string',
+            enum: ['high', 'medium', 'low'],
+          },
+          title: {type: 'string'},
+          explanation: {type: 'string'},
+          evidence: {type: 'string'},
+          recommendation: {type: 'string'},
+        },
+      },
+    },
+  },
+};
+
+export function codeCorrectionStageSchema(stage: 'executor' | 'reviewer' | 'approver'): Record<string, unknown> {
+  if (stage === 'executor') {
+    return {
+      type: 'object',
+      additionalProperties: false,
+      required: ['objective', 'justification', 'impact', 'risks', 'verificationPlan', 'recoveryPlan', 'unresolvedQuestions', 'findingIds', 'edits'],
+      properties: {
+        objective: {type: 'string'},
+        justification: {type: 'string'},
+        impact: {type: 'string'},
+        risks: {type: 'array', items: {type: 'string'}, minItems: 1},
+        verificationPlan: {type: 'string'},
+        recoveryPlan: {type: 'string'},
+        unresolvedQuestions: {type: 'array', items: {type: 'string'}},
+        findingIds: {type: 'array', items: {type: 'string'}, minItems: 1},
+        edits: {
+          type: 'array',
+          minItems: 1,
+          maxItems: 3,
+          items: {
+            type: 'object',
+            additionalProperties: false,
+            required: ['path', 'expectedBlob', 'startLine', 'endLine', 'before', 'after'],
+            properties: {
+              path: {type: 'string'},
+              expectedBlob: {type: 'string'},
+              startLine: {type: 'integer'},
+              endLine: {type: 'integer'},
+              before: {type: 'string'},
+              after: {type: 'string'},
+            },
+          },
+        },
+      },
+    };
+  }
+
+  const checkCodes = codeChecks[stage];
+  const verdicts = stage === 'reviewer'
+    ? ['validated', 'changes_requested', 'rejected']
+    : ['human_required', 'changes_requested', 'rejected'];
+
+  return {
+    type: 'object',
+    additionalProperties: false,
+    required: ['contentHash', 'verdict', 'summary', 'issues', 'checks'],
+    properties: {
+      contentHash: {type: 'string'},
+      verdict: {type: 'string', enum: verdicts},
+      summary: {type: 'string'},
+      issues: {type: 'array', items: {type: 'string'}},
+      checks: {
+        type: 'array',
+        minItems: checkCodes.length,
+        maxItems: checkCodes.length,
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['code', 'status', 'reason'],
+          properties: {
+            code: {type: 'string', enum: checkCodes},
+            status: {type: 'string', enum: ['pass', 'fail', 'not_checked']},
+            reason: {type: 'string'},
+          },
+        },
+      },
+    },
+  };
+}

@@ -68,6 +68,7 @@ describe('OllamaService', () => {
     expect(capturedBody.model).toBe('qwen2.5-coder:7b');
     expect(capturedBody.format).toBe('json');
     expect(capturedBody.stream).toBe(false);
+    expect(capturedBody.options).toEqual({temperature:0.1,num_ctx:8192,num_predict:2048});
     expect(result.output).toEqual({ status: 'ok', findingCount: 3 });
     expect(result.usage?.total_tokens).toBe(75);
   });

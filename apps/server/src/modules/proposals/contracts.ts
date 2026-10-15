@@ -62,3 +62,80 @@ export function instructions(stage:AgentStage):string {
   const checks=requiredChecks[stage].join(', ');
   return common+` Evaluate the exact sealed proposal. Return exactly {contentHash,verdict,summary,issues,checks}. Echo the supplied contentHash. summary is a string; issues is a string array; checks is an array of {code,status,reason}, exactly one for each of: ${checks}. status is pass, fail or not_checked. All mandatory checks must be pass for a positive verdict. ${stage==='reviewer'?'verdict is validated, changes_requested or rejected. Verify source evidence, precise scope, expected values, risks and post-write verification. Blocking preparation questions require changes_requested. Assess preconditions from the frozen source and the explicit expected value; future live revalidation belongs to execution. Never fail preconditions merely because human approval has not yet happened. Require a post-write read confirming the target and every proposed field, and discrepancy/reconciliation handling in verificationPlan. Do not assume the plan was executed.':'verdict is human_required, changes_requested or rejected. For an external Trello change, a positive outcome must be human_required. Never return policy_allowed or authorized. Verify exclusive manager authority, one-card scope and absence of any executed action.'}`;
 }
+
+export function stageSchema(stage:AgentStage,requestedAction?:TrelloAction):Record<string,unknown> {
+  if(stage==='executor') {
+    const actionProperties=requestedAction
+      ? Object.fromEntries(Object.entries(requestedAction).map(([k,v])=>[
+          k,
+          typeof v==='string'?{type:'string'}:v===null?{type:['string','null']}:typeof v==='boolean'?{type:'boolean'}:Array.isArray(v)?{type:'array',items:{type:'string'}}:{type:'string'}
+        ]))
+      : {
+          type:{type:'string',enum:['trello_due_change']},
+          cardId:{type:'string'},
+          expectedDue:{type:['string','null']},
+          proposedDue:{type:'string'},
+        };
+    const actionRequired=requestedAction?Object.keys(requestedAction):['type','cardId','expectedDue','proposedDue'];
+
+    return {
+      type:'object',
+      additionalProperties:false,
+      required:['objective','justification','alternatives','impact','risks','verificationPlan','recoveryPlan','unresolvedQuestions','evidenceIds','actions'],
+      properties:{
+        objective:{type:'string'},
+        justification:{type:'string'},
+        alternatives:{type:'array',items:{type:'string'},minItems:1},
+        impact:{type:'string'},
+        risks:{type:'array',items:{type:'string'},minItems:1},
+        verificationPlan:{type:'string'},
+        recoveryPlan:{type:'string'},
+        unresolvedQuestions:{type:'array',items:{type:'string'}},
+        evidenceIds:{type:'array',items:{type:'string'},minItems:1},
+        actions:{
+          type:'array',
+          minItems:1,
+          maxItems:1,
+          items:{
+            type:'object',
+            additionalProperties:false,
+            required:actionRequired,
+            properties:actionProperties,
+          },
+        },
+      },
+    };
+  }
+
+  const checkCodes=requiredChecks[stage as 'reviewer'|'approver'];
+  const verdicts=stage==='reviewer'
+    ?['validated','changes_requested','rejected']
+    :['human_required','changes_requested','rejected'];
+
+  return {
+    type:'object',
+    additionalProperties:false,
+    required:['contentHash','verdict','summary','issues','checks'],
+    properties:{
+      contentHash:{type:'string'},
+      verdict:{type:'string',enum:verdicts},
+      summary:{type:'string'},
+      issues:{type:'array',items:{type:'string'}},
+      checks:{
+        type:'array',
+        minItems:checkCodes.length,
+        maxItems:checkCodes.length,
+        items:{
+          type:'object',
+          additionalProperties:false,
+          required:['code','status','reason'],
+          properties:{
+            code:{type:'string',enum:checkCodes},
+            status:{type:'string',enum:['pass','fail','not_checked']},
+            reason:{type:'string'},
+          },
+        },
+      },
+    },
+  };
+}

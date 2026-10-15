@@ -11,7 +11,7 @@ import {supportedEfforts} from '../../providers/chatgpt/validation.js';
 import {GitHubError,type GitHubConnection} from '../../integrations/github/client.js';
 import {githubApi,gitSha,readCodeCatalog,readCodeSource} from '../../integrations/github/code-client.js';
 import {fingerprint,safeText,ProposalError} from '../proposals/contracts.js';
-import {CodeError,analysisInstructions,buildCandidate,correctionInstructions,deterministicAnalysis,modelSource,parseAnalysis,parseCodeVerdict} from './evidence.js';
+import {CodeError,analysisInstructions,buildCandidate,codeAnalysisSchema,codeCorrectionStageSchema,correctionInstructions,deterministicAnalysis,modelSource,parseAnalysis,parseCodeVerdict} from './evidence.js';
 
 export interface AnalysisRequest {paths:string[];expectedHead:string;mode:'files'|'comparison';baseSha?:string;withAi:boolean;consent?:boolean;model?:string;reasoningEffort?:ReasoningEffort;requestKey:string}
 export interface CorrectionRequest {purpose?:'demonstration'|'live';analysisId:string;findingIds:string[];goal:string;model:string;reasoningEffort?:ReasoningEffort;consent:boolean;requestKey:string;proposalId?:string;expectedVersion?:number}
@@ -90,7 +90,7 @@ export class CodeReviewService {
   }
   private async analyzeWithModel(binding:ConnectionBinding,actor:AuthUser,id:string,source:CodeSource,model:string,effort:ReasoningEffort|null) {
     try{
-      const credentials=this.provider.connections.credentials(binding,model),response=await this.provider.generate(binding,actor,model,effort,analysisInstructions,JSON.stringify({recipient:'code_analyst',source:modelSource(source)}));
+      const credentials=this.provider.connections.credentials(binding,model),response=await this.provider.generate(binding,actor,model,effort,analysisInstructions,JSON.stringify({recipient:'code_analyst',source:modelSource(source)}),{schema:codeAnalysisSchema});
       if(this.closed||this.provider.connections.credentials(binding,model).entry!==credentials.entry)throw new CodeError('CONNECTION_CHANGED');
       const local=deterministicAnalysis(source),inferred=parseAnalysis(response.output,source),result={...local,...inferred};
       result.findings=[...inferred.findings,...local.findings.filter(item=>!inferred.findings.some(value=>value.path===item.path&&value.startLine===item.startLine&&value.category===item.category))].slice(0,20);
@@ -157,7 +157,7 @@ export class CodeReviewService {
         if(this.closed||this.provider.connections.credentials(binding,job.model).entry!==credentials.entry)throw new CodeError('CONNECTION_CHANGED');
         const prior=(await this.database.query("SELECT output FROM code_messages WHERE project_id=$1 AND proposal_id=$2 AND version=$3 AND stage='reviewer' AND status='succeeded'",[job.project_id,job.proposal_id,job.version])).rows[0];
         const input={schemaVersion:1,instructionsVersion:'code-agents-v2',recipient:stage,projectId:job.project_id,proposalId:job.proposal_id,version:job.version,jobId:job.id,source:modelSource(source),findings,goal:row.goal,contentHash:hash,candidate,priorReview:stage==='approver'?prior?.output??null:null,externalExecutionEnabled:false};inputHash=fingerprint(input);
-        const response=await this.provider.generate(binding,actor,job.model,job.reasoning_effort,correctionInstructions(stage),JSON.stringify(input));
+        const response=await this.provider.generate(binding,actor,job.model,job.reasoning_effort,correctionInstructions(stage),JSON.stringify(input),{schema:codeCorrectionStageSchema(stage)});
         if(this.closed||this.provider.connections.credentials(binding,job.model).entry!==credentials.entry)throw new CodeError('CONNECTION_CHANGED');
         let output:unknown,next:ProposalState;
         if(stage==='executor'){candidate=buildCandidate(response.output,source,findings);hash=fingerprint({schemaVersion:1,source,goal:row.goal,findingIds:row.finding_ids,candidate});output=candidate.correction;next=candidate.checks.some(check=>check.status==='fail')?'changes_requested':'pending_review';}
