@@ -252,3 +252,7 @@ Los horarios confirmados por el usuario y activados son lecturas cada 60 minutos
 ## Actualización del 14 de octubre: correo y usabilidad
 
 Se implementa [notificación SMTP](notifications.md), configuración por pestañas, días/minutos de revisión de código, filtros de reportes y paleta azul/gris. La prueba de correo tuvo aceptación SMTP y recepción confirmada por el usuario. Esto añade USER-08/09 y amplía USER-03; no convierte los 28 AC con subcasos pendientes en superados.
+
+## Validación técnica del 15 de octubre
+
+La [tabla actual de los 39 criterios](real-acceptance-validation.md) registra 34 procedimientos superados y 5 en validación. [El informe de esta tanda](chatgpt-validation-oct15.md) distingue ejecución real, fixtures y revisión humana pendiente. Prevalece sobre los recuentos históricos anteriores, sin cambiar la fuente académica ni declarar aceptación final.

@@ -152,3 +152,18 @@ Se añade [SMTP y cola durable](notifications.md), rutas solo de gestor, prefere
 El gestor autorizó elegir ChatGPT u Ollama. Se incorpora [selección conservada por solicitud y programación](agent-providers.md), con consentimiento explícito, sin cambio automático de proveedor y conservando revisión y aprobación humana. El flujo completo de propuestas y de correcciones se verificó con PostgreSQL y transportes simulados. La inferencia local real con qwen2.5-coder:7b funcionó, pero solo superó 3 de 6 casos sintéticos: no se declara validada su calidad. Se comprobó la interfaz de Propuestas, Código y Automatización desde Brave. La revisión diaria estaba suspendida por errores previos de GitHub; el catálogo volvió a leerse y se guardó de nuevo la programación existente, sin activar IA automática ni cambiar la periodicidad. El correo automático permanece desactivado.
 
 Verificación de esta tanda: 160 pruebas unitarias y 140 escenarios PostgreSQL distintos superados (300 en total), mediante suites separadas; tipos y build superados. Los seis casos reales del modelo local se reportan aparte: 3 superados, 3 fallidos.
+
+
+## Prioridad de proveedores — 15 de octubre de 2026
+
+Decisión del gestor: priorizar el funcionamiento ya integrado con ChatGPT. Diferir las pruebas adicionales de Groq y Ollama; las credenciales nuevas indicadas por el usuario no constituyen validación ni autorización para transmitir datos. Gemini queda sin evaluar y fuera de la prioridad actual. No se modificaron selecciones guardadas ni se activaron programaciones con IA.
+
+ChatGPT dispone de conexión, selección de modelo/razonamiento, inferencia para propuestas y código, credenciales cifradas y renovación automática. La comprobación local de esta revisión encontró `reauthorization_required` con `REFRESH_UNCERTAIN`: necesita volver a conectar antes de una nueva inferencia real. La evaluación histórica pasó el 11 de octubre; no demuestra que la sesión actual funcione. Las suites específicas del proveedor (7 casos) y renovación (9 casos) se repitieron satisfactoriamente con transporte simulado y PostgreSQL. Falta reconectar y validar un recorrido real actual, además de observar la renovación en operación prolongada; no se declara integración totalmente aceptada.
+
+Pendientes diferidos: comparar Groq y Ollama con las mismas fuentes sintéticas, límites y criterios, preservando la selección explícita y sin cambiar automáticamente de proveedor. No se realizaron llamadas a Groq ni Gemini en esta revisión.
+
+## Continuación de validación — 15 de octubre
+
+La conexión incompleta descrita arriba quedó resuelta por el gestor. Se verificaron evaluación real 6/6, propuestas/código con tres agentes y tres renovaciones automáticas sin nuevo OAuth; la inferencia volvió a funcionar después de reiniciar la API. Reporte, correo y lectura de fuentes se observaron con Brave completamente cerrado. Se restauraron lectura cada 60 minutos, revisión diaria 18:00 sin IA automática, reporte viernes 18:00 y correo automático desactivado. Véase [evidencia y límites](chatgpt-validation-oct15.md) y [matriz actualizada](real-acceptance-validation.md): 34 procedimientos superados y 5 en validación.
+
+Se corrigieron contrato JSON, coordinación de roles, motivo obligatorio de nuevas aprobaciones, responsables/fechas en recomendaciones y textos SMTP. Se conservó el rediseño local del usuario corrigiendo etiquetas de avance, hitos y asignación. Verificación: 186 unitarias y 137 escenarios PostgreSQL distintos superados; tipos/build correctos. No se ejecutaron nuevas pruebas de proveedores diferidos, nuevas escrituras externas ni preparación de entrega (punto 5).

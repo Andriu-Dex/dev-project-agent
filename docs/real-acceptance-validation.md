@@ -56,6 +56,21 @@ Los eventos de ejecución verifican también la conservación del resto de la ta
 
 Los datos preparados para los casos incluyen una causa declarada en 99.1 y una dependencia explícita 99.3 → 99.1. Las alertas muestran la predecesora pendiente y vencida y advierten de fechas ausentes. Confirmar la causa o proponer redistribución no se infiere de la mera existencia de esa relación.
 
+
+## Ampliación del 15 de octubre
+
+Los casos RV-32 a RV-38 se describen con identificadores, horarios y límites en [validación de ChatGPT y operación](chatgpt-validation-oct15.md). No sustituyen ni borran los intentos fallidos anteriores.
+
+| Caso | Resultado | Evidencia local en work/acceptance/chatgpt-oct15/ |
+| --- | --- | --- |
+| RV-32 | Evaluación real ChatGPT 6/6 y tres agentes de demostración, rechazo motivado en panel; sin escrituras. | workflows.json, evaluation.png, rejected.png |
+| RV-33 | Revisor real solicita ajustes a evidencia contradictoria y recursos inventados, en entradas aisladas. | adversarial-review.json |
+| RV-34 | Análisis real de api.ts; corrección de contrato inválido sin coerción; v1 ajustes, v2 detenida por regresión, v3 tres agentes completos sin aprobación/publicación. | analysis-diagnostic-before.json, analysis-diagnostic.json, code-v3.json |
+| RV-35 | Reporte 07:40, correo SMTP aceptado y lectura de ambas fuentes con Brave sin procesos; dos HEAD reales y corte sin cambios; preferencias restauradas. | timeline.jsonl, automation-end-closed.json, automation-no-change.json, final-schedule.json |
+| RV-36 | 186 unitarias y 137 escenarios PostgreSQL distintos; tipos/build correctos. Casos negativos con fixtures/transportes aislados. Motivo requerido para nuevas aprobaciones. | unit-current.log, *-db*.log, typecheck-ui.log, build-ui.log |
+| RV-37 | Lector inicia sesión en Brave y consulta propuestas, código y reportes sin controles de gestión; cuenta temporal desactivada al terminar. | reader-account.json, chatgpt-oct15-reader-*.txt |
+| RV-38 | Renovaciones automáticas 07:58/08:56/10:08 sin OAuth; credenciales recuperadas después de reinicio API; ACL y escaneo de secretos acotado; ajustes semánticos del rediseño visual conservados. | timeline.jsonl, final-schedule.json, code-v3.json, env-acl.json, exposure-scan.json, chatgpt-oct15-planning-final.png |
+
 ## Estado de los 39 criterios
 
 “En validación” identifica evidencia parcial obtenida; “Pendiente” identifica subcasos todavía sin ejecución suficiente. “Superado” identifica el procedimiento comprobado con el caso indicado, sin declarar finalizada la entrega. Las referencias remiten a los casos anteriores, no a un porcentaje de cumplimiento. Responsable de comprobación técnica: asistente de desarrollo; decisiones de modificación: gestor, según las autorizaciones referenciadas.
@@ -63,44 +78,44 @@ Los datos preparados para los casos incluyen una causa declarada en 99.1 y una d
 | AC | Estado | Evidencia y trabajo restante |
 | --- | --- | --- |
 | AC-1.01 | Superado | RV-15: 35 filas contrastadas con Trello/snapshot, 29 actividades/seis hitos, fuente y fecha visibles; IDs y línea base v1 conservados. |
-| AC-1.02 | En validación | RV-01, RV-04 a RV-07: campos nativos y ausentes; falta prioridad contradictoria y contraste de la muestra completa. |
-| AC-1.03 | En validación | RV-01/02/07: pendiente, en curso, completada, vencida y bloqueo; completar casos de bloqueo no informado y ambigüedad. |
-| AC-1.04 | En validación | RV-01: cálculo 14/29 y exclusión de hitos; faltan archivadas, referencias y universo vacío. |
-| AC-1.05 | En validación | RV-02: próximos vencimientos y datos ausentes; faltan límites exactos y fuente desactualizada. |
+| AC-1.02 | Superado | RV-15/36/38: muestra real de campos y pruebas de prioridad contradictoria, fechas/asignación ausentes; responsable descrito y miembros nativos separados. |
+| AC-1.03 | Superado | RV-01/02/07/36: estados reales y fixtures de estados ambiguos, bloqueo no informado y finalización contradictoria, sin inferir progreso. |
+| AC-1.04 | Superado | RV-15/36: universo real de 29 actividades; fixtures excluyen hitos, archivadas y referencias y tratan universo vacío como no disponible. |
+| AC-1.05 | Superado | RV-02/36: fechas reales y límites exactos, zona horaria y fuentes antiguas comprobados con fixtures. |
 | AC-2.01 | Superado | RV-01/23: lectura autorizada del tablero, denegación real controlada, conservación del snapshot y recuperación con credencial válida. |
-| AC-2.02 | En validación | RV-01, RV-04 a RV-07: lectura y contraste nativo; terminar muestra de los seis grupos de datos. |
+| AC-2.02 | En validación | RV-15/35: lectura real repetida y contraste de tarjetas, miembros, fechas y etiquetas; falta anexar contraste explícito completo de listas y checklists frente a la fuente. |
 | AC-2.03 | Superado | RV-16: cambios aprobados de fechas, miembros, prioridad y estado registrados entre lecturas; repetición igual con cero diferencias y cero alertas equivalentes duplicadas. |
-| AC-2.04 | En validación | RV-04 a RV-07: cuatro familias propuestas y revisadas; faltan destinos, miembros y etiquetas fuera de alcance. |
-| AC-2.05 | En validación | RV-04 a RV-07: cuatro escrituras específicas verificadas; faltan todos los casos negativos y aprobación obsoleta. |
-| AC-3.01 | En validación | RV-02/14: detección con pestañas del panel cerradas y recuperación/deduplicación comprobadas; falta observar con todo el navegador cerrado. |
+| AC-2.04 | Superado | RV-04 a RV-07/36: cuatro familias reales; destinos arbitrarios, miembros no elegibles y valores inválidos rechazados en pruebas aisladas. |
+| AC-2.05 | Superado | RV-04 a RV-07/36: escrituras reales aprobadas; fixtures cubren aprobación/fuente obsoletas, revocación, permisos y confirmación separada. |
+| AC-3.01 | Superado | RV-14/35: Trello y GitHub leídos a las 07:42:05/07 con cero procesos Brave hasta 07:42:16; recuperación y deduplicación conservadas. |
 | AC-3.02 | Superado | RV-12/28: causa declarada 99.1 y sucesora 99.3 explicadas; 3.7 sin evidencia conserva hipótesis, 14 elementos relacionados y ausencia de cuantificación causal. |
-| AC-3.03 | En validación | RV-12: alternativas generadas desde el hallazgo; completar elegibilidad y aplicabilidad de cada familia y contraste de viabilidad. |
+| AC-3.03 | Superado | RV-12/36: alternativas desde evidencia real y fixtures de elegibilidad, actividad completada/archivada, miembro ya asignado y disponibilidad desconocida. |
 | AC-3.04 | Superado | RV-12: alerta → causa/impacto, alternativas, snapshot y formulario con recursos disponibles, sin reconstrucción externa. |
 | AC-3.05 | Superado | RV-04 a RV-07, RV-24/26: aceptación y rechazo de versiones distintas, motivo persistente, ejecución rechazada sin llamadas externas y lector sin autoridad. |
-| AC-3.06 | En validación | RV-04 a RV-07: decisiones y resultados reconstruibles; falta reconciliación de resultado incierto en fixture aislado. |
-| AC-4.01 | En validación | RV-22: cortes automáticos y recuperación real de corte perdido sin duplicado; viernes 18:00 restaurado. Falta el subcaso literal con navegador completamente cerrado. |
+| AC-3.06 | Superado | RV-04 a RV-07/36: historial real y reconciliación aislada de respuesta perdida, solo por lectura y sin reenvío ciego. |
+| AC-4.01 | Superado | RV-22/35: reporte automático real con Brave completamente cerrado; un solo corte/versión y recuperación anterior tras servicio detenido; viernes 18:00 restaurado. |
 | AC-4.02 | Superado | RV-09: 13 + 2 + 14 = 29; 14/29 = 48,28 %. Bloqueo/retraso de la misma tarjeta no alteran el total; fechas y asignación nativa ausentes se indican. |
-| AC-4.03 | En validación | RV-09: riesgos y cuatro incorporaciones vinculadas a línea base v1; falta el caso sin línea base y revisar desplazamientos de actividades existentes. |
-| AC-4.04 | En validación | RV-09: propuestas, aprobaciones y ejecuciones diferenciadas; falta rechazo humano, ejecución fallida y publicación de código en un corte posterior. |
-| AC-4.05 | En validación | RV-09: recomendaciones por actividad, fuente y dictamen; completar responsable/fecha de la acción sugerida y revisión del contenido. |
-| AC-5.01 | En validación | RV-08: cuatro archivos de commit fijo con blobs; faltan destino ajeno y lectura incompleta. |
-| AC-5.02 | En validación | RV-27: corte diario real parcial con presupuesto, exclusiones y recuperación; faltan dos commits reales y corte sin cambios. |
-| AC-5.03 | En validación | RV-08: señal funcional y complejidad; completar corpus y contraejemplos de las seis categorías/lenguajes. |
-| AC-5.04 | En validación | RV-08: catálogo `utaped-review-v1` ligado al análisis; falta contraste conforme/incumplidor por regla. |
-| AC-5.05 | En validación | RV-08: recomendación acotada, riesgos y verificación; faltan las otras dimensiones y revisar versión corregida. |
-| AC-5.06 | En validación | RV-08/11: revisión v1 detuvo avance; v2 aprobada produjo rama/PR exactos. Faltan rechazo, fuente cambiada y demás controles negativos. |
-| AC-6.01 | En validación | RV-01/02/04/08: entradas y salidas de roles; completar reporte y recorrido desde desviaciones. |
-| AC-6.02 | En validación | RV-08: Revisor pidió ajuste concreto; faltan alternativa inviable/evidencia inconsistente y versión corregida. |
-| AC-6.03 | En validación | RV-04 a RV-07: dictamen exige gestor; falta comprobar reporte rechazado y ausencia de revisión. |
-| AC-6.04 | En validación | RV-08/24/25: secuencias y detenciones por revisor/gestor reconstruidas, ajuste repite etapas. Completar aprobación obsoleta en fixture aislado. |
+| AC-4.03 | Superado | RV-09/16/36: desviaciones reales y fixtures sin línea base/confirmación posterior al corte; referencia preservada. |
+| AC-4.04 | Superado | RV-09/11/35/36: acciones reales según periodo; fixture de reporte diferencia versiones, aprobación, rechazo y publicación fallida sin inventar éxito. El fallo de escritura es aislado. |
+| AC-4.05 | En validación | RV-35/36: recomendaciones vinculan responsable/fecha observados sin crear compromisos; falta revisión humana final del contenido del reporte. |
+| AC-5.01 | Superado | RV-08/34/36: commits/blobs reales fijos; árboles truncados, bytes corruptos y fuente cambiada rechazados en fixtures. |
+| AC-5.02 | Superado | RV-27/35: dos HEAD reales, continuación por presupuesto/exclusión y corte sin cambios de las 07:45 con cero análisis nuevos; límites de cobertura explícitos. |
+| AC-5.03 | Superado | RV-08/34/36: análisis real TS/Java y corpus controlado de seis categorías con positivos y contraejemplos. No implica compilación Java ni ausencia de defectos en todo UTAPED. |
+| AC-5.04 | Superado | RV-08/36: catálogo utaped-review-v1 vinculado a evidencia y corpus conforme/incumplidor por categoría; sin afirmar certificación ISO. |
+| AC-5.05 | En validación | RV-34/36: recomendaciones concretas por categoría y v3 validada por tres agentes; pruebas funcionales/compilación del candidato en UTAPED siguen pendientes. |
+| AC-5.06 | Superado | RV-08/11/34/36: PR real autorizado exacto; rechazo, demostración, fuente cambiada y controles negativos aislados bloquean publicación. Ningún PR nuevo en esta tanda. |
+| AC-6.01 | Superado | RV-12/32/34/35: evidencia y salidas de tres roles en propuestas/código; reportes con tres etapas deterministas explícitas. |
+| AC-6.02 | Superado | RV-33/34: dos entradas adversas reales rechazadas por Revisor; v2 detectó regresión NaN/0n; v3 repitió tres etapas y quedó pendiente de gestor. |
+| AC-6.03 | Superado | RV-32/34/36: Aprobador remite al gestor; fixtures bloquean dictamen inválido/ausente y mantienen reporte sin evidencia en borrador. |
+| AC-6.04 | Superado | RV-25/34/36: ajuste repite etapas, historial de versiones preservado y aprobación obsoleta bloqueada en fixtures. |
 | AC-7.01 | Superado | RV-23/28: fallo explícito con última lectura conservada, fechas de ambas fuentes, avance/alcance distinguidos; Resumen real comprobado nuevamente el 14/10. |
 | AC-7.02 | Superado | RV-14/17: retraso, bloqueo, riesgo y desviación visibles; sin duplicados equivalentes, seguimiento conserva evidencia y resolución/reapertura conservan el mismo ID e historial. |
-| AC-7.03 | En validación | RV-08/12: motivos, riesgos, fuente y alternativas de planificación; completar contraste de alternativas de recomendaciones de código. |
+| AC-7.03 | Superado | RV-12/34: alternativas de planificación y conservar código actual explícitas en v3, con riesgos, fuente y pruebas pendientes. |
 | AC-7.04 | Superado | RV-04 a RV-07 y RV-11: cuatro familias Trello y diff GitHub con destino exacto, revisión, decisión y confirmación de escritura separadas del consentimiento IA. |
 | AC-7.05 | Superado | RV-04 a RV-07, RV-24/25: aceptación, rechazo y ajustes; dos versiones conservadas, seis dictámenes en orden y nueva versión sin decisión heredada. |
-| AC-7.06 | En validación | RV-29: siete decisiones con actor, fecha/huella y denegación UPDATE/DELETE; una aprobación histórica tiene motivo vacío. Conservar limitación, sin inventar una justificación. |
-| AC-8.01 | En validación | RV-04 a RV-08: casos aprobados y fallos conservados; completar consulta desde panel de caso rechazado/fallido. |
-| AC-8.02 | En validación | RV-13/20/21/26/29: anónimo y lector HTTP real denegados, revocación y privilegios comprobados, escaneo acotado sin coincidencias; pendiente lector en navegador y salidas no inspeccionadas. |
+| AC-7.06 | En validación | RV-29/36: motivos obligatorios para todas las decisiones nuevas y evidencia inmutable. Persiste una aprobación histórica sin motivo; excepción no subsanada retrospectivamente. |
+| AC-8.01 | En validación | RV-24/28/37: rechazo y reportes consultados en Brave; fallos preservados y comprobados previamente. Falta cerrar recorrido de consulta de fallo antiguo con el rediseño actual. |
+| AC-8.02 | Superado | RV-13/20/21/26/29/37/38: denegaciones HTTP, lector real en Brave, cuenta temporal desactivada, ACL y escaneo acotado sin secretos actuales conocidos. Límites del escaneo explícitos. |
 
 ## Defectos y repetición
 
@@ -125,3 +140,5 @@ Verificación del agente repetida el 14/10: **138 pruebas unitarias y 120 escena
 Observar la revisión diaria real a las 18:00 y el corte semanal del viernes 16 de octubre a las 18:00, manteniendo servicio/equipo activos. No alterar el reloj ni los cursores para simularlos. Un corte temporal de reporte de prueba, si se acuerda, debe guardarse como configuración explícita y restaurar después la programación confirmada.
 
 Completar los subcasos restantes de la tabla, incluidos fuente obsoleta y aprobación obsoleta con fallos aislados, revisión de salidas y recorridos pendientes. La rama/PR autorizados ya existen; no se repetirá su publicación. No introducir defectos ni commits ficticios en UTAPED para provocar resultados. Al cerrar, trasladar a REQ/CLASS/USER únicamente los AC completamente comprobados y conservar cualquier pendiente.
+
+Actualización del 15/10: **34 procedimientos superados y 5 en validación**, según la tabla actual. Las pruebas adversas aisladas no se presentan como escrituras externas reales. La aceptación humana del contenido y la preparación de entrega siguen separadas.
