@@ -179,4 +179,18 @@ describe.skipIf(process.env.RUN_OPERATIONS_DB_TESTS!=='true')('PostgreSQL schedu
     const instant=new Date(saved.cursor!.next_code as string);expect(instant.getUTCMinutes()).toBe(37);expect([1,5]).toContain(new Date(instant.getTime()-5*3600000).getUTCDay());
   });
 
+  it('persists the Ollama destination and forwards it unchanged to scheduled code analysis',async()=>{
+    const models:string[]=[];
+    const fake={validateScheduledProvider:async(_binding:unknown,model:string)=>{expect(model).toBe('ollama:org/test:7b');},
+      analyze:async(_binding:unknown,_actor:unknown,request:{model:string;consent:boolean})=>{expect(request.consent).toBe(true);models.push(request.model);return {id:randomUUID()};},
+      analysis:async()=>({status:'ready'})} as unknown as CodeReviewService;
+    const scheduled=new OperationService(database,{database,trelloCredentials:null,githubToken:null,fetcher:codeSourceFetcher},fake);
+    const {version,...values}=(await scheduled.overview(projectId)).configuration;
+    const freshActor=(await client.query<AuthUser>('SELECT * FROM users WHERE id=$1',[actor.id])).rows[0]!;
+    await scheduled.configure(projectId,freshActor,{...values,enabled:false,codeEnabled:true,codeWithAi:true,model:'ollama:org/test:7b',reasoningEffort:null,consent:true,maxFiles:4,expectedVersion:version});
+    expect((await scheduled.overview(projectId)).configuration.model).toBe('ollama:org/test:7b');
+    const now=new Date();await client.query('UPDATE operation_cursors SET next_code=$2,lease_until=NULL,code_inventory=$3 WHERE project_id=$1',[projectId,now,'{}']);
+    await scheduled.tick(now);expect(models.length).toBeGreaterThan(0);expect(new Set(models)).toEqual(new Set(['ollama:org/test:7b']));
+  });
+
 });

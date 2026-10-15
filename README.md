@@ -20,7 +20,7 @@ Local supervised checkout: C:\Documentos\D-Proyectos\Git\utaped.
 
 - Independent Node.js/TypeScript service, React/TypeScript dashboard, and PostgreSQL persistence.
 - Explicit sequential Executor, Reviewer, and Approver coordination, without an agent framework initially.
-- Provider: ChatGPT through official authentication; account authorization and a synthetic inference passed on October 11, 2026. Production integration, quality evaluation, and ongoing quota availability remain pending. Ollama remains an alternative to evaluate.
+- Provider: ChatGPT through official authentication; account authorization and a synthetic inference passed on October 11, 2026. Production integration, quality evaluation, and ongoing quota availability remain pending. ChatGPT and installed Ollama models can now be selected for proposal agents, code analysis/corrections, and consented scheduled code reviews. See [agent providers](docs/agent-providers.md) for behavior and measured model limitations.
 - Weekly reports on Fridays at 18:00, America/Guayaquil.
 - The human manager approves every Trello or code modification; other members initially have read-only access.
 - Confirmed manager: Steven Eduardo Paredes Medina, Trello username andrewuzumaki, display name “andrew uzumaki”.

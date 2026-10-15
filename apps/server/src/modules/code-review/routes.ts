@@ -9,7 +9,7 @@ import {CodeReviewService,type AnalysisRequest,type CorrectionRequest} from './s
 
 export function registerCodeReviewRoutes(app:FastifyInstance,service:CodeReviewService,requireUser:(request:FastifyRequest,reply:FastifyReply)=>Promise<AuthUser|null>,repository:AuthRepository) {
   const uuid={type:'string',format:'uuid'},sha={type:'string',pattern:'^[a-f0-9]{40}$'},hash={type:'string',pattern:'^[a-f0-9]{64}$'};
-  const model={type:'string',minLength:1,maxLength:100,pattern:'^[a-zA-Z0-9_.:-]+$'},effort={type:'string',enum:['low','medium','high','xhigh','max']};
+  const model={type:'string',minLength:1,maxLength:100,pattern:'^[a-zA-Z0-9_./:-]+$'},effort={type:'string',enum:['low','medium','high','xhigh','max']};
   const params={type:'object',additionalProperties:false,required:['projectId'],properties:{projectId:uuid}};
   type Params={projectId:string};type VersionParams=Params&{proposalId:string;version:number};
   const versionParams={type:'object',additionalProperties:false,required:['projectId','proposalId','version'],properties:{projectId:uuid,proposalId:uuid,version:{type:'integer',minimum:1,maximum:10000}}};

@@ -1,3 +1,5 @@
+import {AgentProviders} from '../../providers/agents.js';
+import {OllamaService} from '../../providers/ollama/service.js';
 import {randomBytes,randomUUID} from 'node:crypto';
 import pg from 'pg';
 import {afterAll,beforeAll,describe,expect,it} from 'vitest';
@@ -123,6 +125,30 @@ describe.skipIf(process.env.RUN_CODE_DB_TESTS!=='true')('PostgreSQL pinned code 
     await service.decide(projectId,actor,result.job.proposalId,1,result.detail.contentHash!,'approved','Demonstration reviewed.',randomUUID());
     await expect(publication.request(projectId,actor,result.job.proposalId,1,result.detail.contentHash!,randomUUID(),true)).rejects.toMatchObject({code:'DEMONSTRATION_ONLY'});
     const disabled=new PublicationService(database,service,{enabled:false,token:null},transport.fetcher);await expect(disabled.request(projectId,actor,result.job.proposalId,1,result.detail.contentHash!,randomUUID(),true)).rejects.toMatchObject({code:'WRITES_DISABLED'});expect(transport.writes).toHaveLength(0);await publication.close();await disabled.close();
+  });
+
+  it('routes code analysis and correction stages to the selected Ollama model',async()=>{
+    const stages:string[]=[];
+    const local=new OllamaService({database,fetcher:async(url,init)=>{
+      if(String(url).endsWith('/tags'))return Response.json({models:[{name:'test:7b',size:1,modified_at:'fixture'}]});
+      const body=JSON.parse(String(init?.body)),data=JSON.parse(body.messages[1].content);stages.push(data.recipient);
+      let output:unknown;
+      if(data.recipient==='code_analyst'){
+        const {id:ignored,origin:ignoredOrigin,confidence:ignoredConfidence,...finding}=deterministicAnalysis(codeFixture()).findings[0]!;
+        output={summary:'Revisar la interpretación de contenido.',findings:[finding],limitations:['Se desconocen los llamadores.']};
+      }else output=data.recipient==='executor'?syntheticCorrection(data.source,data.findings):syntheticCodeVerdict(data.recipient,data.contentHash);
+      return Response.json({message:{content:JSON.stringify(output)},eval_count:20});
+    }});
+    const localService=new CodeReviewService(database,new AgentProviders(provider,local),null,sourceFetcher);
+    try {
+      const analyzed=await localService.analyze(binding,actor,{...analyzeRequest(),withAi:true,consent:true,model:'ollama:test:7b'});
+      await localService.waitForIdle();const analysis=await localService.analysis(projectId,analyzed.id);expect(analysis?.status).toBe('ready');
+      const {reasoningEffort:ignored,...values}=request();
+      const job=await localService.prepare(binding,actor,{...values,analysisId:analyzed.id,findingIds:[analysis!.result!.findings[0]!.id],model:'ollama:test:7b'});
+      await localService.waitForIdle();const detail=await localService.version(projectId,job.proposalId,job.version);
+      expect(stages).toEqual(['code_analyst','executor','reviewer','approver']);expect(detail.state).toBe('pending_human_approval');
+      expect(detail.messages.every(message=>message.model==='ollama:test:7b')).toBe(true);expect(detail.decisions).toHaveLength(0);
+    }finally{await localService.close();await local.close();}
   });
 
 });

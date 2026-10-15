@@ -30,8 +30,10 @@ import type {OperationService} from '../operations/service.js';
 import {registerOperationRoutes} from '../operations/routes.js';
 import type {PublicationService} from '../code-review/publication.js';
 import {registerPublicationRoutes} from '../code-review/publication-routes.js';
+import type { OllamaService } from '../../providers/ollama/service.js';
+import { registerOllamaRoutes } from '../../providers/ollama/routes.js';
 
-export interface AuthOptions extends AuthConfig { database: AuthDatabase; trello?: TrelloOptions; supervision?:SupervisionOptions; chatgpt?:ChatGPTService; proposals?:ProposalService; executions?:ExecutionService; codeReview?:CodeReviewService; reports?:ReportService; operations?:OperationService; publications?:PublicationService; notifications?:NotificationService }
+export interface AuthOptions extends AuthConfig { database: AuthDatabase; trello?: TrelloOptions; supervision?:SupervisionOptions; chatgpt?:ChatGPTService; ollama?:OllamaService; proposals?:ProposalService; executions?:ExecutionService; codeReview?:CodeReviewService; reports?:ReportService; operations?:OperationService; publications?:PublicationService; notifications?:NotificationService }
 
 export async function registerAuth(app: FastifyInstance, options: AuthOptions) {
   const repository = new AuthRepository(options.database);
@@ -101,6 +103,7 @@ export async function registerAuth(app: FastifyInstance, options: AuthOptions) {
   if (options.trello) registerTrelloRoutes(app, options.trello, requireUser, repository);
   if (options.supervision) registerSupervisionRoutes(app, options.supervision, requireUser, repository);
   if (options.chatgpt) registerChatGPTRoutes(app, options.chatgpt, requireUser, repository);
+  if (options.ollama) registerOllamaRoutes(app, options.ollama, requireUser, repository);
   if (options.proposals) registerProposalRoutes(app, options.proposals, requireUser, repository);
   if (options.executions) registerExecutionRoutes(app, options.executions, requireUser, repository);
   if (options.codeReview) registerCodeReviewRoutes(app, options.codeReview, requireUser, repository);

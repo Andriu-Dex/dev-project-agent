@@ -8,7 +8,7 @@ import {providerCode} from '../../providers/chatgpt/service.js';
 
 export function registerProposalRoutes(app:FastifyInstance,service:ProposalService,requireUser:(request:FastifyRequest,reply:FastifyReply)=>Promise<AuthUser|null>,repository:AuthRepository) {
   const uuid={type:'string',format:'uuid'},effort={type:'string',enum:['low','medium','high','xhigh','max']};
-  const model={type:'string',minLength:1,maxLength:100,pattern:'^[a-zA-Z0-9_.:-]+$'};
+  const model={type:'string',minLength:1,maxLength:100,pattern:'^[a-zA-Z0-9_./:-]+$'};
   const params={type:'object',required:['projectId'],properties:{projectId:uuid}};
   const versionParams={type:'object',required:['projectId','proposalId','version'],properties:{projectId:uuid,proposalId:uuid,version:{type:'integer',minimum:1,maximum:10000}}};
   type VersionParams={projectId:string;proposalId:string;version:number};

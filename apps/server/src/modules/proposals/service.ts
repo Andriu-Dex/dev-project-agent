@@ -1,3 +1,4 @@
+import type {AgentProvider} from '../../providers/agents.js';
 import {buildAction,validateActionDate} from './actions.js';
 import {readTrackingPolicy} from '../tracking/policy.js';
 import type {RequestedTrelloChange} from '@dev-project-agent/contracts';
@@ -7,7 +8,7 @@ import type {AgentJobView,AgentStage,ProposalContent,ProposalState,ProposalVersi
 import type {TrelloDatabase} from '../../integrations/trello/service.js';
 import type {AuthDatabase,AuthUser} from '../auth/repository.js';
 import {assertManager} from '../supervision/access.js';
-import {ChatGPTService,providerCode} from '../../providers/chatgpt/service.js';
+import {providerCode} from '../../providers/chatgpt/service.js';
 import type {ConnectionBinding} from '../../providers/chatgpt/connection.js';
 import {supportedEfforts} from '../../providers/chatgpt/validation.js';
 import {assertTargetDate,fingerprint,instructions,parseContent,parseVerdict,ProposalError,safeText,type ProposalContext} from './contracts.js';
@@ -23,7 +24,7 @@ const code=(error:unknown)=>error instanceof ProposalError?error.code:providerCo
 
 export class ProposalService {
   private tasks=new Set<Promise<void>>();private closed=false;
-  constructor(readonly database:TrelloDatabase,readonly provider:ChatGPTService,private readonly onFailure:()=>void=()=>{}) {}
+  constructor(readonly database:TrelloDatabase,readonly provider:AgentProvider,private readonly onFailure:()=>void=()=>{}) {}
   private async transaction<T>(operation:(client:pg.PoolClient)=>Promise<T>) {
     const client=await this.database.connect();try{await client.query('BEGIN');const result=await operation(client);await client.query('COMMIT');return result;}catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
   }
@@ -68,7 +69,7 @@ export class ProposalService {
     const task=this.pipeline(binding,actor,job).catch(()=>this.onFailure());this.tasks.add(task);void task.then(()=>this.tasks.delete(task));
   }
   async prepare(binding:ConnectionBinding,actor:AuthUser,request:ProposalRequest) {
-    await assertManager(this.database,binding.projectId,actor);await this.provider.ensureConnection(binding);
+    await assertManager(this.database,binding.projectId,actor);await this.provider.ensureConnection(binding,request.model);
     const effort=request.reasoningEffort??null,due=request.requestedDue?new Date(request.requestedDue):null;
     if(this.closed||!request.requestedChange&&(!due||!Number.isFinite(due.getTime())||due.getTime()<=Date.now()))throw new ProposalError('INVALID_TARGET_DATE');
     safeText(request.goal);if(!request.goal.trim())throw new ProposalError('INVALID_REQUEST');
@@ -97,7 +98,7 @@ export class ProposalService {
     if(created)this.launch(binding,actor,job);return jobView(job);
   }
   async resume(binding:ConnectionBinding,actor:AuthUser,proposalId:string,version:number,model:string,effort:ReasoningEffort|null,requestKey:string) {
-    await assertManager(this.database,binding.projectId,actor);await this.provider.ensureConnection(binding);
+    await assertManager(this.database,binding.projectId,actor);await this.provider.ensureConnection(binding,model);
     const hash=fingerprint({proposalId,version,model,effort,resume:true});let created=false;
     const job=await this.transaction(async client=>{
       await assertManager(client,binding.projectId,actor);await client.query('SELECT pg_advisory_xact_lock(hashtext($1))',['agent:'+binding.projectId]);

@@ -184,12 +184,38 @@ export interface ProviderCaseResult {
   durationMs:number;usage:Record<string,number>|null;output:ProviderCaseOutput|null;errorCode:string|null;
 }
 export interface ProviderEvaluation {
+  provider?:'chatgpt'|'ollama';
   reasoningEffort:ReasoningEffort|null;
   id:string;model:string;suiteVersion:string;status:'running'|'passed'|'failed'|'interrupted';
   createdAt:string;finishedAt:string|null;errorCode:string|null;
   result:{cases:ProviderCaseResult[];passed:number;total:number;requiresHumanReview:true;productionReady:false}|null;
 }
 export interface ProviderOverview {connection:ProviderConnection;evaluations:ProviderEvaluation[]}
+
+export interface OllamaModel {
+  digest?:string;
+  name: string;
+  size: number;
+  modifiedAt: string;
+  details?: {
+    format?: string | undefined;
+    family?: string | undefined;
+    parameterSize?: string | undefined;
+    quantizationLevel?: string | undefined;
+  } | undefined;
+}
+
+export interface OllamaConnection {
+  status: 'connected' | 'unavailable';
+  baseUrl: string;
+  models: OllamaModel[];
+  errorCode: string | null;
+}
+
+export interface OllamaOverview {
+  connection: OllamaConnection;
+  evaluations: ProviderEvaluation[];
+}
 
 export type ProposalState='draft'|'pending_review'|'in_review'|'pending_policy_check'|'in_policy_check'|'pending_human_approval'|'authorized'|'changes_requested'|'rejected'|'invalidated'|'executing'|'executed'|'execution_failed'|'reconciliation_required';
 export type AgentStage='executor'|'reviewer'|'approver';

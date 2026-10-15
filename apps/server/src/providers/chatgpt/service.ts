@@ -15,7 +15,7 @@ export function providerCode(error:unknown) {
     error&&typeof error==='object'&&'code' in error&&error.code==='FORBIDDEN'?'FORBIDDEN':'PROVIDER_UNAVAILABLE';
 }
 interface Registration {host_id:string;client_id:string|null;subject:string|null}
-const selection=`SELECT e.id,e.model,e.reasoning_effort AS "reasoningEffort",e.suite_version AS "suiteVersion",e.status,e.created_at AS "createdAt",e.finished_at AS "finishedAt",e.error_code AS "errorCode",r.result FROM provider_evaluations e LEFT JOIN provider_evaluation_results r ON r.evaluation_id=e.id AND r.project_id=e.project_id`;
+const selection=`SELECT e.id,e.provider,e.model,e.reasoning_effort AS "reasoningEffort",e.suite_version AS "suiteVersion",e.status,e.created_at AS "createdAt",e.finished_at AS "finishedAt",e.error_code AS "errorCode",r.result FROM provider_evaluations e LEFT JOIN provider_evaluation_results r ON r.evaluation_id=e.id AND r.project_id=e.project_id`;
 const view=(row:ProviderEvaluation):ProviderEvaluation=>({...row,createdAt:new Date(row.createdAt).toISOString(),finishedAt:row.finishedAt?new Date(row.finishedAt).toISOString():null});
 
 export class ChatGPTService {
@@ -34,7 +34,7 @@ export class ChatGPTService {
   async initialize() {
     await this.vault?.recover();
     // A single local service owns this milestone. Do not replay an interrupted quota-consuming evaluation.
-    await this.options.database.query(`WITH interrupted AS (UPDATE provider_evaluations SET status='interrupted',finished_at=clock_timestamp(),error_code='SERVICE_RESTARTED' WHERE status='running' RETURNING id,project_id)
+    await this.options.database.query(`WITH interrupted AS (UPDATE provider_evaluations SET status='interrupted',finished_at=clock_timestamp(),error_code='SERVICE_RESTARTED' WHERE status='running' AND provider='chatgpt' RETURNING id,project_id)
       INSERT INTO audit_events (project_id,actor_type,actor_id,action,resource_type,resource_id,outcome) SELECT project_id,'system',NULL,'provider.recovery','provider',id::text,'failed' FROM interrupted`);
   }
   async audit(binding:ConnectionBinding,action:string,outcome:string,resourceId:string) {
@@ -74,7 +74,7 @@ export class ChatGPTService {
   async overview(binding:ConnectionBinding,manager:boolean) {
     let renewalError:string|null=null;
     if(manager)try{await this.ensureConnection(binding);}catch(error){renewalError=providerCode(error);}
-    const rows=await this.options.database.query<ProviderEvaluation>(selection+' WHERE e.project_id=$1 ORDER BY e.created_at DESC,e.id DESC LIMIT 20',[binding.projectId]);
+    const rows=await this.options.database.query<ProviderEvaluation>(selection+" WHERE e.project_id=$1 AND (e.provider='chatgpt' OR e.provider IS NULL) ORDER BY e.created_at DESC,e.id DESC LIMIT 20",[binding.projectId]);
     const connection=manager?this.connections.view(binding):{status:'disconnected' as const,expiresAt:null,errorCode:null,models:[]};
     const metadata=manager&&this.vault?await this.vault.metadata(binding):{renewable:false,retryAt:null,lastRefreshedAt:null};
     return {connection:{...connection,...(renewalError?{errorCode:renewalError}:{}),...metadata},evaluations:rows.rows.map(view)};
@@ -107,13 +107,13 @@ export class ChatGPTService {
       await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',['provider-evaluation:'+binding.projectId]);
       const previous=await client.query<ProviderEvaluation>(selection+' WHERE e.project_id=$1 AND e.requested_by=$2 AND e.request_key=$3',[binding.projectId,actor.id,requestKey]);
       if(previous.rows[0]){
-        if(previous.rows[0].model!==model||previous.rows[0].reasoningEffort!==effort)throw new ProviderValidationError('CONFLICT');row=previous.rows[0];
+        if(previous.rows[0].provider!=='chatgpt'||previous.rows[0].model!==model||previous.rows[0].reasoningEffort!==effort)throw new ProviderValidationError('CONFLICT');row=previous.rows[0];
       }else{
         this.connections.credentials(binding,model);
         if(effort&&!supportedEfforts(model).includes(effort))throw new ProviderValidationError('UNSUPPORTED_EFFORT');
         const active=await client.query("SELECT id FROM provider_evaluations WHERE project_id=$1 AND status='running'",[binding.projectId]);
         if(active.rows.length)throw new ProviderValidationError('CONFLICT');
-        const inserted=await client.query<{id:string}>("INSERT INTO provider_evaluations (project_id,requested_by,request_key,model,suite_version,status,reasoning_effort) VALUES ($1,$2,$3,$4,$5,'running',$6) RETURNING id",[binding.projectId,actor.id,requestKey,model,SUITE_VERSION,effort]);
+        const inserted=await client.query<{id:string}>("INSERT INTO provider_evaluations (project_id,requested_by,request_key,model,suite_version,status,reasoning_effort,provider) VALUES ($1,$2,$3,$4,$5,'running',$6,'chatgpt') RETURNING id",[binding.projectId,actor.id,requestKey,model,SUITE_VERSION,effort]);
         row=(await client.query<ProviderEvaluation>(selection+' WHERE e.id=$1',[inserted.rows[0]!.id])).rows[0]!;
         await client.query("INSERT INTO audit_events (project_id,actor_type,actor_id,action,resource_type,resource_id,outcome) VALUES ($1,'user',$2,'provider.evaluate','provider',$3,'requested')",[binding.projectId,actor.id,row.id]);created=true;
       }

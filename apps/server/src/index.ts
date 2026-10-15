@@ -1,3 +1,4 @@
+import {AgentProviders} from './providers/agents.js';
 import {NotificationService,startNotificationWorker} from './modules/notifications/service.js';
 import {smtpFromEnvironment} from './modules/notifications/smtp.js';
 import { existsSync } from 'node:fs';
@@ -10,6 +11,7 @@ import { credentialsFromEnvironment } from './integrations/trello/client.js';
 import { githubToken } from './integrations/github/client.js';
 import { startSupervisionWorker } from './modules/supervision/worker.js';
 import { ChatGPTService } from './providers/chatgpt/service.js';
+import { OllamaService } from './providers/ollama/service.js';
 import {ExecutionService} from './modules/proposals/execution.js';
 import {executionConfiguration,trelloExecutionRemote} from './integrations/trello/execution-client.js';
 import {CodeReviewService} from './modules/code-review/service.js';
@@ -35,12 +37,14 @@ const pool = new pg.Pool({
 });
 const supervision={database:pool,trelloCredentials:credentialsFromEnvironment(process.env),githubToken:githubToken(process.env)};
 const chatgpt=new ChatGPTService({database:pool,callbackOrigin:`http://127.0.0.1:${port}`,credentialKey:credentialKey(process.env.CHATGPT_CREDENTIAL_KEY??''),onFailure:()=>app.log.error('Provider operation could not persist its result.')});
+const ollama=new OllamaService({database:pool,baseUrl:process.env.OLLAMA_BASE_URL,onFailure:()=>app.log.error('Ollama operation could not persist its result.')});
+const agentProviders=new AgentProviders(chatgpt,ollama);
 const reports=new ReportService(pool);
-const proposals=new ProposalService(pool,chatgpt,()=>app.log.error('Agent workflow could not publish its result.'));
+const proposals=new ProposalService(pool,agentProviders,()=>app.log.error('Agent workflow could not publish its result.'));
 const writeConfig=executionConfiguration(process.env);
 const executions=new ExecutionService(pool,{enabled:writeConfig.enabled,remote:writeConfig.credentials?trelloExecutionRemote(writeConfig.credentials):null,onFailure:()=>app.log.error('Execution result could not be persisted. Reconciliation is required before any further write.')});
 const githubWriteConfiguration=publicationConfiguration(process.env);
-const codeReview=new CodeReviewService(pool,chatgpt,supervision.githubToken,fetch,()=>app.log.error('Code review could not persist its result.'),githubWriteConfiguration);
+const codeReview=new CodeReviewService(pool,agentProviders,supervision.githubToken,fetch,()=>app.log.error('Code review could not persist its result.'),githubWriteConfiguration);
 const publications=new PublicationService(pool,codeReview,githubWriteConfiguration,fetch,()=>app.log.error('GitHub publication requires reconciliation.'));
 const operations=new OperationService(pool,supervision,codeReview);
 const smtp=smtpFromEnvironment(process.env);
@@ -51,14 +55,14 @@ const notifications=new NotificationService(pool,smtp.transport,smtp.status,pars
 const app = buildApp({
   checkDatabase: async () => { await pool.query('SELECT 1'); },
   logger: true,
-  auth: { ...authConfigFromEnvironment(process.env), database: pool, trello: { database: pool, credentials: supervision.trelloCredentials },supervision,chatgpt,proposals,executions,codeReview,reports,operations,publications,notifications },
+  auth: { ...authConfigFromEnvironment(process.env), database: pool, trello: { database: pool, credentials: supervision.trelloCredentials },supervision,chatgpt,ollama,proposals,executions,codeReview,reports,operations,publications,notifications },
 });
 pool.on('error', () => { app.log.error('Idle database connection failed.'); });
 let worker:ReturnType<typeof startSupervisionWorker>|undefined;
 let reportWorker:ReturnType<typeof startReportWorker>|undefined;
 let operationWorker:ReturnType<typeof startOperationWorker>|undefined;
 let notificationWorker:ReturnType<typeof startNotificationWorker>|undefined;
-app.addHook('onClose', async () => {await notificationWorker?.close();await operationWorker?.close();await reportWorker?.close();await publications.close();await chatgpt.close();await proposals.close();await executions.close();await codeReview.close();await worker?.close();await pool.end(); });
+app.addHook('onClose', async () => {await notificationWorker?.close();await operationWorker?.close();await reportWorker?.close();await publications.close();await ollama.close();await chatgpt.close();await proposals.close();await executions.close();await codeReview.close();await worker?.close();await pool.end(); });
 
 const webRoot = fileURLToPath(new URL('../../web/dist/', import.meta.url));
 if (existsSync(webRoot)) {
@@ -72,6 +76,7 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) {
 }
 try {
   await chatgpt.initialize();
+  await ollama.initialize();
   await proposals.initialize();
   await executions.initialize();
   await codeReview.initialize();

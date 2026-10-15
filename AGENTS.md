@@ -22,7 +22,7 @@ Distinguish confirmed decisions, proposed defaults, and observed facts. Do not c
 
 Independent application: Node.js/TypeScript service, React/TypeScript dashboard, PostgreSQL, and explicit sequential Executor, Reviewer, and Approver orchestration. Selected tools: Fastify, pg, node-pg-migrate, React/Vite, npm workspaces, PostgreSQL-backed server sessions, Vitest, and Playwright. Verify versions and compatibility before installation; see docs/technical-design.md and docs/api-design.md.
 
-ChatGPT through official authentication is the planned provider, subject to eligibility, quota, and integration validation; Ollama is a local alternative to evaluate. No additional API or hosting budget.
+ChatGPT through official authentication is the planned provider, subject to eligibility, quota, and integration validation; The manager authorized choosing ChatGPT or Ollama for agents on October 14, 2026. Preserve the explicit provider per job and scheduled configuration; never fall back to a different provider automatically. See docs/agent-providers.md. No additional API or hosting budget.
 
 Authorized manager: Steven Eduardo Paredes Medina, Trello account andrewuzumaki. External product changes require review and specific human approval. UTAPED corrections use agent/<proposal-id>-v<version> with PRs to develop; humans merge into develop and main. This repository uses develop for development and main for a validated release.
 

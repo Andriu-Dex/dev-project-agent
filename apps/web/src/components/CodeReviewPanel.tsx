@@ -1,3 +1,5 @@
+import {AgentModelSelect} from './AgentModelSelect';
+import {readAgentProviders,providerDestination} from './agentProviders';
 import {useCallback,useEffect,useRef,useState} from 'react';
 import type {AgentVerdict,CodeAnalysisView,CodeCatalog,CodeOverview,CodeProposalView,ProjectAccess,ProviderOverview,ReasoningEffort} from '@dev-project-agent/contracts';
 import {ReasoningSelect,effortLabels} from './ReasoningSelect';
@@ -25,7 +27,7 @@ export function CodeReviewPanel({project,csrfToken}:{project:ProjectAccess;csrfT
   const keys=useRef(new Map<string,string>());
   const refresh=useCallback(async(signal?:AbortSignal)=>{
     const data=await read<CodeOverview>(prefix,signal?{signal}:{});if(signal?.aborted)return;setOverview(data);
-    if(project.canManageProject){const connection=await read<ProviderOverview>(`/api/v1/projects/${project.id}/chatgpt`,signal?{signal}:{});if(signal?.aborted)return;setProvider(connection);setModel(previous=>connection.connection.models.some(item=>item.slug===previous)?previous:connection.connection.models[0]?.slug??'');}
+    if(project.canManageProject){const connection=await readAgentProviders(`/api/v1/projects/${project.id}`,signal);if(signal?.aborted)return;setProvider(connection);setModel(previous=>connection.connection.models.some(item=>item.slug===previous)?previous:connection.connection.models[0]?.slug??'');}
   },[prefix,project.canManageProject,project.id]);
   useEffect(()=>{const controller=new AbortController();void refresh(controller.signal).catch(()=>{if(!controller.signal.aborted)setError('No se pudo cargar la revisión de código. Actualiza el panel.');});return()=>controller.abort();},[refresh]);
   const running=overview?.analyses.some(item=>item.status==='running')||overview?.jobs.some(item=>item.status==='running')||overview?.publications.some(item=>['queued','running'].includes(item.status));
@@ -61,17 +63,17 @@ export function CodeReviewPanel({project,csrfToken}:{project:ProjectAccess;csrfT
         {!catalog.files.length&&<p>No hay archivos admitidos en este catálogo.</p>}
         <label htmlFor="code-scope">Alcance del análisis</label><select id="code-scope" value={mode} onChange={event=>{setMode(event.target.value as typeof mode);setConsent(false);}} disabled={busy||running}><option value="files">Archivos seleccionados en el commit</option><option value="comparison">Archivos seleccionados que cambiaron desde otro commit</option></select>
         {mode==='comparison'&&<><label htmlFor="code-base">Commit anterior para comparar (SHA completo)</label><input id="code-base" maxLength={40} value={baseSha} onChange={event=>{setBaseSha(event.target.value);setConsent(false);}} disabled={busy||running}/><p className="muted">Los archivos seleccionados deben aparecer en la comparación; se revisa su contenido actual. Commits iguales no acreditan una revisión de calidad.</p></>}
-        <label className="confirmation"><input type="checkbox" checked={withAi} onChange={event=>{setWithAi(event.target.checked);setConsent(false);}} disabled={busy||running}/>Añadir revisión con ChatGPT a las comprobaciones locales</label>
+        <label className="confirmation"><input type="checkbox" checked={withAi} onChange={event=>{setWithAi(event.target.checked);setConsent(false);}} disabled={busy||running}/>Añadir revisión con IA a las comprobaciones locales</label>
         <button disabled={busy||running||!paths.length||(mode==='comparison'&&!/^[a-f0-9]{40}$/.test(baseSha))||(withAi&&(!connected||!consent||!model))} onClick={()=>void action(async()=>{const result=await post<{id:string}>('/analyses',{paths,expectedHead:catalog.head,mode,...(mode==='comparison'?{baseSha}:{}),withAi,...(withAi?providerFields:{})});setAnalysisId(result.id);setAnalysis(null);setConsent(false);setNotice('Análisis guardado. Consulta el resultado y sus límites.');})}>Analizar código seleccionado</button>
       </>}
     </details>}
     {project.canManageProject&&<details className="proposal-form" open={withAi||!!analysis?.result?.findings.length}>
       <summary>Modelo y autorización para enviar código</summary>
-      {!connected&&<p className="muted">Conecta ChatGPT en el panel del proveedor para revisar con IA o preparar correcciones. Las comprobaciones locales están disponibles sin esa conexión.</p>}
+      {!connected&&<p className="muted">Conecta ChatGPT o inicia Ollama en Configuración para revisar con IA o preparar correcciones. Las comprobaciones locales están disponibles sin esa conexión.</p>}
       <div className="input-group"><label htmlFor="code-purpose">Propósito de nuevas correcciones</label><select id="code-purpose" value={purpose} disabled={busy||running} onChange={event=>{setPurpose(event.target.value as typeof purpose);setConsent(false);}}><option value="demonstration">Demostración (sin publicación)</option><option value="live">Uso real (rama y PR tras aprobación)</option></select></div>
-      <label htmlFor="code-model">Modelo para revisar código</label><select id="code-model" value={model} onChange={event=>{setModel(event.target.value);setConsent(false);}} disabled={busy||running||!connected}>{provider?.connection.models.map(item=><option key={item.slug} value={item.slug}>{item.displayName}</option>)}</select>
+      <AgentModelSelect id="code-model" models={provider?.connection.models??[]} value={model} onChange={value=>{setModel(value);setEffort('');setConsent(false);}} disabled={busy||running||!connected}/>
       <ReasoningSelect id="code-effort" model={selectedModel} value={effort} onChange={value=>{setEffort(value);setConsent(false);}} disabled={busy||running||!connected}/>
-      <label className="confirmation"><input type="checkbox" checked={consent} onChange={event=>setConsent(event.target.checked)} disabled={busy||running||!connected}/>Autorizo enviar a ChatGPT el código seleccionado, los hallazgos y el objetivo de esta solicitud usando mi plan.</label>
+      <label className="confirmation"><input type="checkbox" checked={consent} onChange={event=>setConsent(event.target.checked)} disabled={busy||running||!connected}/>Autorizo enviar a {providerDestination(model)} el código seleccionado, los hallazgos y el objetivo de esta solicitud.</label>
     </details>}
     <h3>Análisis de código guardados</h3>{!overview?<p role="status">Consultando revisión…</p>:!overview.analyses.length?<p>Aún no hay análisis de código.</p>:<ul>{overview.analyses.map(item=><li key={item.id}>{dates(item.createdAt)} · {states[item.status]} <button disabled={busy} onClick={()=>{setAnalysisId(item.id);setAnalysis(null);}}>Abrir análisis de código</button>{item.errorCode&&<p className="form-error">{explain(item.errorCode)}</p>}</li>)}</ul>}
     {analysis&&<div className="proposal-detail">

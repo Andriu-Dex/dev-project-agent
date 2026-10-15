@@ -1,3 +1,5 @@
+import {AgentProviders} from '../../providers/agents.js';
+import {OllamaService} from '../../providers/ollama/service.js';
 import {randomBytes,randomUUID} from 'node:crypto';
 import pg from 'pg';
 import {afterAll,beforeAll,describe,expect,it} from 'vitest';
@@ -109,4 +111,22 @@ describe.skipIf(process.env.RUN_PROPOSALS_DB_TESTS!=='true')('PostgreSQL three-a
   it('restricts runtime updates to lifecycle fields and keeps evidence and decisions immutable',async()=>{
     const grants=await client.query("SELECT has_column_privilege('dev_project_agent_app','proposal_versions','state','UPDATE') AS state,has_column_privilege('dev_project_agent_app','proposal_versions','context','UPDATE') AS context,has_table_privilege('dev_project_agent_app','proposal_contents','UPDATE') AS content,has_table_privilege('dev_project_agent_app','agent_messages','DELETE') AS messages,has_table_privilege('dev_project_agent_app','proposal_decisions','UPDATE') AS decisions");expect(grants.rows[0]).toEqual({state:true,context:false,content:false,messages:false,decisions:false});
   });
+  it('runs all three agents through Ollama and persists the selected provider without external writes',async()=>{
+    await refresh();const stages:string[]=[];
+    const local=new OllamaService({database,fetcher:async(url,init)=>{
+      if(String(url).endsWith('/tags'))return Response.json({models:[{name:'org/test:7b',size:1,modified_at:'fixture'}]});
+      const body=JSON.parse(String(init?.body)),data=JSON.parse(body.messages[1].content);stages.push(data.recipient);
+      const output=data.recipient==='executor'?syntheticContent(data):syntheticVerdict(data.recipient,data.contentHash);
+      return Response.json({message:{content:JSON.stringify(output)},prompt_eval_count:10,eval_count:20});
+    }});
+    const localService=new ProposalService(database,new AgentProviders(provider,local));
+    try {
+      const {reasoningEffort:ignored,...values}=request();const job=await localService.prepare(binding,actor,{...values,model:'ollama:org/test:7b'});
+      await localService.waitForIdle();const detail=await localService.version(projectId,job.proposalId,job.version);
+      expect(stages).toEqual(['executor','reviewer','approver']);expect(detail?.state).toBe('pending_human_approval');
+      expect(detail?.messages).toHaveLength(3);expect(detail?.decisions).toHaveLength(0);
+      expect((await localService.overview(projectId)).jobs.find(item=>item.id===job.id)?.model).toBe('ollama:org/test:7b');
+    } finally {await localService.close();await local.close();}
+  });
+
 });

@@ -40,7 +40,9 @@
     "test:renewal-db": "node --env-file=.env scripts/test-renewal.mjs",
     "test:reports-db": "node --env-file=.env scripts/test-reports.mjs",
     "test:operations-db": "node --env-file=.env scripts/test-operations.mjs",
-    "test:notifications-db": "node --env-file=.env scripts/test-notifications.mjs"
+    "test:notifications-db": "node --env-file=.env scripts/test-notifications.mjs",
+    "test:ollama-db": "node --env-file=.env scripts/test-ollama.mjs",
+    "ollama:validate": "node --env-file=.env --import tsx scripts/validate-ollama.ts"
   },
   "devDependencies": {
     "@inquirer/prompts": "8.7.3",
