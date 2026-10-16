@@ -7,7 +7,13 @@ Add-Type -AssemblyName System.IO.Compression.FileSystem
 $releaseSource = (Resolve-Path -LiteralPath $Source).Path
 $releaseDestination = [System.IO.Path]::GetFullPath($Destination)
 if (Test-Path -LiteralPath $releaseDestination) { throw 'Release archive already exists.' }
-[System.IO.Compression.ZipFile]::CreateFromDirectory($releaseSource, $releaseDestination, [System.IO.Compression.CompressionLevel]::Optimal, $false)
+$releaseWriter = [System.IO.Compression.ZipFile]::Open($releaseDestination, [System.IO.Compression.ZipArchiveMode]::Create)
+try {
+    foreach ($releaseSourceFile in (Get-ChildItem -LiteralPath $releaseSource -File -Recurse -Force)) {
+        $releaseRelativePath = $releaseSourceFile.FullName.Substring($releaseSource.Length).TrimStart([char]'\').Replace('\','/')
+        [void][System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($releaseWriter, $releaseSourceFile.FullName, $releaseRelativePath, [System.IO.Compression.CompressionLevel]::Optimal)
+    }
+} finally { $releaseWriter.Dispose() }
 $releaseArchive = [System.IO.Compression.ZipFile]::OpenRead($releaseDestination)
 try {
     $releaseManifestEntry = $releaseArchive.GetEntry('release-manifest.json')
