@@ -8,7 +8,7 @@ Caso supervisado: UTAPED. Revisión del guion: 15 de octubre de 2026.
 2. Ingresar como gestor sin mostrar contraseñas, tokens ni el contenido de `.env`.
 3. Comprobar las fuentes y sus fechas de observación. No presentar porcentajes históricos como valores actuales.
 4. Preparar una tarjeta de prueba identificada, con propósito **Demostración**. Este propósito nunca permite modificar Trello ni publicarse en GitHub.
-5. Revisar [el estado de implementación](implementation-status.md), [las evidencias reales](real-acceptance-validation.md) y [la matriz académica](academic-acceptance-matrix.md). No anunciar aceptación de los 39 criterios mientras esté pendiente.
+5. Revisar [el estado de implementación](archive/validation/implementation-status.md), [las evidencias reales](validation/real-acceptance-validation.md) y [la matriz académica](academic-acceptance-matrix.md). No anunciar aceptación de los 39 criterios mientras esté pendiente.
 
 ## Recorrido sugerido
 
@@ -48,7 +48,7 @@ Mostrar destinatario, tipos de aviso, resumen, recordatorios y horario de silenc
 
 ChatGPT y Ollama se eligen explícitamente; no hay cambio automático de proveedor ante un fallo. Ollama es el servidor de inferencia: su calidad depende del modelo y los parámetros. No prometer privacidad absoluta, coste operativo nulo o latencia fija.
 
-Consultar el [informe Ollama](ollama-improvement-report.md), especialmente su corrección y reconciliación. Ningún modelo local evaluado está validado para sustituir al proveedor principal. Los nuevos parámetros necesitan evaluación real antes de cerrar las compuertas pendientes.
+Consultar el [informe Ollama](archive/experiments/ollama-improvement-report.md), especialmente su corrección y reconciliación. Ningún modelo local evaluado está validado para sustituir al proveedor principal. Los nuevos parámetros necesitan evaluación real antes de cerrar las compuertas pendientes.
 
 ## Seguridad y recuperación
 

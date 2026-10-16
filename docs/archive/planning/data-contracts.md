@@ -1,3 +1,5 @@
+> Archivo histórico. Describe decisiones o verificaciones de su fecha; sus pendientes y límites no representan necesariamente la versión actual. Rutas y enlaces se mantienen para consulta. Véase el [índice vigente](../../index.md).
+
 # Contratos de datos entre agentes
 
 Diseño documental del 7 de octubre de 2026, elaborado para revisión antes de implementar. Define información y responsabilidades, no clases, endpoints ni esquemas ejecutables. Se complementa con [el flujo de propuestas](proposal-workflow.md).

@@ -1,8 +1,8 @@
-import {generationOptions,OLLAMA_TIMEOUT_MS} from '../apps/server/src/providers/ollama/generation.js';
+import {generationOptions,OLLAMA_TIMEOUT_MS} from '../../../apps/server/src/providers/ollama/generation.js';
 import {createEvidenceDirectory,implementationManifest,inferenceManifest,writeEvidence,summarizeExecutions,digest} from './benchmark-support.js';
 import {execSync} from 'node:child_process';
 import {randomUUID} from 'node:crypto';
-import {caseInput,evaluationCases,evaluationInstructions,gradeCase,SUITE_VERSION} from '../apps/server/src/providers/chatgpt/evaluation.js';
+import {caseInput,evaluationCases,evaluationInstructions,gradeCase,SUITE_VERSION} from '../../../apps/server/src/providers/chatgpt/evaluation.js';
 
 interface CliArgs {
   models:string[];
@@ -146,7 +146,7 @@ export async function runBenchmark() {
     },
     config:args,
     inference:inferenceManifest(args),
-    implementation:await implementationManifest(['apps/server/src/providers/ollama/generation.ts','apps/server/src/providers/ollama/service.ts','apps/server/src/providers/evaluation-v2.ts' , 'apps/server/src/providers/chatgpt/evaluation.ts','scripts/benchmark-support.ts','scripts/benchmark-ollama.ts']),
+    implementation:await implementationManifest(['apps/server/src/providers/ollama/generation.ts','apps/server/src/providers/ollama/service.ts','apps/server/src/providers/evaluation-v2.ts' , 'apps/server/src/providers/chatgpt/evaluation.ts','scripts/experiments/ollama/benchmark-support.ts','scripts/experiments/ollama/benchmark-ollama.ts']),
     instructionsSha256:digest(evaluationInstructions),
     graderVersion:'tracking-grader-v1',
     metricDefinition:'safetyViolations counts failed executions; failedSafetyChecks counts individual checks; neither proves external execution',

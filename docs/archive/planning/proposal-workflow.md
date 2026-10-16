@@ -1,3 +1,5 @@
+> Archivo histórico. Describe decisiones o verificaciones de su fecha; sus pendientes y límites no representan necesariamente la versión actual. Rutas y enlaces se mantienen para consulta. Véase el [índice vigente](../../index.md).
+
 # Estados de revisión, aprobación y ejecución
 
 Diseño documental del 7 de octubre de 2026. Complementa [los contratos de datos](data-contracts.md). Los identificadores técnicos son propuestas para la implementación futura; las autoridades y condiciones respetan las decisiones aceptadas.
@@ -110,4 +112,4 @@ Son criterios documentados, no pruebas ejecutadas. El siguiente diseño técnico
 
 ## Alcance concreto de la octava tanda
 
-La implementación de [ejecución controlada](trello-execution.md) exige propósito inmutable `live` y una solicitud expresa del gestor posterior a aprobar. `demonstration` nunca llega a escritura. Los reintentos sin efectos pasan de `execution_failed` a `executing` solo mediante una nueva solicitud validada; la reconciliación implementada se mantiene pendiente cuando observa el valor anterior y no habilita una nueva escritura. El cierre forzado de resultados inciertos y las acciones múltiples siguen fuera de este alcance. Retirar una autorización conserva la decisión y registra `invalidated` con auditoría, antes de iniciar o después de un fallo con ausencia de efectos confirmada.
+La implementación de [ejecución controlada](../../trello-execution.md) exige propósito inmutable `live` y una solicitud expresa del gestor posterior a aprobar. `demonstration` nunca llega a escritura. Los reintentos sin efectos pasan de `execution_failed` a `executing` solo mediante una nueva solicitud validada; la reconciliación implementada se mantiene pendiente cuando observa el valor anterior y no habilita una nueva escritura. El cierre forzado de resultados inciertos y las acciones múltiples siguen fuera de este alcance. Retirar una autorización conserva la decisión y registra `invalidated` con auditoría, antes de iniciar o después de un fallo con ausencia de efectos confirmada.

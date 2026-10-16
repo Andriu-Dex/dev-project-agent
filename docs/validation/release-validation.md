@@ -2,7 +2,7 @@
 
 Fecha: 15 de octubre de 2026, America/Guayaquil. Identificación exacta de la fuente y del artefacto: commit, fecha y hashes incluidos en `release-manifest.json` y en el archivo de validación junto al ZIP. Esta verificación local no constituye promoción a `main` ni entrega académica.
 
-## Comprobaciones ejecutadas
+## Comprobaciones del cierre original
 
 | Comprobación | Resultado observado |
 | --- | --- |
@@ -40,3 +40,15 @@ La matriz mantiene **38 comprobaciones superadas y AC-7.06 cerrado con EX-01 his
 No se ejecutaron scripts de UTAPED, compilación Java, recorridos completos de sus pantallas, nuevos cambios Trello, publicaciones GitHub ni merge. La aplicación requiere equipo/base/servicio encendidos. ChatGPT depende de cuota y vigencia de autorización; Ollama depende de su modelo y equipo. No se añadieron Gemini/Groq ni fallback automático.
 
 El cierre deja commits locales, paquete y guía revisables. Promoción a `main`, etiqueta, push/release remota y entrega al profesor quedan para la decisión final del gestor. La rama temporal de defensa permanece separada.
+
+## Revalidación tras ajustes visuales y limpieza documental
+
+15 de octubre de 2026, sobre los ajustes visuales de `704ff4b` y la limpieza previa a la fusión:
+
+- `npm run docs:check`: destinos locales válidos en 54 documentos Markdown; no comprueba servicios remotos ni fragmentos de encabezado.
+- `npm test`: 192 pruebas superadas y 158 PostgreSQL omitidas por ser optativas. La configuración permanente excluye paquetes locales, respaldos y temporales, manteniendo 39 archivos de pruebas.
+- `npm run test:isolated`: 350 pruebas superadas en 39 archivos, sin omisiones, en base temporal eliminada al terminar.
+- `npm run typecheck` y `npm run build`: superados. El JavaScript inicial actual es de 575,28 kB antes de gzip, con advertencia no bloqueante de Vite; sustituye las cifras de chunks del cierre original para la interfaz actual.
+- Se separaron guías vigentes, evidencia y archivo histórico; los diagnósticos opcionales de Ollama conservan sus comandos y pruebas. No se ejecutaron benchmarks reales ni escrituras externas.
+
+La reorganización no repite la validación de instalación, respaldo o paquete: sus evidencias anteriores siguen identificando sus propias fuentes y artefactos. El ZIP anterior no contiene los ajustes visuales y documentales posteriores; debe regenerarse desde el commit final aceptado antes de distribuirlo.

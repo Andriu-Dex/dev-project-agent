@@ -1,6 +1,8 @@
+> Archivo histórico. Describe decisiones o verificaciones de su fecha; sus pendientes y límites no representan necesariamente la versión actual. Rutas y enlaces se mantienen para consulta. Véase el [índice vigente](../../index.md).
+
 # Pantallas del gestor
 
-Diseño funcional del 7 de octubre de 2026; sin prototipos ejecutables ni desarrollo de interfaz. Corresponde al [modelo de datos](data-model.md) y al [flujo de propuestas](proposal-workflow.md).
+Diseño funcional del 7 de octubre de 2026; sin prototipos ejecutables ni desarrollo de interfaz. Corresponde al [modelo de datos](../../data-model.md) y al [flujo de propuestas](proposal-workflow.md).
 
 ## Usuarios, navegación y presentación
 

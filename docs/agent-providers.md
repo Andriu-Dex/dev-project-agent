@@ -31,7 +31,7 @@ El 14 de octubre se comprobó inferencia real local con `qwen2.5-coder:7b`: el c
 
 Las pruebas automatizadas con transporte simulado y PostgreSQL verifican el flujo completo de los tres agentes, análisis y corrección de código, conservación de la decisión humana pendiente, persistencia del proveedor programado y ausencia de cambio automático. Estas pruebas verifican la integración; no sustituyen la calidad del modelo real ni cierran los 39 criterios académicos.
 
-La auditoría reproducible de resultados y los pendientes de evaluación final se describen en la [corrección del informe Ollama](ollama-improvement-report.md#12-correcciones-y-reconciliación-de-evidencia--15-de-octubre). `npm run ollama:audit-evidence` cuenta los resultados almacenados sin reescribir ni volver a calificar los originales.
+La auditoría reproducible de resultados y los pendientes de evaluación final se describen en la [corrección del informe Ollama](archive/experiments/ollama-improvement-report.md#12-correcciones-y-reconciliación-de-evidencia--15-de-octubre). `npm run ollama:audit-evidence` cuenta los resultados almacenados sin reescribir ni volver a calificar los originales.
 
 
 ## Política de cierre para Ollama

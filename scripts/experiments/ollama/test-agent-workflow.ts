@@ -1,17 +1,17 @@
 import pg from 'pg';
 import {randomBytes,randomUUID} from 'node:crypto';
-import {buildApp} from '../apps/server/src/app.js';
-import {hashPassword} from '../apps/server/src/modules/auth/password.js';
-import type {AuthUser} from '../apps/server/src/modules/auth/repository.js';
-import type {TrelloDatabase} from '../apps/server/src/integrations/trello/service.js';
-import {boardFixture,boardId,listId} from '../apps/server/src/integrations/trello/fixtures.js';
-import {claimJob,enqueueJob,getJob} from '../apps/server/src/modules/supervision/jobs.js';
-import {executeJob,type SupervisionOptions} from '../apps/server/src/modules/supervision/worker.js';
-import {ChatGPTService} from '../apps/server/src/providers/chatgpt/service.js';
-import {OllamaService} from '../apps/server/src/providers/ollama/service.js';
-import {AgentProviders} from '../apps/server/src/providers/agents.js';
-import type {ConnectionBinding} from '../apps/server/src/providers/chatgpt/connection.js';
-import {ProposalService} from '../apps/server/src/modules/proposals/service.js';
+import {buildApp} from '../../../apps/server/src/app.js';
+import {hashPassword} from '../../../apps/server/src/modules/auth/password.js';
+import type {AuthUser} from '../../../apps/server/src/modules/auth/repository.js';
+import type {TrelloDatabase} from '../../../apps/server/src/integrations/trello/service.js';
+import {boardFixture,boardId,listId} from '../../../apps/server/src/integrations/trello/fixtures.js';
+import {claimJob,enqueueJob,getJob} from '../../../apps/server/src/modules/supervision/jobs.js';
+import {executeJob,type SupervisionOptions} from '../../../apps/server/src/modules/supervision/worker.js';
+import {ChatGPTService} from '../../../apps/server/src/providers/chatgpt/service.js';
+import {OllamaService} from '../../../apps/server/src/providers/ollama/service.js';
+import {AgentProviders} from '../../../apps/server/src/providers/agents.js';
+import type {ConnectionBinding} from '../../../apps/server/src/providers/chatgpt/connection.js';
+import {ProposalService} from '../../../apps/server/src/modules/proposals/service.js';
 
 export async function runRealAgentWorkflow(modelName = 'qwen2.5-coder:7b') {
   console.log(`\n=== Testing Real Agent Workflow with Model: ${modelName} ===\n`);

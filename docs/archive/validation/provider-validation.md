@@ -1,3 +1,5 @@
+> Archivo histórico. Describe decisiones o verificaciones de su fecha; sus pendientes y límites no representan necesariamente la versión actual. Rutas y enlaces se mantienen para consulta. Véase el [índice vigente](../../index.md).
+
 # Validación del proveedor de IA
 
 Actualización del 11 de octubre de 2026. Se completó `npm run ai:validate` con inicio de sesión y consentimiento del usuario, verificación de identidad y permisos del plan, y una inferencia real exitosa. No se reutilizan credenciales de Codex, GitHub CLI ni cookies del navegador.
@@ -22,7 +24,7 @@ Esta prueba acredita acceso e inferencia básica para esta cuenta y aplicación 
 
 Disponible para el gestor en `http://127.0.0.1:5174/`: **Conectar con ChatGPT**, luego **Continue with ChatGPT**. El callback reside en el servicio local (`127.0.0.1:3100` con la configuración actual), verifica también la sesión local y los permisos vigentes, y devuelve una página de resultado. El panel actualiza el estado por polling. No hay que mantener abierta una terminal de validación temporal.
 
-La autorización pendiente está ligada a proyecto, usuario, versión de autenticación y sesión local. La conexión completada admite [acceso renovable cifrado](renewable-access.md): sobrevive a reinicios y al cierre de sesión del panel, respeta el vencimiento oficial y renueva automáticamente. La versión anterior solo guardaba acceso en memoria durante treinta minutos; es necesario conectar una vez tras actualizar para establecer el acceso persistente. **Desconectar ChatGPT** elimina el acceso local e intenta revocarlo remotamente; el panel informa si no pudo confirmar esa revocación.
+La autorización pendiente está ligada a proyecto, usuario, versión de autenticación y sesión local. La conexión completada admite [acceso renovable cifrado](../../renewable-access.md): sobrevive a reinicios y al cierre de sesión del panel, respeta el vencimiento oficial y renueva automáticamente. La versión anterior solo guardaba acceso en memoria durante treinta minutos; es necesario conectar una vez tras actualizar para establecer el acceso persistente. **Desconectar ChatGPT** elimina el acceso local e intenta revocarlo remotamente; el panel informa si no pudo confirmar esa revocación.
 
 Una vez conectado se muestra el catálogo de esa cuenta, conservando el orden y los nombres de presentación del proveedor. El gestor elige un modelo y marca explícitamente el envío de los seis casos sintéticos mediante su plan. No se envían fuentes de UTAPED, secretos ni datos personales. La petición solo admite un modelo del catálogo, un nivel de razonamiento verificado opcional y una clave UUID de idempotencia; no acepta prompts arbitrarios, direcciones externas ni herramientas.
 

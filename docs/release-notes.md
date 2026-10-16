@@ -6,7 +6,7 @@ Incluye supervisión Trello/GitHub, políticas/horarios dinámicos, línea base,
 
 El cierre añade cobertura progresiva: inventario, estados/motivos, cola por fragmentos, contexto local, continuación, pausa, reintentos, invalidación por cambios y consumidores, módulos, filtros/paginación y evidencia histórica. Los reportes usan un corte de cobertura anterior a su fecha. Las correcciones conservan su flujo acotado; no se publican desde fragmentos.
 
-Añade pruebas en base aislada, verificación de instalación compilada, respaldo privado con restauración y empaquetado desde commit limpio con manifiesto/SHA-256. La carga de Código se separa para reducir el JavaScript inicial.
+Añade pruebas en base aislada, verificación de instalación compilada, respaldo privado con restauración y empaquetado desde commit limpio con manifiesto/SHA-256. La presentación de Código mantiene los ajustes visuales posteriores del gestor; el build actual puede advertir sobre el tamaño del JavaScript inicial.
 
 La aceptación conserva 38 comprobaciones superadas y EX-01 para una aprobación antigua sin motivo. No se altera la decisión histórica ni se atribuye dispensa al profesor. Las escrituras previas verificadas no se repiten para empaquetar.
 

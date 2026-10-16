@@ -1,3 +1,5 @@
+> Archivo histórico. Describe decisiones o verificaciones de su fecha; sus pendientes y límites no representan necesariamente la versión actual. Rutas y enlaces se mantienen para consulta. Véase el [índice vigente](../../index.md).
+
 # Informe de Evaluación y Mejora del Proveedor Ollama
 
 **Fecha de ejecución:** 14 y 15 de octubre de 2026
@@ -157,7 +159,7 @@ Se implementaron mejoras modulares en la arquitectura del servidor, contratos y 
    - `OllamaService.evaluate()` adopta por defecto `SUITE_VERSION_V2` (`tracking-synthetic-v2`).
    - Se modificó `OllamaPanel.tsx` incorporando un selector que permite al gestor alternar entre la suite V2 ampliada y la suite V1 base, así como etiquetas en español para los nuevos controles (`Sin reclamos de ejecución`, `Resistencia a inyecciones`).
 
-6. **Corrección del cálculo de mediana tibia (`scripts/benchmark-v2.ts` y `benchmark-ollama.ts`):**
+6. **Corrección del cálculo de mediana tibia (`scripts/experiments/ollama/benchmark-v2.ts` y `benchmark-ollama.ts`):**
    - Se corrigió el orden de operaciones: ahora se extrae cronológicamente la primera ejecución (arranque en frío con carga de pesos a VRAM) y posteriormente se ordena el arreglo restante para calcular la mediana tibia real.
 
 ---
@@ -221,7 +223,7 @@ Se evaluaron los dos flujos multi-agente del sistema: propuestas de cambio de se
   - Superó el Ejecutor (15,197 ms) gracias a `stageSchema`, pero se detuvo en el Revisor (7,183 ms) emitiendo `changes_requested` al confundir la aprobación humana futura con un fallo de precondición técnica.
 
 #### 2. Flujo de Revisión de Código (`CodeReviewService` / `src/parse.ts`):
-Se evaluó el flujo completo mediante [`scripts/test-code-workflow.ts`](../scripts/test-code-workflow.ts) aplicando esquemas JSON Schema (`codeAnalysisSchema` y `codeCorrectionStageSchema`):
+Se evaluó el flujo completo mediante [`scripts/experiments/ollama/test-code-workflow.ts`](../../../scripts/experiments/ollama/test-code-workflow.ts) aplicando esquemas JSON Schema (`codeAnalysisSchema` y `codeCorrectionStageSchema`):
 - **`qwen3.5:4b` (Falla en Análisis de Código):**
   - Bajo la restricción preventiva de generación `num_predict: 2048`, el modelo consumió los 2,048 tokens en razonamiento interno preliminar (`done_reason: 'length'`), deteniéndose con contenido vacío (`INVALID_MODEL_OUTPUT`).
   - Al permitirle mayor margen de salida, emite el bloque JSON pero incluye caracteres de salto de línea extra en la propiedad `evidence` que rompen la coincidencia exacta byte a byte contra el archivo de código fuente, disparando `INVALID_CODE_EVIDENCE`.

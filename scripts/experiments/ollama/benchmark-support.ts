@@ -1,7 +1,7 @@
 import {createHash} from 'node:crypto';
 import {mkdir,readFile,writeFile} from 'node:fs/promises';
 import {dirname} from 'node:path';
-import {generationOptions,OLLAMA_GENERATION_VERSION,OLLAMA_TIMEOUT_MS,type GenerationSettings} from '../apps/server/src/providers/ollama/generation.js';
+import {generationOptions,OLLAMA_GENERATION_VERSION,OLLAMA_TIMEOUT_MS,type GenerationSettings} from '../../../apps/server/src/providers/ollama/generation.js';
 
 export const digest=(value:string)=>createHash('sha256').update(value).digest('hex');
 export async function createEvidenceDirectory(directory:string) {

@@ -2,7 +2,7 @@ import {describe,it,expect} from 'vitest';
 import {mkdtemp,readFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
-import {generationOptions} from '../apps/server/src/providers/ollama/generation.js';
+import {generationOptions} from '../../../apps/server/src/providers/ollama/generation.js';
 import {compareSummary,createEvidenceDirectory,inferenceManifest,summarizeExecutions,writeEvidence} from './benchmark-support.js';
 
 describe('Benchmark evidence integrity',()=>{

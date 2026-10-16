@@ -1,30 +1,30 @@
 # Revisión de código y correcciones
 
-Actualización del 12 de octubre de 2026: se incorpora el [catálogo versionado de criterios](code-standard-catalog.md), complejidad como sexta categoría y [publicación controlada GitHub](github-publication.md). El propósito real se elige al crear la corrección y permanece inmutable; las correcciones anteriores se conservan como demostración. La descripción de publicación solo simulada de la novena tanda es histórica. El entorno actual sigue sin habilitar escrituras reales. La [programación diaria](project-operations.md) comparte el servicio de revisión y conserva cobertura por contenido y archivos aplazados/excluidos.
+La versión actual incluye análisis acotado, seis categorías del [catálogo de criterios](code-standard-catalog.md), correcciones de tres roles, simulación demostrativa y [publicación real controlada en GitHub](github-publication.md). Esta última exige configuración, credenciales separadas, propósito real y autorización/confirmación específicas; no realiza merge. No se presupone el valor de los indicadores locales de escritura.
 
-Implementación del 11 de octubre de 2026. Esta tanda añade revisión acotada de código, correcciones con tres agentes, decisiones del gestor y **simulación de publicación**. No hay adaptador de escritura en GitHub, endpoint para publicar realmente, cambios en el checkout de UTAPED ni integración automática. La aprobación de esta etapa autoriza una demostración local; no habilita una publicación futura.
+La pestaña de cobertura del repositorio ofrece una [cola progresiva independiente](repository-coverage.md). Sus fragmentos no se convierten directamente en cambios publicables; para corregir se vuelve al análisis acotado y sus revisiones.
 
 ## Recorrido del gestor
 
-1. En «Revisión de código y correcciones», pulsar «Leer catálogo de GitHub». El destino procede de la conexión configurada del proyecto, actualmente UTAPED/develop.
-2. Seleccionar hasta ocho archivos. Se puede revisar su estado actual o seleccionar archivos que cambiaron desde un SHA anterior. La comparación revisa el contenido actual de esos archivos; no constituye análisis completo de todas las diferencias históricas. Commits iguales se rechazan como comparación sin cambios.
-3. Solicitar comprobaciones locales sin conectar ChatGPT. Para añadir análisis con IA, conectar el proveedor, elegir modelo/esfuerzo compatible y marcar el consentimiento para enviar el código de esa solicitud. Las seis pruebas sintéticas del panel del proveedor **no** autorizan el envío de código real.
-4. Abrir el análisis y revisar sus archivos, commit, comprobaciones, hallazgos y límites. Ningún patrón ni conclusión del modelo se presenta como vulnerabilidad confirmada. Cero hallazgos no acredita calidad integral.
-5. Seleccionar hasta diez hallazgos de no más de tres archivos, escribir un objetivo concreto y autorizar el envío a ChatGPT. Ejecutor prepara el diff; Revisor comprueba evidencia/alcance/verificación; Aprobador exige la decisión humana. No ejecutan comandos ni código.
-6. Revisar el diff, riesgos, comprobaciones y dictámenes. Aprobar, rechazar o solicitar ajustes con motivo. Ajustes o invalidación permiten crear otra versión y repetir las tres etapas, sin heredar una aprobación.
-7. Una versión aprobada permite registrar la simulación de `agent/<proposal-id>-v<version>` con destino a la rama configurada. Se conserva el plan, los blobs antes/después y la huella exacta. No se crea ningún commit, rama ni PR en GitHub. Una autorización puede retirarse; las evidencias y decisiones anteriores permanecen.
+1. Abrir Código y preparar un nuevo análisis desde el catálogo configurado.
+2. Seleccionar hasta ocho archivos permitidos o una comparación con commit base explícito.
+3. Elegir reglas locales o IA con proveedor/modelo y consentimiento de envío. Las evaluaciones sintéticas no autorizan enviar código real.
+4. Revisar hallazgos, evidencia, commit, comprobaciones y límites. Cero hallazgos no acredita calidad integral.
+5. Seleccionar hallazgos de hasta tres archivos, describir objetivo y propósito, y preparar el candidato mediante los tres roles.
+6. Decidir sobre la versión/huella exactas con motivo. Ajustes crean otra versión y repiten revisión.
+7. En demostración, registrar solo simulación. En uso real autorizado, solicitar la publicación confirmada y consultar su verificación; la integración es humana.
 
-El consentimiento se desmarca al cambiar alcance, selección, objetivo, modelo o esfuerzo y después de aceptar una solicitud. Cada petición de IA requiere autoridad actual y una conexión vigente propia de la sesión. Las personas con acceso de consulta pueden leer el historial; no pueden leer un catálogo remoto nuevo, enviar código, decidir ni simular publicaciones.
+Lectores consultan evidencia, pero no solicitan catálogo remoto, envían código, deciden o publican. Los botones y la disposición corresponden a la interfaz actual; consultar la [guía operativa](first-release-guide.md).
 
 ## Fuente y límites
 
 La lectura usa únicamente GET en `api.github.com`: commit de la rama, árbol Git completo y blobs seleccionados por SHA. Se verifica tamaño, UTF-8 y hash Git de cada blob; no se interpreta un enlace suministrado por el modelo. Un árbol truncado, una lista de comparación incompleta o un HEAD distinto del mostrado impiden preparar el análisis. La lista de archivos de una comparación se toma de su primera página, aunque los commits tengan paginación; se rechazan comparaciones que alcancen el límite de 300 archivos.
 
-Límites de esta tanda: árbol de 2500 entradas; ocho archivos; 30 000 bytes por archivo y 120 000 bytes de código seleccionado. Se admiten TS/TSX/JS/JSX, variantes CJS/MJS, Java y JSON en rutas regulares de hasta 240 caracteres. No se admiten symlinks, submódulos como archivos editables, binarios, `.github`, `.git`, dependencias, builds ni rutas de credenciales. La detección conservadora de secretos reconocibles puede rechazar archivos legítimos; no garantiza identificar todos los secretos. Revisar los archivos antes de autorizar su envío.
+Límites del análisis acotado: árbol de 2500 entradas; ocho archivos; 30 000 bytes por archivo y 120 000 bytes de código seleccionado. Se admiten TS/TSX/JS/JSX, variantes CJS/MJS, Java y JSON en rutas regulares de hasta 240 caracteres. No se admiten symlinks, submódulos como archivos editables, binarios, `.github`, `.git`, dependencias, builds ni rutas de credenciales. La detección conservadora de secretos reconocibles puede rechazar archivos legítimos; no garantiza identificar todos los secretos. Revisar los archivos antes de autorizar su envío.
 
 La entrada serializada de cada etapa tiene un límite local de 512 000 bytes, independiente de los 120 000 bytes de código. Incluye fuente, candidato, diff, fragmentos previos/nuevos y dictámenes; no se trunca para continuar. Una entrada mayor se rechaza antes de enviar, con `INPUT_TOO_LARGE` y una indicación de reducir el alcance. Este límite de la aplicación no garantiza disponibilidad ni capacidad de contexto de todos los modelos. El 13 de octubre, un caso real de cuatro archivos produjo 35 029 bytes al llegar al Revisor y detectó el límite anterior incompatible de 32 000 bytes. La corrección conserva las evidencias y requiere continuar explícitamente la etapa pendiente; no repite el Ejecutor.
 
-El análisis local transforma TS/JS de manera aislada con el compilador TypeScript y comprueba JSON. No ejecuta imports, scripts, código ni dependencias del repositorio. Los patrones de ejecución dinámica, composición de consultas y repetición textual producen hipótesis con líneas concretas. Java se marca `not_checked`: no se compila. No se han ejecutado builds, pruebas de UTAPED, comprobaciones de tipos entre módulos ni análisis de toda la aplicación.
+El análisis local transforma TS/JS de manera aislada con el compilador TypeScript y comprueba JSON. No ejecuta imports, scripts, código ni dependencias del repositorio. Los patrones de ejecución dinámica, composición de consultas y repetición textual producen hipótesis con líneas concretas. Java se marca `not_checked`: no se compila. El analizador no ejecuta builds, pruebas de UTAPED ni comprobaciones de tipos entre módulos. Las comprobaciones funcionales documentadas de candidatos concretos tienen un alcance separado y no validan toda la aplicación.
 
 Cada hallazgo generado por IA debe citar exactamente un fragmento de hasta veinte líneas del archivo seleccionado. Ruta, rango y evidencia se validan contra el texto guardado. La validación del fragmento prueba su procedencia, no la conclusión del modelo.
 
@@ -34,13 +34,13 @@ El Ejecutor devuelve ediciones estructuradas, no comandos ni un parche arbitrari
 
 Las comprobaciones de sintaxis del candidato se guardan. Un fallo detiene el flujo con `changes_requested`; preguntas bloqueantes o comprobaciones obligatorias incumplidas impiden un dictamen positivo. Los dictámenes no convierten una comprobación no ejecutada del proyecto en prueba superada. Una propuesta puede ser revisable y requerir pruebas adicionales de UTAPED antes de cualquier integración real.
 
-La huella SHA-256 vincula fuente congelada, objetivo, hallazgos seleccionados y candidato completo. Revisor y Aprobador deben devolver esa misma huella. La decisión humana está ligada a proyecto, propuesta, versión y huella; se verifican los dictámenes requeridos. Antes y después de cada inferencia de preparación de correcciones, antes de aprobar y antes de simular se comprueba el destino y HEAD remoto. Cambiar el origen exige otro análisis y versión. Los rechazos y ajustes no necesitan una lectura remota para registrar la negativa.
+La huella SHA-256 vincula fuente congelada, objetivo, hallazgos seleccionados y candidato completo. Revisor y Aprobador deben devolver esa misma huella. La decisión humana está ligada a proyecto, propuesta, versión y huella; se verifican los dictámenes requeridos. Antes y después de cada inferencia de preparación de correcciones, antes de aprobar y antes de simular o publicar se comprueba el destino y HEAD remoto. Cambiar el origen exige otro análisis y versión. Los rechazos y ajustes no necesitan una lectura remota para registrar la negativa.
 
-Las llamadas a GitHub y las transacciones locales no son una transacción distribuida: la rama podría cambiar después de una lectura. Como esta fase no escribe externamente, esa carrera no produce un cambio en UTAPED. La futura publicación real deberá revalidar las precondiciones en su propio límite de escritura y gestionar resultados inciertos; estas aprobaciones demostrativas no podrán reutilizarse.
+Las llamadas a GitHub y las transacciones locales no son una transacción distribuida: la rama podría cambiar después de una lectura. La publicación real revalida las precondiciones en su propio límite de escritura y gestiona resultados inciertos. Las aprobaciones demostrativas no pueden reutilizarse para una publicación real.
 
 Los errores de cuota, desconexión o reinicio no repiten solicitudes automáticamente. «Continuar etapa de código pendiente» requiere una solicitud y consentimiento nuevos y reutiliza el contenido sellado de las etapas ya completadas. Un análisis de IA fallido se conserva y requiere un análisis nuevo. Se recuperan trabajos activos como `interrupted` al iniciar el servicio; esta recuperación supone una sola instancia local del servidor, como el resto de esta entrega.
 
-Las inferencias tienen un máximo local de 180 segundos. Una espera agotada conserva `INFERENCE_TIMEOUT`, separado de una cancelación de autorización o un error de formato. Las instrucciones `code-agents-v2` explicitan propiedades, tipos de listas y límites de texto del dictamen; la validación estricta permanece activa. En la prueba real, el Revisor solicitó ajustes en la versión 1 por cobertura incompleta de invalidación CSRF y no dejó pasar el candidato al Aprobador.
+El adaptador ChatGPT aplica un máximo local de 180 segundos; los límites de otros proveedores se documentan por separado. Una espera agotada conserva `INFERENCE_TIMEOUT`, separado de una cancelación de autorización o un error de formato. Las instrucciones `code-agents-v2` explicitan propiedades, tipos de listas y límites de texto del dictamen; la validación estricta permanece activa. En la prueba real, el Revisor solicitó ajustes en la versión 1 por cobertura incompleta de invalidación CSRF y no dejó pasar el candidato al Aprobador.
 
 ## Persistencia y API
 
@@ -50,7 +50,7 @@ Todas las rutas parten de `/api/v1/projects/:projectId/code-review`; las mutacio
 
 | Método | Ruta relativa | Resultado |
 | --- | --- | --- |
-| GET | `/` | Últimos treinta análisis, propuestas, trabajos y simulaciones |
+| GET | `/` | Últimos treinta análisis, propuestas, trabajos y publicaciones |
 | GET | `/catalog` | Catálogo remoto acotado, solo gestor |
 | POST | `/analyses` | Fuente congelada y análisis local o de IA; 202 |
 | GET | `/analyses/:analysisId` | Fuente, resultado y límites guardados |
@@ -66,20 +66,8 @@ Análisis: `paths`, `expectedHead`, `mode`, `baseSha` cuando se compara, `withAi
 
 ## Comprobaciones y evidencia
 
-- `npm test`: 105 pruebas unitarias superadas; los escenarios de PostgreSQL se ejecutan aparte.
-- `npm run test:code-db`: 14 escenarios de esta tanda con rollback, proveedor y GitHub sintéticos: permisos, CSRF, consentimiento, evidencia, tres etapas, hashes, decisiones, versiones, interrupción, cuotas, cambios de HEAD, desconexión, retirada y rol restringido.
-- Las seis suites PostgreSQL anteriores suman 65 escenarios superados; no se borraron datos reales ni se modificó Trello para probarlas.
-- TypeScript y build pasan. Playwright recorre análisis local, consentimiento/esfuerzo, tres agentes, ajuste, nueva versión, aprobación, simulación, retirada, historial y acceso de consulta; prueba ambos temas y móvil sin desbordamiento ni errores del navegador. Capturas en `work/ui/`, fuera de Git.
-- Lectura real de UTAPED/develop, commit `248eebabac46112c2af9cd7302e1b279c11cb1a3`: `frontend/src/App.tsx`, `frontend/src/shared/api.ts` y `backend/src/main/java/ec/edu/uta/utaped/UtapedApplication.java`. Hashes Git verificados; las dos transformaciones TS pasan; compilación Java no realizada; cero hallazgos de patrones dentro de esos tres archivos. No se envió este código a ChatGPT.
-- `npm run code:inspect` lista archivos permitidos de la primera conexión configurada; con rutas como argumentos lee y comprueba esos archivos sin guardar análisis, invocar IA ni modificar el repositorio.
+Las comprobaciones actuales están en [aceptación real](validation/real-acceptance-validation.md), [cierre de validación](validation/validation-closeout.md) y [verificación de versión](validation/release-validation.md). Los conteos y el alcance de la primera tanda permanecen en el [registro histórico](archive/validation/code-review.md); no describen las capacidades actuales de publicación.
 
-Esta evidencia comprueba funcionamiento y controles de la aplicación. Falta evaluar la calidad real del proveedor con código y correcciones representativos, bajo consentimiento del gestor; los dobles de prueba no prueban esa calidad. La futura publicación real y los reportes semanales siguen pendientes.
+Usar `npm run test:isolated` para las integraciones en una base desechable. `npm run code:inspect` es una lectura explícita acotada sin guardar análisis ni invocar IA. No se ejecutan builds o pruebas completas de UTAPED por analizar sus archivos. Las pruebas específicas de candidatos conservan los límites documentados; Java sigue sin compilarse en el analizador.
 
-Los criterios de trazabilidad, control de cambios y verificación se relacionan con [las normas de referencia acordadas](standards-and-quality.md); no se declara certificación ni cumplimiento integral de una norma ISO.
-
-## Referencias oficiales consultadas
-
-- [GitHub: blobs](https://docs.github.com/en/rest/git/blobs#get-a-blob), [árboles](https://docs.github.com/en/rest/git/trees#get-a-tree) y [comparación de commits](https://docs.github.com/en/rest/commits/commits#compare-two-commits).
-- [TypeScript Compiler API](https://github.com/microsoft/TypeScript/wiki/Using-the-Compiler-API) y [jsdiff](https://github.com/kpdecker/jsdiff).
-- [OpenAI: modelos e inferencia con Sign in with ChatGPT](https://developers.openai.com/siwc/token-sharing-open-source/models-and-inference) y [separación de instrucciones y datos](https://developers.openai.com/api/docs/guides/prompt-engineering).
-- [Fastify: validación y serialización](https://fastify.dev/docs/latest/Reference/Validation-and-Serialization/), incluida la configuración explícita para rechazar propiedades adicionales.
+El contrato de publicación real está en su [guía específica](github-publication.md); las restricciones de fuentes, candidatos, evidencia y decisiones anteriores siguen vigentes. No se declara certificación ISO.

@@ -1,3 +1,5 @@
+> Archivo histórico. Describe decisiones o verificaciones de su fecha; sus pendientes y límites no representan necesariamente la versión actual. Rutas y enlaces se mantienen para consulta. Véase el [índice vigente](../../index.md).
+
 # Diseño técnico de la primera entrega
 
 Fecha: 7 de octubre de 2026. Selección técnica documentada para revisión, sin instalar dependencias, generar código, crear SQL o iniciar servicios. Se mantiene UTAPED como único proyecto operativo hasta el 4 de noviembre. Las decisiones del usuario prevalecen sobre estas propuestas técnicas.
@@ -79,7 +81,7 @@ Conectar solo el tablero y repositorio configurados. Durante desarrollo se valid
 
 Revisión de código mediante copia de lectura o directorio de trabajo aislado, referenciado por commit. Preparar candidatos localmente no modifica el checkout supervisado. No ejecutar scripts, hooks o instalaciones del repositorio por el hecho de analizarlo. Las comprobaciones ejecutables requieren lista permitida y entorno aislado con límites.
 
-El candidato exacto se sella antes de revisión. Tras aprobación puede materializarse en una rama aislada y verificarse. Publicar rama o solicitud en GitHub solo si esas operaciones exactas constan en el alcance aprobado; no se asume permiso de push por aprobar una corrección. Flujo confirmado para UTAPED: agent/<proposal-id>-v<version> con PR hacia develop; incorporación a develop y main humana. Para el propio dev-project-agent: desarrollo en develop y versión final validada en main. Véase docs/reports-and-operations.md. Esta planificación no crea ramas ni autoriza commits o publicaciones actuales.
+El candidato exacto se sella antes de revisión. Tras aprobación puede materializarse en una rama aislada y verificarse. Publicar rama o solicitud en GitHub solo si esas operaciones exactas constan en el alcance aprobado; no se asume permiso de push por aprobar una corrección. Flujo confirmado para UTAPED: agent/<proposal-id>-v<version> con PR hacia develop; incorporación a develop y main humana. Para el propio dev-project-agent: desarrollo en develop y versión final validada en main. Véase docs/archive/planning/reports-and-operations.md. Esta planificación no crea ramas ni autoriza commits o publicaciones actuales.
 
 ## IA y secretos
 

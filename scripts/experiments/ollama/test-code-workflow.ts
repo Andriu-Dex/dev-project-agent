@@ -1,14 +1,14 @@
 import pg from 'pg';
 import {randomBytes,randomUUID} from 'node:crypto';
-import {hashPassword} from '../apps/server/src/modules/auth/password.js';
-import type {AuthUser} from '../apps/server/src/modules/auth/repository.js';
-import type {TrelloDatabase} from '../apps/server/src/integrations/trello/service.js';
-import {ChatGPTService} from '../apps/server/src/providers/chatgpt/service.js';
-import {OllamaService} from '../apps/server/src/providers/ollama/service.js';
-import {AgentProviders} from '../apps/server/src/providers/agents.js';
-import type {ConnectionBinding} from '../apps/server/src/providers/chatgpt/connection.js';
-import {CodeReviewService} from '../apps/server/src/modules/code-review/service.js';
-import {codeSourceFetcher,syntheticHead} from '../apps/server/src/modules/code-review/fixtures.js';
+import {hashPassword} from '../../../apps/server/src/modules/auth/password.js';
+import type {AuthUser} from '../../../apps/server/src/modules/auth/repository.js';
+import type {TrelloDatabase} from '../../../apps/server/src/integrations/trello/service.js';
+import {ChatGPTService} from '../../../apps/server/src/providers/chatgpt/service.js';
+import {OllamaService} from '../../../apps/server/src/providers/ollama/service.js';
+import {AgentProviders} from '../../../apps/server/src/providers/agents.js';
+import type {ConnectionBinding} from '../../../apps/server/src/providers/chatgpt/connection.js';
+import {CodeReviewService} from '../../../apps/server/src/modules/code-review/service.js';
+import {codeSourceFetcher,syntheticHead} from '../../../apps/server/src/modules/code-review/fixtures.js';
 
 export async function runRealCodeWorkflow(modelName = 'qwen3.5:4b') {
   console.log(`\n=== Testing Real Code Review Workflow with Model: ${modelName} ===\n`);

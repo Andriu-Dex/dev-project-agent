@@ -1,6 +1,8 @@
+> Archivo histórico. Describe decisiones o verificaciones de su fecha; sus pendientes y límites no representan necesariamente la versión actual. Rutas y enlaces se mantienen para consulta. Véase el [índice vigente](../../index.md).
+
 # Recorridos funcionales del gestor
 
-Diseño documental, sin ejecutar acciones reales. Vincula [modelo de datos](data-model.md), [pantallas](manager-screens.md) y [estados](proposal-workflow.md). Las fechas de ejemplos son ficticias y no cambian la planificación de UTAPED.
+Diseño documental, sin ejecutar acciones reales. Vincula [modelo de datos](../../data-model.md), [pantallas](manager-screens.md) y [estados](proposal-workflow.md). Las fechas de ejemplos son ficticias y no cambian la planificación de UTAPED.
 
 ## 1. Detectar retraso y aprobar una corrección
 

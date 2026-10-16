@@ -15,7 +15,7 @@ Version **1.0.0**. Independent Node.js/TypeScript/Fastify service, React/TypeScr
 - Consented SMTP notifications, selected events, daily digest, quiet hours, reminders and delivery history.
 - ChatGPT as validated primary provider, with encrypted renewable access and model/effort selection. Ollama is optional: discover compatible installed models on the configured server and evaluate them. Connection does not establish quality. No automatic provider fallback.
 
-The academic record closes **38 criteria as passed and one with historical exception EX-01**. This does not assert that every old record meets current policy or that the professor waived a criterion. See [acceptance](docs/real-acceptance-validation.md), [closeout](docs/validation-closeout.md) and [release verification](docs/release-validation.md).
+The academic record closes **38 criteria as passed and one with historical exception EX-01**. This does not assert that every old record meets current policy or that the professor waived a criterion. See [acceptance](docs/validation/real-acceptance-validation.md), [closeout](docs/validation/validation-closeout.md) and [release verification](docs/validation/release-validation.md).
 
 ## Install and run
 
@@ -61,7 +61,7 @@ npm run verify:install
 npm run db:backup
 ```
 
-`test:isolated` creates/migrates a disposable database, uses the runtime role for permission checks, runs synthetic unit/integration tests and removes only that test database. No test workers initialize against operational data. `test:coverage-db` narrows this runner to coverage. Regular `npm test` omits opt-in PostgreSQL cases; omissions are not passes.
+`test:isolated` creates/migrates a disposable database, uses the runtime role for permission checks, runs synthetic unit/integration tests and removes only that test database. No test workers initialize against operational data. `test:coverage-db` narrows this runner to coverage. Regular `npm test` omits opt-in PostgreSQL cases; omissions are not passes. Test discovery excludes local work packages, backups and temporary directories through `vitest.config.ts`. Run `npm run docs:check` to verify local documentation links.
 
 `verify:install` starts compiled code on a free loopback port with another disposable database and no external credentials. It verifies dashboard delivery, health, authentication and safe defaults.
 
@@ -77,13 +77,15 @@ UTAPED is the configured and validated project. Generic identifiers and adapters
 
 ## Documentation
 
+Start with the [current documentation index](docs/index.md). Original planning and experiments are preserved in the [historical archive](docs/archive/index.md).
+
 - [Operator guide](docs/first-release-guide.md) · [Progressive coverage](docs/repository-coverage.md)
-- [Backup/recovery](docs/backup-and-recovery.md) · [Release notes](docs/release-notes.md) · [Release verification](docs/release-validation.md)
+- [Backup/recovery](docs/backup-and-recovery.md) · [Release notes](docs/release-notes.md) · [Release verification](docs/validation/release-validation.md)
 - [Architecture](docs/architecture.md) · [Requirements](docs/requirements.md) · [Business rules](docs/business-rules.md)
-- [Academic matrix](docs/academic-acceptance-matrix.md) · [Real acceptance](docs/real-acceptance-validation.md)
+- [Academic matrix](docs/academic-acceptance-matrix.md) · [Real acceptance](docs/validation/real-acceptance-validation.md)
 - [Providers](docs/agent-providers.md) · [Renewable access](docs/renewable-access.md)
 - [Code review](docs/code-review.md) · [GitHub publication](docs/github-publication.md)
 - [Trello execution](docs/trello-execution.md) · [Notifications](docs/notifications.md) · [Reports](docs/weekly-reports.md)
-- [Git conventions](docs/git-conventions.md) · [Implementation history](docs/implementation-status.md)
+- [Git conventions](docs/git-conventions.md) · [Implementation history](docs/archive/validation/implementation-status.md)
 
 Repository: https://github.com/Andriu-Dex/dev-project-agent. Supervised repository: https://github.com/Andriu-Dex/utaped. The local folder name `utaped-agent` does not need to change.
