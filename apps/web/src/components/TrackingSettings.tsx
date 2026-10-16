@@ -51,24 +51,135 @@ export function TrackingSettings({ projectId, canManage, csrfToken, onSaved }: {
     } catch (failure) { setError(failure instanceof Error && failure.message.startsWith('Cada línea') ? failure.message : 'No se pudo confirmar el guardado. Recarga la configuración antes de volver a intentar.'); }
     finally { setBusy(false); }
   }
-  return <details open className="tracking-settings">
-    <summary>Configuración del seguimiento</summary>
-    {error && <p role="alert" className="form-error">{error}</p>}
-    {message && <p role="status">{message}</p>}
-    {!configuration && !error && <p role="status">Cargando configuración…</p>}
-    {configuration && <>
-      <p className="muted">Versión {configuration.version} · {new Date(configuration.changedAt).toLocaleString('es-EC', { timeZone: 'America/Guayaquil' })} · {configuration.changedBy?.displayName ?? 'Configuración inicial'}.</p>
-      {!configuration.confirmed && <p>Valores iniciales. El gestor puede ajustarlos y guardarlos para confirmar la configuración del proyecto.</p>}
-      {canManage ? <form className="tracking-settings-form" onSubmit={event => void save(event)}>
-        <label>Próximos vencimientos (horas)<input type="number" min={1} max={720} step={1} required value={dueHours} disabled={busy} onChange={event => setDueHours(event.target.value)} /></label>
-        <label>Lectura desactualizada después de (minutos)<input type="number" min={1} max={10080} step={1} required value={staleMinutes} disabled={busy} onChange={event => setStaleMinutes(event.target.value)} /></label>
-        <label>Etiquetas de prioridad<textarea rows={3} value={priority} disabled={busy} onChange={event=>setPriority(event.target.value)} placeholder={'ALTA = high\nMEDIA = medium\nBAJA = low'}/><small>Una por línea. Valores: high (alta), medium (media), low (baja).</small></label>
-        <label>Etiquetas de bloqueo<textarea rows={3} value={blocked} disabled={busy} onChange={event=>setBlocked(event.target.value)} placeholder="BLOQUEADA"/><small>Una etiqueta exacta por línea. Vacío significa que el bloqueo no está informado.</small></label>
-        <label>Etiquetas de estado<textarea rows={3} value={states} disabled={busy} onChange={event=>setStates(event.target.value)}/><small>Etiqueta = pending (pendiente), in_progress (en curso) o completed (completada).</small></label>
-        <p className="muted">Ventana: de 1 a 720 horas. Antigüedad: de 1 a 10 080 minutos. Los cambios se aplican a nuevas evaluaciones; las versiones anteriores se conservan.</p>
-        <button type="submit" disabled={busy}>{busy ? 'Guardando…' : 'Guardar configuración'}</button>
-      </form> : <p>Próximos vencimientos: {configuration.dueSoonHours} horas. Antigüedad máxima: {configuration.staleAfterMinutes} minutos. Solo el gestor puede modificar estos valores.</p>}
-    </>}
-    <button type="button" disabled={busy} onClick={() => { setMessage(''); setAttempt(value => value + 1); }}>Recargar configuración</button>
-  </details>;
+  return (
+    <div className="tracking-settings tracking-settings-panel">
+      {error && <p role="alert" className="form-error settings-alert">{error}</p>}
+      {message && <p role="status" className="settings-notice">{message}</p>}
+      {!configuration && !error && <p role="status" className="muted">Cargando configuración…</p>}
+      {configuration && (
+        <>
+          <div className="settings-meta-bar">
+            <div className="meta-left">
+              <span className="badge">Versión {configuration.version}</span>
+              <span className="muted">
+                {new Date(configuration.changedAt).toLocaleString('es-EC', { timeZone: 'America/Guayaquil' })} · {configuration.changedBy?.displayName ?? 'Configuración inicial'}
+              </span>
+            </div>
+            <button
+              type="button"
+              className="header-action-button"
+              disabled={busy}
+              onClick={() => { setMessage(''); setAttempt(value => value + 1); }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+              </svg>
+              <span>Recargar configuración</span>
+            </button>
+          </div>
+
+          {!configuration.confirmed && (
+            <div className="settings-notice-box">
+              <p>Valores iniciales. El gestor puede ajustarlos y guardarlos para confirmar la configuración del proyecto.</p>
+            </div>
+          )}
+
+          {canManage ? (
+            <form className="tracking-settings-form" onSubmit={event => void save(event)}>
+              <div className="settings-section-card">
+                <h4 className="settings-card-title">Umbrales temporales</h4>
+                <div className="settings-form-row">
+                  <div className="form-field">
+                    <label htmlFor="due-hours">Próximos vencimientos (horas)</label>
+                    <input
+                      id="due-hours"
+                      type="number"
+                      min={1}
+                      max={720}
+                      step={1}
+                      required
+                      value={dueHours}
+                      disabled={busy}
+                      onChange={event => setDueHours(event.target.value)}
+                    />
+                    <small>Ventana de anticipación (1 a 720 horas).</small>
+                  </div>
+                  <div className="form-field">
+                    <label htmlFor="stale-minutes">Lectura desactualizada después de (minutos)</label>
+                    <input
+                      id="stale-minutes"
+                      type="number"
+                      min={1}
+                      max={10080}
+                      step={1}
+                      required
+                      value={staleMinutes}
+                      disabled={busy}
+                      onChange={event => setStaleMinutes(event.target.value)}
+                    />
+                    <small>Antigüedad máxima admisible (hasta 10 080 min).</small>
+                  </div>
+                </div>
+              </div>
+
+              <div className="settings-section-card">
+                <h4 className="settings-card-title">Mapeo de etiquetas en Trello</h4>
+                <p className="settings-card-desc">Asocia las etiquetas de tus tarjetas con los criterios de supervisión.</p>
+                <div className="settings-form-grid-3">
+                  <div className="form-field">
+                    <label htmlFor="priority-labels">Etiquetas de prioridad</label>
+                    <textarea
+                      id="priority-labels"
+                      rows={3}
+                      value={priority}
+                      disabled={busy}
+                      onChange={event => setPriority(event.target.value)}
+                      placeholder={'ALTA = high\nMEDIA = medium\nBAJA = low'}
+                    />
+                    <small>Una por línea. Valores: <code>high</code>, <code>medium</code>, <code>low</code>.</small>
+                  </div>
+                  <div className="form-field">
+                    <label htmlFor="blocked-labels">Etiquetas de bloqueo</label>
+                    <textarea
+                      id="blocked-labels"
+                      rows={3}
+                      value={blocked}
+                      disabled={busy}
+                      onChange={event => setBlocked(event.target.value)}
+                      placeholder="BLOQUEADA"
+                    />
+                    <small>Una etiqueta por línea. Vacío si no se informa.</small>
+                  </div>
+                  <div className="form-field">
+                    <label htmlFor="state-labels">Etiquetas de estado</label>
+                    <textarea
+                      id="state-labels"
+                      rows={3}
+                      value={states}
+                      disabled={busy}
+                      onChange={event => setStates(event.target.value)}
+                      placeholder={'PENDIENTE = pending\nEN CURSO = in_progress\nCOMPLETADA = completed'}
+                    />
+                    <small>Valores: <code>pending</code>, <code>in_progress</code>, <code>completed</code>.</small>
+                  </div>
+                </div>
+              </div>
+
+              <div className="settings-form-footer">
+                <p className="muted">Ventana: de 1 a 720 horas. Antigüedad: de 1 a 10 080 minutos. Los cambios se aplican a nuevas evaluaciones; las versiones anteriores se conservan inmutables.</p>
+                <button type="submit" className="save-settings-btn" disabled={busy}>
+                  {busy ? 'Guardando…' : 'Guardar configuración'}
+                </button>
+              </div>
+            </form>
+          ) : (
+            <div className="viewer-readonly-box">
+              <p>Próximos vencimientos: <strong>{configuration.dueSoonHours} horas</strong>. Antigüedad máxima: <strong>{configuration.staleAfterMinutes} minutos</strong>.</p>
+              <p className="muted">Solo el gestor del proyecto puede modificar estos parámetros.</p>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
 }

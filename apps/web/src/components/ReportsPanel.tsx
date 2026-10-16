@@ -420,7 +420,7 @@ export function ReportsPanel({
               ) : (
                 <>
                   <Icon path="M12 5v14 M5 12h14" />
-                  <span>+ Generar reporte ahora</span>
+                  <span>Generar reporte ahora</span>
                 </>
               )}
             </button>

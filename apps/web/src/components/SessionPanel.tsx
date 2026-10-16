@@ -1,4 +1,4 @@
-import { useEffect, useState, lazy, Suspense, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import type { SessionResponse, ProjectRole } from '@dev-project-agent/contracts';
 import {Workspace, Icon} from './Workspace';
 import {OverviewPage} from './OverviewPage';
@@ -11,7 +11,7 @@ import {OperationsSettings} from './OperationsSettings';
 import {TrackingSettings} from './TrackingSettings';
 import { ProviderPanel } from './ProviderPanel';
 import { OllamaPanel } from './OllamaPanel';
-const CodeReviewPanel=lazy(()=>import('./CodeReviewPanel').then(module=>({default:module.CodeReviewPanel})));
+import {CodeReviewPanel} from './CodeReviewPanel';
 import {ReportsPanel} from './ReportsPanel';
 import { ProposalPanel } from './ProposalPanel';
 import { OperationsPage } from './OperationsPage';
@@ -92,7 +92,7 @@ export function SessionPanel() {
     if(page==='planning')return <PlanningPage key={sourceRevision} project={project}/>;
     if(page==='alerts')return <AlertsPage {...props}/>;
     if(page==='proposals')return <ProposalPanel {...props} sourceRevision={sourceRevision}/>;
-    if(page==='code')return <Suspense fallback={<p role="status">Cargando revisión de código…</p>}><CodeReviewPanel {...props}/></Suspense>;
+    if(page==='code')return <CodeReviewPanel {...props}/>;
     if(page==='reports')return <ReportsPanel {...props}/>;
     if(page==='operations')return <OperationsPage {...props} onCompleted={()=>setSourceRevision(value=>value+1)}/>;
     return (
@@ -178,14 +178,42 @@ export function SessionPanel() {
       </SettingsPage>
     );
   }}/>{error&&<div className="global-notice" role="alert">{error}</div>}</>;
-  return <main className="login-layout"><div className="login-story"><a className="workspace-brand" href="#overview"><img src="/favicon.jpg" alt="Dev Project Agent" className="brand-mark"/><span>Dev Project Agent</span></a><div><p className="eyebrow">CLARIDAD PARA DECIDIR</p><h1>Tu proyecto,<br/>bajo control.</h1><p>Comprende el avance, anticipa los riesgos y revisa cada propuesta con evidencia.</p><div className="login-points"><p>01 <span>Planificación conectada con Trello</span></p><p>02 <span>Revisión de código y recomendaciones</span></p><p>03 <span>Decisiones humanas, trazabilidad completa</span></p></div></div><small>Dev Project Agent · Seguimiento de proyectos de software</small></div><div className="login-content"><section aria-labelledby="session-title">
-    <h2 id="session-title">{session?.authenticated ? 'Tu proyecto' : 'Iniciar sesión'}</h2>
-    {error && <p role="alert" className="form-error">{error}</p>}
+  return (
+    <main className="login-layout">
+      <div className="login-story">
+        <div className="login-story-header">
+          <a className="workspace-brand" href="#overview">
+            <img src="/favicon.jpg" alt="Dev Project Agent" className="brand-mark" />
+            <span>Dev Project Agent</span>
+          </a>
+        </div>
+        <div className="login-story-body">
+          <span className="login-badge">CLARIDAD PARA DECIDIR</span>
+          <h1 className="login-hero-title">Tu proyecto,<br />bajo control.</h1>
+          <p className="login-hero-desc">Comprende el avance, anticipa los riesgos y revisa cada propuesta con evidencia.</p>
+          <div className="login-points">
+            <div className="login-point-item"><span className="point-number">01</span> <span>Planificación conectada con Trello</span></div>
+            <div className="login-point-item"><span className="point-number">02</span> <span>Revisión de código y recomendaciones</span></div>
+            <div className="login-point-item"><span className="point-number">03</span> <span>Decisiones humanas, trazabilidad completa</span></div>
+          </div>
+        </div>
+        <div className="login-story-footer">
+          <small>Dev Project Agent · Seguimiento de proyectos de software</small>
+        </div>
+      </div>
+      <div className="login-content">
+        <section className="login-card" aria-labelledby="session-title">
+          <div className="login-card-header">
+            <h2 id="session-title">{session?.authenticated ? 'Tu proyecto' : 'Iniciar sesión'}</h2>
+            {!session?.authenticated && (
+              <p className="login-card-subtitle">Ingresa con la cuenta habilitada para tu proyecto.</p>
+            )}
+          </div>
+          {error && <p role="alert" className="form-error login-alert">{error}</p>}
     {!session && (error
       ? <button onClick={() => setAttempt(value => value + 1)}>Reintentar acceso</button>
       : <p role="status">Comprobando sesión…</p>)}
     {session && !session.authenticated && <>
-      <p className="muted">Ingresa con la cuenta habilitada para tu proyecto.</p>
       <form className="login-form" onSubmit={event => void submit(event)}>
         <div className="input-group">
           <label htmlFor="login">Usuario</label>
@@ -220,24 +248,53 @@ export function SessionPanel() {
             </button>
           </div>
         </div>
-        <button disabled={busy} type="submit">{busy ? 'Ingresando…' : 'Ingresar'}</button>
+        <button className="login-submit-button" disabled={busy} type="submit">{busy ? 'Ingresando…' : 'Ingresar'}</button>
       </form>
     </>}
-    {session?.authenticated && <>
-      <p>Hola, <strong>{session.user.displayName}</strong>.</p>
-      {session.project ? <>
-        <p><strong>{session.project.name}</strong> <span className="badge">{session.project.role === 'manager' ? 'Gestor' : 'Consulta'}</span></p>
-        <p className="muted">{canManage ? 'Puedes solicitar supervisiones y administrar la configuración del proyecto.' : 'Tu acceso permite consultar el proyecto.'}</p>
-        {canManage && <div aria-labelledby="team-title">
-          <h3 id="team-title">Equipo con acceso</h3>
-          {memberError && <p role="alert" className="form-error">{memberError}</p>}
-          {!members && !memberError && <p role="status">Cargando equipo…</p>}
-          {members && <ul>{members.map(member => <li key={member.id}>{member.displayName} · {member.role === 'manager' ? 'Gestor' : 'Consulta'}</li>)}</ul>}
-        </div>}
-      </> : <p role="alert">Tu cuenta no tiene acceso activo a un proyecto. Contacta al gestor.</p>}
-      <button disabled={busy} onClick={() => void submit()}>{busy ? 'Cerrando sesión…' : 'Cerrar sesión'}</button>
-    </>}
-  </section>
-
-  </div></main>;
+    {session?.authenticated && (
+      <div className="login-authenticated-state">
+        <p className="login-welcome">Hola, <strong>{session.user.displayName}</strong>.</p>
+        {session.project ? (
+          <div className="project-access-info">
+            <p><strong>{session.project.name}</strong> <span className="badge">{session.project.role === 'manager' ? 'Gestor' : 'Consulta'}</span></p>
+            <p className="muted">{canManage ? 'Puedes solicitar supervisiones y administrar la configuración del proyecto.' : 'Tu acceso permite consultar el proyecto.'}</p>
+            {canManage && (
+              <div aria-labelledby="team-title" className="login-team-preview">
+                <h3 id="team-title">Equipo con acceso</h3>
+                {memberError && <p role="alert" className="form-error">{memberError}</p>}
+                {!members && !memberError && <p role="status">Cargando equipo…</p>}
+                {members && (
+                  <ul>
+                    {members.map(member => (
+                      <li key={member.id}>{member.displayName} · {member.role === 'manager' ? 'Gestor' : 'Consulta'}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div role="alert" className="login-no-project-banner">
+            <div className="no-project-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="8" x2="12" y2="12"></line>
+                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+              </svg>
+            </div>
+            <div>
+              <strong>Sin proyecto asignado</strong>
+              <p>Tu cuenta no tiene acceso activo a un proyecto. Contacta al gestor para obtener los permisos correspondientes.</p>
+            </div>
+          </div>
+        )}
+        <button className="logout-action-button" disabled={busy} onClick={() => void submit()}>
+          {busy ? 'Cerrando sesión…' : 'Cerrar sesión'}
+        </button>
+      </div>
+    )}
+        </section>
+      </div>
+    </main>
+  );
 }

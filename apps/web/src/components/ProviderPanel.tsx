@@ -52,43 +52,161 @@ export function ProviderPanel({project,csrfToken}:{project:ProjectAccess;csrfTok
     }catch{setError('No se pudo confirmar la solicitud. Actualiza el panel antes de volver a intentar.');}
     finally{setBusy(false);}
   }
-  return <section aria-labelledby="provider-title" className="provider-panel">
-    <div className="section-heading"><h2 id="provider-title">ChatGPT y evaluación del proveedor</h2><button onClick={()=>{setError('');setRefresh(value=>value+1);}} disabled={busy}>Actualizar conexión</button></div>
-    <p className="muted">Evalúa el proveedor con seis casos sintéticos de seguimiento. Esta prueba no envía datos de UTAPED y puede consumir uso de tu plan de ChatGPT.</p>
-    {(error||loadError)&&<p role="alert" className="form-error">{error||loadError}</p>}
-    {!data?<p role="status">Consultando proveedor…</p>:<>
-      {project.canManageProject?<>
-        <p role="status">Estado: <strong>{statuses[data.connection.status]}</strong>{data.connection.status==='connected'&&data.connection.expiresAt&&` · Disponible hasta ${date(data.connection.expiresAt)}`}</p>
-        {data.connection.errorCode&&<p className="form-error">{explain(data.connection.errorCode)}</p>}
-        <p className="muted">{data.connection.renewable?'Renovación automática activa. Las credenciales se conservan cifradas y sobreviven al cierre de sesión del panel y al reinicio del servicio.':'La conexión actual no tiene acceso renovable guardado. Conecta ChatGPT para habilitar la renovación automática.'} Desconectar ChatGPT elimina el acceso guardado e intenta revocarlo en el proveedor. Los cambios externos conservan sus requisitos de aprobación.</p>
-        {data.connection.lastRefreshedAt&&<p className="muted">Última renovación: {date(data.connection.lastRefreshedAt)}.</p>}
-        {data.connection.retryAt&&<p className="muted">Próximo intento de renovación: {date(data.connection.retryAt)}. Un fallo temporal conserva el acceso guardado.</p>}
-        <div className="supervision-actions">
-          <button onClick={()=>void action('authorization')} disabled={busy||running||data.connection.status==='pending'}>{data.connection.status==='connected'?'Volver a conectar ChatGPT':'Conectar con ChatGPT'}</button>
-          {['pending','connected'].includes(data.connection.status)&&<button onClick={()=>void action('disconnect')} disabled={busy}>Desconectar ChatGPT</button>}
+  return (
+    <section aria-labelledby="provider-title" className="provider-panel">
+      <div className="section-heading">
+        <div>
+          <h2 id="provider-title">ChatGPT y evaluación del proveedor</h2>
+          <p className="muted">Evalúa el proveedor con seis casos sintéticos de seguimiento. Esta prueba no envía datos de UTAPED y puede consumir uso de tu plan de ChatGPT.</p>
         </div>
-        {authorization&&data.connection.status==='pending'&&<div className="provider-authorization"><p>Completa la autorización antes de {date(authorization.expiresAt)}. El estado se actualizará aquí al terminar.</p><a href={authorization.url} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer">Continue with ChatGPT</a></div>}
-        {data.connection.status==='connected'&&<div className="provider-evaluation-form">
-          <label htmlFor="provider-model">Modelo de tu cuenta</label><select id="provider-model" value={model} onChange={event=>{setModel(event.target.value);setEffort('');setConsent(false);}} disabled={busy||running}>{data.connection.models.map(value=><option key={value.slug} value={value.slug}>{value.displayName}</option>)}</select>
-          <ReasoningSelect id="provider-effort" model={data.connection.models.find(value=>value.slug===model)} value={effort} onChange={value=>{setEffort(value);setConsent(false);}} disabled={busy||running}/>
-          <label className="confirmation"><input type="checkbox" checked={consent} onChange={event=>setConsent(event.target.checked)} disabled={busy||running}/>Quiero enviar los seis casos sintéticos usando mi plan de ChatGPT.</label>
-          <button onClick={()=>void action('evaluations')} disabled={busy||running||!consent||!model}>{running?'Evaluando casos…':'Evaluar proveedor'}</button>
-        </div>}
-      </>:<p className="muted">Solo el gestor puede conectar ChatGPT e iniciar pruebas. Puedes consultar las evaluaciones guardadas del proyecto.</p>}
-      <h3>Evaluaciones recientes</h3>
-      {!data.evaluations.length&&<p>Aún no hay evaluaciones de calidad guardadas. La prueba inicial de acceso no sustituye estas evaluaciones.</p>}
-      <div className="work-items">{data.evaluations.map(evaluation=><article key={evaluation.id} className="work-item">
-        <h4>{evaluationStatuses[evaluation.status]} · {evaluation.model}</h4><p>{date(evaluation.createdAt)} · Razonamiento: {evaluation.reasoningEffort?effortLabels[evaluation.reasoningEffort]:'Predeterminado'}</p>
-        {evaluation.status==='running'&&<p role="status">Ejecutando los casos en secuencia. No cierres sesión ni desconectes para completar la prueba.</p>}
-        {evaluation.errorCode&&<p className="form-error">{explain(evaluation.errorCode)}</p>}
-        {evaluation.result&&<><p><strong>{evaluation.result.passed} de {evaluation.result.total}</strong> casos superaron las comprobaciones automáticas. Revisión humana pendiente; este resultado no habilita cambios externos.</p>
-          <details><summary>Ver casos y respuestas</summary>{evaluation.result.cases.map(test=><div key={test.caseId} className="provider-case">
-            <h5>{test.title} · {test.passed?'Superado':'Revisar'}</h5><p>{(test.durationMs/1000).toLocaleString('es-EC')} s{test.usage?.total_tokens!==undefined&&` · ${test.usage.total_tokens} tokens`}</p>
-            <ul>{test.checks.map(check=><li key={check.code}>{checks[check.code]??check.code}: {check.passed?'Correcto':'No superado'}</li>)}</ul>
-            {test.output&&<><p>{classifications[test.output.classification]} · Evidencia: {test.output.evidenceIds.join(', ')}</p><p>{test.output.recommendation}</p>{test.output.unknowns.length>0&&<><p>Datos desconocidos:</p><ul>{test.output.unknowns.map((value,index)=><li key={index}>{value}</li>)}</ul></>}</>}
-            {test.errorCode&&<p>{explain(test.errorCode)}</p>}
-          </div>)}</details></>}
-      </article>)}</div>
-    </>}
-  </section>;
+        <button
+          type="button"
+          className="header-action-button"
+          onClick={()=>{setError('');setRefresh(value=>value+1);}}
+          disabled={busy}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+          </svg>
+          <span>Actualizar conexión</span>
+        </button>
+      </div>
+
+      {(error||loadError)&&<p role="alert" className="form-error settings-alert">{error||loadError}</p>}
+
+      {!data ? (
+        <p role="status" className="muted">Consultando proveedor…</p>
+      ) : (
+        <>
+          {project.canManageProject ? (
+            <div className="provider-connection-card">
+              <div className="connection-header-row">
+                <div>
+                  <span className="connection-label">Estado de conexión</span>
+                  <div className="connection-status-pill">
+                    <span className={`status-dot-indicator ${data.connection.status}`} />
+                    <strong>{statuses[data.connection.status]}</strong>
+                    {data.connection.status==='connected'&&data.connection.expiresAt&&(
+                      <span className="muted expiry-note">· Disponible hasta {date(data.connection.expiresAt)}</span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="connection-actions-group">
+                  <button
+                    type="button"
+                    className="save-settings-btn provider-connect-btn"
+                    onClick={()=>void action('authorization')}
+                    disabled={busy||running||data.connection.status==='pending'}
+                  >
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+                      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+                    </svg>
+                    <span>{data.connection.status==='connected'?'Volver a conectar ChatGPT':'Conectar con ChatGPT'}</span>
+                  </button>
+                  {['pending','connected'].includes(data.connection.status)&&(
+                    <button
+                      type="button"
+                      className="provider-disconnect-btn"
+                      onClick={()=>void action('disconnect')}
+                      disabled={busy}
+                    >
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <path d="M18.36 6.64a9 9 0 1 1-12.73 0"/>
+                        <line x1="12" y1="2" x2="12" y2="12"/>
+                      </svg>
+                      <span>Desconectar ChatGPT</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {data.connection.errorCode&&<p className="form-error">{explain(data.connection.errorCode)}</p>}
+
+              <p className="muted note-text">
+                {data.connection.renewable
+                  ? 'Renovación automática activa. Las credenciales se conservan cifradas y sobreviven al cierre de sesión del panel y al reinicio del servicio.'
+                  : 'La conexión actual no tiene acceso renovable guardado. Conecta ChatGPT para habilitar la renovación automática.'} Desconectar ChatGPT elimina el acceso guardado e intenta revocarlo en el proveedor.
+              </p>
+
+              {data.connection.lastRefreshedAt&&<p className="muted small-note">Última renovación: {date(data.connection.lastRefreshedAt)}.</p>}
+              {data.connection.retryAt&&<p className="muted small-note">Próximo intento de renovación: {date(data.connection.retryAt)}. Un fallo temporal conserva el acceso guardado.</p>}
+
+              {authorization&&data.connection.status==='pending'&&(
+                <div className="provider-authorization">
+                  <p>Completa la autorización antes de {date(authorization.expiresAt)}. El estado se actualizará aquí al terminar.</p>
+                  <a href={authorization.url} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer" className="save-settings-btn" style={{display: 'inline-flex', alignItems: 'center', textDecoration: 'none'}}>
+                    Continue with ChatGPT
+                  </a>
+                </div>
+              )}
+
+              {data.connection.status==='connected'&&(
+                <div className="provider-evaluation-form settings-section-card" style={{marginTop: '20px'}}>
+                  <h4 className="settings-card-title">Ejecutar prueba de evaluación con casos sintéticos</h4>
+                  <div className="form-field">
+                    <label htmlFor="provider-model">Modelo de tu cuenta</label>
+                    <select
+                      id="provider-model"
+                      value={model}
+                      onChange={event=>{setModel(event.target.value);setEffort('');setConsent(false);}}
+                      disabled={busy||running}
+                    >
+                      {data.connection.models.map(value=><option key={value.slug} value={value.slug}>{value.displayName}</option>)}
+                    </select>
+                  </div>
+                  <ReasoningSelect id="provider-effort" model={data.connection.models.find(value=>value.slug===model)} value={effort} onChange={value=>{setEffort(value);setConsent(false);}} disabled={busy||running}/>
+                  <label className="checkbox-label provider-consent-label">
+                    <input type="checkbox" checked={consent} onChange={event=>setConsent(event.target.checked)} disabled={busy||running}/>
+                    <span>Quiero enviar los seis casos sintéticos usando mi plan de ChatGPT.</span>
+                  </label>
+                  <button
+                    className="save-settings-btn"
+                    onClick={()=>void action('evaluations')}
+                    disabled={busy||running||!consent||!model}
+                  >
+                    {running?'Evaluando casos…':'Evaluar proveedor'}
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="muted">Solo el gestor puede conectar ChatGPT e iniciar pruebas. Puedes consultar las evaluaciones guardadas del proyecto.</p>
+          )}
+
+          <div className="evaluations-history-block" style={{marginTop: '28px'}}>
+            <h3 className="section-subtitle">Evaluaciones recientes</h3>
+            {!data.evaluations.length && (
+              <p className="muted">Aún no hay evaluaciones de calidad guardadas. La prueba inicial de acceso no sustituye estas evaluaciones.</p>
+            )}
+            <div className="work-items">
+              {data.evaluations.map(evaluation=>(
+                <article key={evaluation.id} className="work-item">
+                  <div className="section-heading">
+                    <h4>{evaluationStatuses[evaluation.status]} · {evaluation.model}</h4>
+                    <span className="badge">{date(evaluation.createdAt)}</span>
+                  </div>
+                  <p className="muted">Razonamiento: {evaluation.reasoningEffort?effortLabels[evaluation.reasoningEffort]:'Predeterminado'}</p>
+                  {evaluation.status==='running'&&<p role="status">Ejecutando los casos en secuencia. No cierres sesión ni desconectes para completar la prueba.</p>}
+                  {evaluation.errorCode&&<p className="form-error">{explain(evaluation.errorCode)}</p>}
+                  {evaluation.result&&(
+                    <>
+                      <p><strong>{evaluation.result.passed} de {evaluation.result.total}</strong> casos superaron las comprobaciones automáticas. Revisión humana pendiente; este resultado no habilita cambios externos.</p>
+                      <details><summary>Ver casos y respuestas</summary>{evaluation.result.cases.map(test=><div key={test.caseId} className="provider-case">
+                        <h5>{test.title} · {test.passed?'Superado':'Revisar'}</h5><p>{(test.durationMs/1000).toLocaleString('es-EC')} s{test.usage?.total_tokens!==undefined&&` · ${test.usage.total_tokens} tokens`}</p>
+                        <ul>{test.checks.map(check=><li key={check.code}>{checks[check.code]??check.code}: {check.passed?'Correcto':'No superado'}</li>)}</ul>
+                        {test.output&&<><p>{classifications[test.output.classification]} · Evidencia: {test.output.evidenceIds.join(', ')}</p><p>{test.output.recommendation}</p>{test.output.unknowns.length>0&&<><p>Datos desconocidos:</p><ul>{test.output.unknowns.map((value,index)=><li key={index}>{value}</li>)}</ul></>}</>}
+                        {test.errorCode&&<p>{explain(test.errorCode)}</p>}
+                      </div>)}</details>
+                    </>
+                  )}
+                </article>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+    </section>
+  );
 }

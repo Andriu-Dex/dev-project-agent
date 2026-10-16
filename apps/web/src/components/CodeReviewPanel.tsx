@@ -274,8 +274,6 @@ export function CodeReviewPanel({
 }) {
   const prefix = `/api/v1/projects/${project.id}/code-review`;
 
-  const [scopeView,setScopeView]=useState<'recent'|'coverage'>('recent');
-
   // Main data states
   const [overview, setOverview] = useState<CodeOverview | null>(null);
   const [catalog, setCatalog] = useState<CodeCatalog | null>(null);
@@ -284,7 +282,7 @@ export function CodeReviewPanel({
   const [busy, setBusy] = useState(false);
 
   // Active view tab
-  const [activeTab, setActiveTab] = useState<'proposals' | 'analyses' | 'publications'>('proposals');
+  const [activeTab, setActiveTab] = useState<'proposals' | 'analyses' | 'coverage' | 'publications'>('proposals');
 
   // Catalog & file selection states
   const [showCatalog, setShowCatalog] = useState(false);
@@ -610,11 +608,6 @@ export function CodeReviewPanel({
 
   return (
     <div className="proposals-dashboard code-review-dashboard">
-      <div className="coverage-view-switch" role="group" aria-label="Tipo de revisión de código">
-        <button type="button" aria-pressed={scopeView==='recent'} onClick={()=>setScopeView('recent')}>Cambios y correcciones</button>
-        <button type="button" aria-pressed={scopeView==='coverage'} onClick={()=>setScopeView('coverage')}>Cobertura del repositorio</button>
-      </div>
-      {scopeView==='coverage'?<RepositoryCoverage key={project.id} project={project} csrfToken={csrfToken} onInspect={path=>{setScopeView('recent');setShowCatalog(true);void action(async()=>{const value=await read<CodeCatalog>(prefix+'/catalog');setCatalog(value);setPaths(value.files.some(file=>file.path===path)?[path]:[]);setMode('files');setConsent(false);setNotice(value.files.some(file=>file.path===path)?'Archivo seleccionado. Prepara un análisis acotado antes de proponer su corrección.':'Este archivo excede el alcance de corrección automática o está excluido. Conserva la evidencia y prepara una revisión manual.');});}}/>:<>
       {/* Hero Context Banner matching proposals-hero-banner */}
       <section className="proposals-hero-banner">
         <div className="proposals-hero-main">
@@ -661,7 +654,7 @@ export function CodeReviewPanel({
               }}
             >
               <Icon path={showCatalog ? 'M18 6L6 18 M6 6l12 12' : 'M12 5v14 M5 12h14'} />
-              <span>{showCatalog ? 'Cerrar catálogo' : '+ Nuevo análisis'}</span>
+              <span>{showCatalog ? 'Cerrar catálogo' : 'Nuevo análisis'}</span>
             </button>
           )}
         </div>
@@ -1034,6 +1027,17 @@ export function CodeReviewPanel({
             <Icon path="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             <span>Análisis y Hallazgos</span>
             <span className="code-tab-pill">{totalAnalyses}</span>
+          </button>
+
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'coverage'}
+            className={'code-nav-tab-btn' + (activeTab === 'coverage' ? ' is-active' : '')}
+            onClick={() => setActiveTab('coverage')}
+          >
+            <Icon path="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            <span>Cobertura del Repositorio</span>
           </button>
 
           <button
@@ -1413,7 +1417,7 @@ export function CodeReviewPanel({
                 }}
               >
                 <Icon path="M12 5v14 M5 12h14" />
-                <span>+ Nuevo análisis</span>
+                <span>Nuevo análisis</span>
               </button>
             )}
           </div>
@@ -1809,7 +1813,32 @@ export function CodeReviewPanel({
         </div>
       )}
 
-      {/* TAB 3: Publications & PRs */}
+      {/* TAB 3: Repository Coverage */}
+      {activeTab === 'coverage' && (
+        <RepositoryCoverage
+          key={project.id}
+          project={project}
+          csrfToken={csrfToken}
+          onInspect={path => {
+            setActiveTab('analyses');
+            setShowCatalog(true);
+            void action(async () => {
+              const value = await read<CodeCatalog>(prefix + '/catalog');
+              setCatalog(value);
+              setPaths(value.files.some(file => file.path === path) ? [path] : []);
+              setMode('files');
+              setConsent(false);
+              setNotice(
+                value.files.some(file => file.path === path)
+                  ? 'Archivo seleccionado. Prepara un análisis acotado antes de proponer su corrección.'
+                  : 'Este archivo excede el alcance de corrección automática o está excluido. Conserva la evidencia y prepara una revisión manual.'
+              );
+            });
+          }}
+        />
+      )}
+
+      {/* TAB 4: Publications & PRs */}
       {activeTab === 'publications' && (
         <div className="code-analyses-list-card">
           <div className="code-catalog-header">
@@ -2745,7 +2774,6 @@ export function CodeReviewPanel({
           </aside>
         </div>
       )}
-      </>}
     </div>
   );
 }

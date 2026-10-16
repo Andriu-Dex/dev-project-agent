@@ -1,5 +1,6 @@
 import {useCallback,useEffect,useRef,useState} from 'react';
 import type {ProjectAccess,OllamaOverview} from '@dev-project-agent/contracts';
+import {Icon} from './Workspace';
 
 const evaluationStatuses:Record<string,string>={
   running:'En ejecución',
@@ -129,8 +130,16 @@ export function OllamaPanel({project,csrfToken}:{project:ProjectAccess;csrfToken
     <section aria-labelledby="ollama-title" className="provider-panel">
       <div className="section-heading">
         <h2 id="ollama-title">Ollama · proveedor opcional</h2>
-        <button onClick={()=>{setError('');setRefresh(v=>v+1);}} disabled={busy}>
-          Actualizar estado
+        <button
+          type="button"
+          className="header-action-button"
+          onClick={()=>{setError('');setRefresh(v=>v+1);}}
+          disabled={busy}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+          </svg>
+          <span>Actualizar estado</span>
         </button>
       </div>
       <p className="muted">
@@ -172,7 +181,17 @@ export function OllamaPanel({project,csrfToken}:{project:ProjectAccess;csrfToken
               ))}
             </select>
 
-            <p className="muted" role="status">{selectedEvaluation?`Última evaluación de este modelo: ${evaluationStatuses[selectedEvaluation.status]??selectedEvaluation.status}${selectedEvaluation.result?` · ${selectedEvaluation.result.passed}/${selectedEvaluation.result.total} casos`:''}. Los resultados requieren revisión humana y no garantizan la calidad en otros casos.`:'Modelo conectado sin evaluación guardada en este proyecto. Puedes evaluarlo antes de usarlo con los agentes.'}</p>
+            <div className="evaluation-status-card" role="status">
+              <Icon path="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              <div>
+                <strong>Estado de evaluación del modelo seleccionado</strong>
+                <p>
+                  {selectedEvaluation
+                    ? `Última evaluación: ${evaluationStatuses[selectedEvaluation.status] ?? selectedEvaluation.status}${selectedEvaluation.result ? ` (${selectedEvaluation.result.passed}/${selectedEvaluation.result.total} casos superados)` : ''}. Los resultados requieren revisión humana y no garantizan la calidad en otros casos.`
+                    : 'Modelo conectado sin evaluación guardada en este proyecto. Puedes evaluarlo antes de usarlo con los agentes.'}
+                </p>
+              </div>
+            </div>
             <label htmlFor="ollama-suite-select">Suite de evaluación</label>
             <select
               id="ollama-suite-select"
