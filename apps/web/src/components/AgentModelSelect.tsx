@@ -13,6 +13,7 @@ export function AgentModelSelect({id,models,value,onChange,disabled=false}:{id:s
     <select id={id} required value={value} disabled={disabled||!available.length} onChange={event=>onChange(event.target.value)}>
       <option value="">Selecciona un modelo</option>{available.map(model=><option key={model.slug} value={model.slug}>{model.displayName}</option>)}
     </select>
+    {selected==='ollama'&&<p className="muted">La calidad, precisión y velocidad dependen del modelo y del equipo. Estar conectado no acredita una evaluación satisfactoria. Evalúa el modelo en Configuración antes de confiar en sus resultados.</p>}
     <p className="muted">Se utilizará este proveedor para las etapas de esta solicitud. Si falla, no se cambia automáticamente al otro.</p>
   </div>;
 }

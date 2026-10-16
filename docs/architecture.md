@@ -70,3 +70,8 @@ No se incluye OpenClaw en la solución inicial. No se requiere entrenamiento ni 
 ## Pendientes de diseño
 
 Autenticación local y primer gestor, modalidad exacta de acceso a GitHub y Trello, frecuencia de consultas, herramienta de análisis por lenguaje, formatos del reporte, política de copias de seguridad y retención, rama destino y ruta concreta de autenticación ChatGPT.
+
+
+## Actualización de cierre · cobertura progresiva
+
+La aplicación sigue siendo un monolito modular con un único proceso de servicio, workers y PostgreSQL. El nuevo módulo de cobertura utiliza el adaptador GitHub de solo lectura, el analizador determinista existente y el proveedor explícito ChatGPT/Ollama; no ejecuta scripts del repositorio. Guarda inventario por commit, cola por fragmentos, dependencias identificadas, generaciones y evidencia inmutable. Un worker con lease procesa tandas acotadas; los reportes leen cortes persistidos anteriores a su fecha. El panel separa cambios/correcciones de cobertura del repositorio. Las correcciones mantienen su autorización y publicación independientes. Ver [cobertura](repository-coverage.md).

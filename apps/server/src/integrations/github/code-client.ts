@@ -28,17 +28,24 @@ export function githubApi(connection:GitHubConnection,token:string|null,fetcher:
   return {get};
 }
 export function gitSha(value:unknown):string {if(typeof value!=='string'||!/^[a-f0-9]{40}$/.test(value))throw new GitHubError('INVALID_SOURCE');return value;}
-export async function readCodeCatalog(connection:GitHubConnection,token:string|null,fetcher:typeof fetch=fetch):Promise<CodeCatalog> {
+export async function readCodeCatalog(connection:GitHubConnection,token:string|null,fetcher:typeof fetch=fetch,inventoryLimit=sourceLimits.treeEntries):Promise<CodeCatalog> {
   const api=githubApi(connection,token,fetcher);
   const commit=await api.get('/commits/'+encodeURIComponent(connection.branch)) as {sha:unknown;commit:{tree:{sha:unknown}}};
   const head=gitSha(commit.sha),treeSha=gitSha(commit.commit?.tree?.sha);
   const tree=await api.get('/git/trees/'+treeSha+'?recursive=1') as {sha:unknown;truncated:unknown;tree:unknown[]};
-  if(gitSha(tree.sha)!==treeSha||tree.truncated!==false||!Array.isArray(tree.tree)||tree.tree.length>sourceLimits.treeEntries)throw new GitHubError('INCOMPLETE_SOURCE');
+  if(gitSha(tree.sha)!==treeSha||tree.truncated!==false||!Array.isArray(tree.tree)||tree.tree.length>inventoryLimit)throw new GitHubError('INCOMPLETE_SOURCE');
   const entries=tree.tree.map(raw=>{const item=raw as {path:unknown;type:unknown;mode:unknown;sha:unknown;size?:unknown};
     if(!item||typeof item.path!=='string'||item.path.length>1000||/[\x00-\x1f]/.test(item.path)||!['tree','blob','commit'].includes(String(item.type))||typeof item.mode!=='string')throw new GitHubError('INVALID_SOURCE');
     return {path:item.path,type:item.type as 'tree'|'blob'|'commit',mode:item.mode,sha:gitSha(item.sha),size:typeof item.size==='number'?item.size:null};});
   if(new Set(entries.map(entry=>entry.path)).size!==entries.length)throw new GitHubError('INCOMPLETE_SOURCE');
   return {connection,head,treeSha,observedAt:new Date().toISOString(),files:entries.filter(entry=>entry.type==='blob'&&['100644','100755'].includes(entry.mode)&&validCodePath(entry.path)&&entry.size!==null&&entry.size>=0&&entry.size<=sourceLimits.fileBytes).map(entry=>({path:entry.path,blobSha:entry.sha,mode:entry.mode,size:entry.size!})),inventory:entries.filter((entry):entry is typeof entry & {type:'blob'|'commit'}=>entry.type!=='tree'),limits:sourceLimits};
+}
+export async function readPinnedBlob(connection:GitHubConnection,entry:{blobSha:string;size:number},token:string|null,fetcher:typeof fetch=fetch) {
+  const raw=await githubApi(connection,token,fetcher).get('/git/blobs/'+gitSha(entry.blobSha)) as {sha:unknown;encoding:unknown;size:unknown;content:unknown};
+  if(gitSha(raw.sha)!==entry.blobSha||raw.encoding!=='base64'||raw.size!==entry.size||typeof raw.content!=='string'||!/^[A-Za-z0-9+/=\r\n]*$/.test(raw.content))throw new GitHubError('INVALID_SOURCE');
+  const data=Buffer.from(raw.content,'base64');if(data.byteLength!==entry.size)throw new GitHubError('INVALID_SOURCE');
+  let content:string;try{content=new TextDecoder('utf-8',{fatal:true,ignoreBOM:true}).decode(data);}catch{throw new GitHubError('UNSUPPORTED_ENCODING');}
+  assertSafeCode(content);if(blobHash(content)!==entry.blobSha)throw new GitHubError('INVALID_SOURCE');return content;
 }
 export async function readCodeSource(connection:GitHubConnection,request:{paths:string[];mode:'files'|'comparison';baseSha:string|null;expectedHead:string},token:string|null,fetcher:typeof fetch=fetch):Promise<CodeSource> {
   if(!request.paths.length||request.paths.length>sourceLimits.files||new Set(request.paths).size!==request.paths.length||request.paths.some(path=>!validCodePath(path)))throw new GitHubError('INVALID_SCOPE');

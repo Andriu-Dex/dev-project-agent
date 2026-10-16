@@ -1,3 +1,4 @@
+import {RepositoryCoverage} from './RepositoryCoverage';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type {
   AgentVerdict,
@@ -272,6 +273,8 @@ export function CodeReviewPanel({
   csrfToken: string;
 }) {
   const prefix = `/api/v1/projects/${project.id}/code-review`;
+
+  const [scopeView,setScopeView]=useState<'recent'|'coverage'>('recent');
 
   // Main data states
   const [overview, setOverview] = useState<CodeOverview | null>(null);
@@ -607,6 +610,11 @@ export function CodeReviewPanel({
 
   return (
     <div className="proposals-dashboard code-review-dashboard">
+      <div className="coverage-view-switch" role="group" aria-label="Tipo de revisión de código">
+        <button type="button" aria-pressed={scopeView==='recent'} onClick={()=>setScopeView('recent')}>Cambios y correcciones</button>
+        <button type="button" aria-pressed={scopeView==='coverage'} onClick={()=>setScopeView('coverage')}>Cobertura del repositorio</button>
+      </div>
+      {scopeView==='coverage'?<RepositoryCoverage key={project.id} project={project} csrfToken={csrfToken} onInspect={path=>{setScopeView('recent');setShowCatalog(true);void action(async()=>{const value=await read<CodeCatalog>(prefix+'/catalog');setCatalog(value);setPaths(value.files.some(file=>file.path===path)?[path]:[]);setMode('files');setConsent(false);setNotice(value.files.some(file=>file.path===path)?'Archivo seleccionado. Prepara un análisis acotado antes de proponer su corrección.':'Este archivo excede el alcance de corrección automática o está excluido. Conserva la evidencia y prepara una revisión manual.');});}}/>:<>
       {/* Hero Context Banner matching proposals-hero-banner */}
       <section className="proposals-hero-banner">
         <div className="proposals-hero-main">
@@ -2737,6 +2745,7 @@ export function CodeReviewPanel({
           </aside>
         </div>
       )}
+      </>}
     </div>
   );
 }

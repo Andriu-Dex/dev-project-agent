@@ -1,3 +1,4 @@
+import {CoverageService,startCoverageWorker} from './modules/code-review/coverage.js';
 import {AgentProviders} from './providers/agents.js';
 import {NotificationService,startNotificationWorker} from './modules/notifications/service.js';
 import {smtpFromEnvironment} from './modules/notifications/smtp.js';
@@ -46,6 +47,7 @@ const executions=new ExecutionService(pool,{enabled:writeConfig.enabled,remote:w
 const githubWriteConfiguration=publicationConfiguration(process.env);
 const codeReview=new CodeReviewService(pool,agentProviders,supervision.githubToken,fetch,()=>app.log.error('Code review could not persist its result.'),githubWriteConfiguration);
 const publications=new PublicationService(pool,codeReview,githubWriteConfiguration,fetch,()=>app.log.error('GitHub publication requires reconciliation.'));
+const coverage=new CoverageService(pool,agentProviders,supervision.githubToken);
 const operations=new OperationService(pool,supervision,codeReview);
 const smtp=smtpFromEnvironment(process.env);
 const mailBase=process.env.APP_PUBLIC_URL??'http://127.0.0.1:5174';
@@ -55,14 +57,15 @@ const notifications=new NotificationService(pool,smtp.transport,smtp.status,pars
 const app = buildApp({
   checkDatabase: async () => { await pool.query('SELECT 1'); },
   logger: true,
-  auth: { ...authConfigFromEnvironment(process.env), database: pool, trello: { database: pool, credentials: supervision.trelloCredentials },supervision,chatgpt,ollama,proposals,executions,codeReview,reports,operations,publications,notifications },
+  auth: { ...authConfigFromEnvironment(process.env), database: pool, trello: { database: pool, credentials: supervision.trelloCredentials },supervision,chatgpt,ollama,proposals,executions,codeReview,reports,operations,publications,notifications,coverage },
 });
 pool.on('error', () => { app.log.error('Idle database connection failed.'); });
 let worker:ReturnType<typeof startSupervisionWorker>|undefined;
 let reportWorker:ReturnType<typeof startReportWorker>|undefined;
 let operationWorker:ReturnType<typeof startOperationWorker>|undefined;
+let coverageWorker:ReturnType<typeof startCoverageWorker>|undefined;
 let notificationWorker:ReturnType<typeof startNotificationWorker>|undefined;
-app.addHook('onClose', async () => {await notificationWorker?.close();await operationWorker?.close();await reportWorker?.close();await publications.close();await ollama.close();await chatgpt.close();await proposals.close();await executions.close();await codeReview.close();await worker?.close();await pool.end(); });
+app.addHook('onClose', async () => {await coverageWorker?.close();await notificationWorker?.close();await operationWorker?.close();await reportWorker?.close();await publications.close();await ollama.close();await chatgpt.close();await proposals.close();await executions.close();await codeReview.close();await worker?.close();await pool.end(); });
 
 const webRoot = fileURLToPath(new URL('../../web/dist/', import.meta.url));
 if (existsSync(webRoot)) {
@@ -85,6 +88,7 @@ try {
   worker=startSupervisionWorker(supervision,()=>app.log.error('Supervision worker could not access storage.'));
   reportWorker=startReportWorker(reports,()=>app.log.error('Report worker could not access storage.'));
   notificationWorker=startNotificationWorker(notifications,()=>app.log.error('Notification worker could not complete a storage operation.'));
+  coverageWorker=startCoverageWorker(coverage,()=>app.log.error('Coverage worker could not access storage.'));
   operationWorker=startOperationWorker(operations,()=>app.log.error('Operation worker could not access storage.'));
 } catch {
   app.log.error('Server startup failed.');

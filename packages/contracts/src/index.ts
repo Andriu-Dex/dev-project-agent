@@ -278,6 +278,7 @@ export interface CodeOverview {analyses:Omit<CodeAnalysisView,'source'|'result'>
 export interface ReportSchedule {version:number;enabled:boolean;weekday:number;hour:number;minute:number;timeZone:'America/Guayaquil';changedAt:string|null;nextCutoff:string|null;errorCode?:string|null}
 export interface ReportSummary {id:string;version:number;kind:'scheduled'|'manual';status:'queued'|'published'|'draft'|'failed';periodStart:string;cutoff:string;createdAt:string;finishedAt:string|null;errorCode:string|null}
 export interface WeeklyReport {
+  codeCoverage?: import('./coverage.js').ReportCoverage | null;
   riskAssessments?:{itemId:string;name:string;causeStatus:string;cause:string;impact:string;alternatives:{title:string;goal:string;eligible:boolean}[]}[];
   schemaVersion:1;project:{id:string;name:string};responsible:{id:string;name:string};periodStart:string;cutoff:string;generatedAt:string;partialPeriod:boolean;late:boolean;
   policyVersion:number|null;scheduleVersion:number|null;baselineVersion:number|null;
@@ -294,3 +295,4 @@ export interface WeeklyReport {
 }
 export interface ReportDetail extends ReportSummary {contentHash:string|null;data:WeeklyReport|null}
 export interface ReportsOverview {schedule:ReportSchedule;reports:ReportSummary[]}
+export * from './coverage.js';

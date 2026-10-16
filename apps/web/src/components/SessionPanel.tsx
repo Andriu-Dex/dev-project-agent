@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useState, lazy, Suspense, type FormEvent } from 'react';
 import type { SessionResponse, ProjectRole } from '@dev-project-agent/contracts';
 import {Workspace, Icon} from './Workspace';
 import {OverviewPage} from './OverviewPage';
@@ -11,7 +11,7 @@ import {OperationsSettings} from './OperationsSettings';
 import {TrackingSettings} from './TrackingSettings';
 import { ProviderPanel } from './ProviderPanel';
 import { OllamaPanel } from './OllamaPanel';
-import {CodeReviewPanel} from './CodeReviewPanel';
+const CodeReviewPanel=lazy(()=>import('./CodeReviewPanel').then(module=>({default:module.CodeReviewPanel})));
 import {ReportsPanel} from './ReportsPanel';
 import { ProposalPanel } from './ProposalPanel';
 import { OperationsPage } from './OperationsPage';
@@ -92,7 +92,7 @@ export function SessionPanel() {
     if(page==='planning')return <PlanningPage key={sourceRevision} project={project}/>;
     if(page==='alerts')return <AlertsPage {...props}/>;
     if(page==='proposals')return <ProposalPanel {...props} sourceRevision={sourceRevision}/>;
-    if(page==='code')return <CodeReviewPanel {...props}/>;
+    if(page==='code')return <Suspense fallback={<p role="status">Cargando revisión de código…</p>}><CodeReviewPanel {...props}/></Suspense>;
     if(page==='reports')return <ReportsPanel {...props}/>;
     if(page==='operations')return <OperationsPage {...props} onCompleted={()=>setSourceRevision(value=>value+1)}/>;
     return (

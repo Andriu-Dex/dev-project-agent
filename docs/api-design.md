@@ -139,3 +139,8 @@ Rutas nuevas relativas a `/api/v1/projects/:projectId`:
 | POST | `/code-review/publications/:id/reconcile` | Solo consulta/verificación, sin repetir escrituras. |
 
 Las lecturas requieren sesión y pertenencia; las mutaciones requieren gestor, origen permitido y CSRF. Programación y publicación revalidan la autoridad persistida. No hay endpoint de merge. Límites y resultados inciertos se consultan en el trabajo conservado.
+
+
+## API añadida en 1.0.0
+
+`/api/v1/projects/:projectId/code-review/coverage` expone resumen, archivos paginados, evidencia por ruta, actualización de inventario, límites y controles start/pause/retry. Ver [contratos y restricciones](repository-coverage.md). Las lecturas requieren membresía; mutaciones exigen gestor, CSRF, origen permitido, esquema estricto y `expectedRevision`. No hay rutas de ejecución de comandos ni publicación desde fragmentos.

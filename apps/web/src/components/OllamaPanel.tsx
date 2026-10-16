@@ -72,6 +72,7 @@ export function OllamaPanel({project,csrfToken}:{project:ProjectAccess;csrfToken
   },[load,refresh]);
 
   const running=data?.evaluations.some(value=>value.status==='running')??false;
+  const selectedEvaluation=data?.evaluations.find(value=>value.model===model);
   const polling=running||data?.connection.status==='connected';
 
   useEffect(()=>{
@@ -127,14 +128,15 @@ export function OllamaPanel({project,csrfToken}:{project:ProjectAccess;csrfToken
   return (
     <section aria-labelledby="ollama-title" className="provider-panel">
       <div className="section-heading">
-        <h2 id="ollama-title">Ollama (Modelos locales)</h2>
+        <h2 id="ollama-title">Ollama · proveedor opcional</h2>
         <button onClick={()=>{setError('');setRefresh(v=>v+1);}} disabled={busy}>
           Actualizar estado
         </button>
       </div>
       <p className="muted">
         Usa los modelos disponibles en el servidor Ollama configurado. También puedes elegirlos en Propuestas, Código y Automatización. La privacidad y los recursos dependen del servidor y del modelo instalado.
-        Puedes evaluar la capacidad de respuesta y fidelidad del JSON con la suite de seis casos sintéticos.
+        Puedes evaluar la capacidad de respuesta y fidelidad del JSON con la suite base de seis casos o la suite ampliada de 24 casos sintéticos.
+        La calidad, precisión y velocidad dependen del modelo seleccionado y del equipo. Conectar un modelo no garantiza que sea adecuado para las tareas del agente; revisa su evaluación antes de utilizarlo.
       </p>
 
       {(error||loadError)&&<p role="alert" className="form-error">{error||loadError}</p>}
@@ -154,7 +156,7 @@ export function OllamaPanel({project,csrfToken}:{project:ProjectAccess;csrfToken
 
         {data.connection.status==='connected'&&project.canManageProject&&<>
           {data.connection.models.length===0?<p className="muted">
-            No se detectaron modelos descargados en Ollama. Puedes descargar uno en tu terminal con <code>ollama pull qwen2.5-coder:7b</code>.
+            No se detectaron modelos disponibles. Instala el modelo compatible que prefieras en tu servidor de Ollama y actualiza el estado.
           </p>:<div className="provider-evaluation-form">
             <label htmlFor="ollama-model-select">Modelo local instalado</label>
             <select
@@ -170,6 +172,7 @@ export function OllamaPanel({project,csrfToken}:{project:ProjectAccess;csrfToken
               ))}
             </select>
 
+            <p className="muted" role="status">{selectedEvaluation?`Última evaluación de este modelo: ${evaluationStatuses[selectedEvaluation.status]??selectedEvaluation.status}${selectedEvaluation.result?` · ${selectedEvaluation.result.passed}/${selectedEvaluation.result.total} casos`:''}. Los resultados requieren revisión humana y no garantizan la calidad en otros casos.`:'Modelo conectado sin evaluación guardada en este proyecto. Puedes evaluarlo antes de usarlo con los agentes.'}</p>
             <label htmlFor="ollama-suite-select">Suite de evaluación</label>
             <select
               id="ollama-suite-select"

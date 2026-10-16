@@ -440,7 +440,7 @@ export function OperationsPage({
           </div>
           <h2 className="proposals-hero-title">Operación y Supervisión Continua</h2>
           <p className="proposals-hero-subtitle">
-            Sincronización en tiempo real de Trello y GitHub, verificación de avance contra la línea base de
+            Sincronización periódica de Trello y GitHub, verificación de avance contra la línea base de
             planificación, trazabilidad de análisis y auditoría inmutable de eventos.
           </p>
         </div>

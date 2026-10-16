@@ -32,3 +32,8 @@ El 14 de octubre se comprobó inferencia real local con `qwen2.5-coder:7b`: el c
 Las pruebas automatizadas con transporte simulado y PostgreSQL verifican el flujo completo de los tres agentes, análisis y corrección de código, conservación de la decisión humana pendiente, persistencia del proveedor programado y ausencia de cambio automático. Estas pruebas verifican la integración; no sustituyen la calidad del modelo real ni cierran los 39 criterios académicos.
 
 La auditoría reproducible de resultados y los pendientes de evaluación final se describen en la [corrección del informe Ollama](ollama-improvement-report.md#12-correcciones-y-reconciliación-de-evidencia--15-de-octubre). `npm run ollama:audit-evidence` cuenta los resultados almacenados sin reescribir ni volver a calificar los originales.
+
+
+## Política de cierre para Ollama
+
+Ollama se conserva como proveedor opcional para modelos compatibles instalados en la instancia configurada por `OLLAMA_BASE_URL`. No se fija una lista de nombres ni se descarga un modelo automáticamente. Conexión disponible, resultado de evaluación y adecuación al caso son estados distintos. La interfaz muestra evaluación reciente por modelo y advierte que calidad, precisión y velocidad dependen del modelo y equipo; las suites sintéticas no garantizan comportamiento general. No hay fallback automático ni disminución de los requisitos de evidencia/revisión/aprobación. ChatGPT continúa como proveedor principal validado. La prueba real conocida de Ollama de 3/6 no se reemplaza por estas pruebas de integración sintéticas. Gemini/Groq y nuevos benchmarks quedan diferidos.

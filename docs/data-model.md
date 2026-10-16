@@ -150,3 +150,8 @@ La octava tanda agrega `proposals.purpose` inmutable para el servicio (demostrac
 ## Modelo implementado de revisión de código
 
 La migración `1791795600000_code-review.cjs` concreta el módulo separado de revisión/corrección de código. `code_analyses` mantiene solicitudes y estados; `code_sources` congela commit, árbol y archivos; `code_results` conserva hallazgos/comprobaciones; `code_proposals` identifica correcciones demostrativas; `code_versions` conserva objetivos, selección y estados; `code_candidates` guarda diff/contenido/huella; `code_jobs` y `code_messages` registran las tres etapas; `code_decisions` registra gestor, versión de autoridad, decisión y motivo; `code_publications` almacena exclusivamente simulaciones. Claves compuestas y permisos por columna protegen proyecto y evidencia. Este módulo no cambia las propuestas de Trello ni añade tablas para integración automática. Véase [modelo, controles y API](code-review.md#persistencia-y-api).
+
+
+## Modelo físico añadido para cobertura
+
+`code_coverage_projects` configura inventario/cola/programación por proyecto; `code_coverage_files` mantiene ruta/blob/generación/estado y dependencias. `code_coverage_batches` identifica cada ejecución y método; `code_coverage_results` conserva resultado por generación/fragmento con FK compuesta al proyecto. `code_coverage_snapshots` guarda cortes inmutables para reportes. Resultados/cortes son append-only para el rol de aplicación. Una restricción única por archivo/generación/parte impide duplicar evidencia. Los eliminados salen del inventario vigente sin eliminar su historial. Ver [detalle](repository-coverage.md).

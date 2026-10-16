@@ -1,3 +1,5 @@
+import type {CoverageService} from '../code-review/coverage.js';
+import {registerCoverageRoutes} from '../code-review/coverage-routes.js';
 import type {NotificationService} from '../notifications/service.js';
 import {registerNotificationRoutes} from '../notifications/routes.js';
 import { randomBytes } from 'node:crypto';
@@ -33,7 +35,7 @@ import {registerPublicationRoutes} from '../code-review/publication-routes.js';
 import type { OllamaService } from '../../providers/ollama/service.js';
 import { registerOllamaRoutes } from '../../providers/ollama/routes.js';
 
-export interface AuthOptions extends AuthConfig { database: AuthDatabase; trello?: TrelloOptions; supervision?:SupervisionOptions; chatgpt?:ChatGPTService; ollama?:OllamaService; proposals?:ProposalService; executions?:ExecutionService; codeReview?:CodeReviewService; reports?:ReportService; operations?:OperationService; publications?:PublicationService; notifications?:NotificationService }
+export interface AuthOptions extends AuthConfig { database: AuthDatabase; trello?: TrelloOptions; supervision?:SupervisionOptions; chatgpt?:ChatGPTService; ollama?:OllamaService; proposals?:ProposalService; executions?:ExecutionService; codeReview?:CodeReviewService; reports?:ReportService; operations?:OperationService; publications?:PublicationService; notifications?:NotificationService; coverage?:CoverageService }
 
 export async function registerAuth(app: FastifyInstance, options: AuthOptions) {
   const repository = new AuthRepository(options.database);
@@ -106,6 +108,7 @@ export async function registerAuth(app: FastifyInstance, options: AuthOptions) {
   if (options.ollama) registerOllamaRoutes(app, options.ollama, requireUser, repository);
   if (options.proposals) registerProposalRoutes(app, options.proposals, requireUser, repository);
   if (options.executions) registerExecutionRoutes(app, options.executions, requireUser, repository);
+  if (options.coverage) registerCoverageRoutes(app, options.coverage, requireUser, repository);
   if (options.codeReview) registerCodeReviewRoutes(app, options.codeReview, requireUser, repository);
   if (options.reports) registerReportRoutes(app, options.reports, requireUser, repository);
   if (options.operations) registerOperationRoutes(app, options.operations, requireUser, repository);
