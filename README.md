@@ -1,81 +1,25 @@
 # Dev Project Agent
 
-Assistant for the UTAPED project manager: planning supervision, Trello integration, delay detection, weekly reporting, and code review through three specialized agents.
+Local project supervision for a human manager: Trello planning, GitHub code review, sequential proposal agents, evidence-based reports and configurable manager email.
 
-## Status
+Version **1.0.0**. Independent Node.js/TypeScript/Fastify service, React/TypeScript dashboard and PostgreSQL. Development uses `develop`; promotion to `main`, tags and remote publication require the manager's release decision. Temporary defense materials are excluded.
 
-Implementation started on October 7, 2026. Academic deadline: November 4, 2026. Four team members. The local application now includes an eight-page responsive workspace, light/dark themes, project permissions, read-only Trello/GitHub synchronization, configurable tracking mappings and thresholds, durable source/code schedules, baseline comparisons, persistent alerts with causes and alternatives, and correlated history. Sequential proposal agents support dates, priorities, assignments and declared states with immutable versions and manager decisions. Bounded code review includes a versioned six-category TS/Java criterion catalog and controlled GitHub branch/draft-PR publication with human integration. Weekly reports preserve historical sources, risks, decisions and results, with scheduling, recovery and printable A4 output. ChatGPT access is encrypted and renewable. Real writes and schedules have case-specific UTAPED evidence in the acceptance record; demonstrations remain permanently non-executable. Final representative academic acceptance is pending. See [implementation status](docs/implementation-status.md) and the [operator guide](docs/first-release-guide.md).
+## Delivered scope
 
-Repository: https://github.com/Andriu-Dex/dev-project-agent
+- Eight responsive dashboard sections, modern blue/neutral styling, light/dark themes, manager/viewer permissions and PostgreSQL-backed sessions.
+- Read-only Trello/GitHub synchronization, immutable observations, configurable tracking rules, baselines, dependencies, delays and persistent alerts.
+- Sequential Executor, Reviewer and Approver for bounded, versioned proposals. The manager decides on exact content; external execution requires separate confirmation and fresh checks. Demonstrations remain non-executable.
+- Date, priority, member and state changes through separately gated Trello credentials; branch/draft-PR publication through separately gated GitHub credentials. No automatic merge.
+- Recent-change analysis and **progressive repository coverage**: inventory, durable batches, large-file fragments, dependency context, pause/resume, bounded retries, change invalidation, exclusions and immutable evidence.
+- Configurable source, code and report schedules; reports with historical cutoffs, coverage snapshots and A4 printing.
+- Consented SMTP notifications, selected events, daily digest, quiet hours, reminders and delivery history.
+- ChatGPT as validated primary provider, with encrypted renewable access and model/effort selection. Ollama is optional: discover compatible installed models on the configured server and evaluate them. Connection does not establish quality. No automatic provider fallback.
 
-The local folder remains named utaped-agent; renaming it is not required.
+The academic record closes **38 criteria as passed and one with historical exception EX-01**. This does not assert that every old record meets current policy or that the professor waived a criterion. See [acceptance](docs/real-acceptance-validation.md), [closeout](docs/validation-closeout.md) and [release verification](docs/release-validation.md).
 
-Supervised project: https://github.com/Andriu-Dex/utaped
+## Install and run
 
-Confirmed planning source: Trello board “UTAPED - UTA Planificación y Evidencias Docentes”, ID 6a95a200128aa8ce9dd216c0. Invitation links and tokens are not stored in documentation.
-
-Local supervised checkout: C:\Documentos\D-Proyectos\Git\utaped.
-
-## Confirmed decisions
-
-- Independent Node.js/TypeScript service, React/TypeScript dashboard, and PostgreSQL persistence.
-- Explicit sequential Executor, Reviewer, and Approver coordination, without an agent framework initially.
-- Provider: ChatGPT through official authentication. The October 15 real evaluation passed 6/6 cases; proposal/code agents, automatic renewal and recovery after API restart were observed. These checks do not guarantee future quota or eliminate reauthorization after revocation. ChatGPT and installed Ollama models can now be selected for proposal agents, code analysis/corrections, and consented scheduled code reviews. See [agent providers](docs/agent-providers.md) for behavior and measured model limitations.
-- Weekly reports on Fridays at 18:00, America/Guayaquil.
-- The human manager approves every Trello or code modification; other members initially have read-only access.
-- Confirmed manager: Steven Eduardo Paredes Medina, Trello username andrewuzumaki, display name “andrew uzumaki”.
-- Code corrections are prepared in branches and reviewed; humans perform final integration.
-- dev-project-agent: development on develop; validated final release on main.
-- UTAPED: approved corrections on agent/<proposal-id>-v<version>, PRs to develop; humans merge into develop and later main.
-- English for filenames, code, code comments, logs, commits, PR metadata, README.md, and repository instructions. Spanish for application end-user content. Personal documentation inside docs/ may remain in Spanish by explicit user exception. Preserve source values and proper names.
-
-## Documentation
-
-- [Implementation status and provider validation](docs/implementation-status.md)
-- [Trello reading and synchronization](docs/trello-integration.md)
-- [Tracking rules and implementation limits](docs/tracking-rules.md)
-- [Source supervision, baseline and history](docs/supervision.md)
-- [AI provider validation](docs/provider-validation.md)
-- [Renewable ChatGPT access](docs/renewable-access.md)
-- [Weekly reports and printing](docs/weekly-reports.md)
-- [Code review and corrections](docs/code-review.md)
-- [Versioned code review criteria](docs/code-standard-catalog.md)
-- [Controlled GitHub publication and recovery](docs/github-publication.md)
-- [Scheduled operations and alerts](docs/project-operations.md)
-- [Manager email notifications and dynamic settings](docs/notifications.md)
-- [Installation and operator guide](docs/first-release-guide.md)
-- [Git conventions](docs/git-conventions.md)
-- [Standards and quality criteria](docs/standards-and-quality.md)
-- [Reports and operations](docs/reports-and-operations.md)
-- [Technical design](docs/technical-design.md)
-- [API design](docs/api-design.md)
-- [PostgreSQL conceptual model](docs/data-model.md)
-- [Manager screens](docs/manager-screens.md)
-- [Manager workflows](docs/manager-workflows.md)
-- [Agent data contracts](docs/data-contracts.md)
-- [Proposal workflow](docs/proposal-workflow.md)
-- [Requirements and acceptance](docs/requirements.md)
-- [First-release academic acceptance matrix](docs/academic-acceptance-matrix.md)
-- [Architecture](docs/architecture.md)
-- [Business rules](docs/business-rules.md)
-- [Work plan](docs/work-plan.md)
-- [Trello export validation](docs/trello-validation.md)
-
-## Remaining work
-
-The fourth export was validated: 25 activities and six milestones, with 14 activities declared complete (56%). All six milestones have a due time of 17:00 and no native start, consistent with their descriptions. Steven and the branch workflow are confirmed.
-
-Tracking thresholds, label mappings and schedules are configurable and versioned. Complete the 39 academic acceptance criteria with representative UTAPED evidence, observe scheduled runs and real credential renewal, and validate external writes only on specifically authorized resources with fresh approvals. Java compilation and complete project builds/tests are outside the isolated reviewer; record their results separately. No ISO certification, automatic merge, hosted 24/7 operation, or multi-organization SaaS is claimed.
-
-## Repository preparation
-
-The initial commit contains planning and Git configuration. Commit 9a764ff adds the application foundation and theme support. Implementation continues on develop; commits are kept local unless a push is requested.
-
-.editorconfig, .gitattributes, .gitignore, and AGENTS.md define repository conventions. The private docs/utaped-trello.json export remains local and ignored because it contains profiles, history, and links. package-lock.json records dependencies. Local credentials are generated in an ignored .env file and never printed by setup.
-
-## Local development
-
-Requirements: Node.js 24.19.0, npm 11, and Docker with Compose. Run commands from the repository root:
+Requirements: Node.js **24.19.0 or later in 24.x**, npm **11.x**, Docker with Compose. Run from the repository root:
 
 ```sh
 npm ci
@@ -83,61 +27,63 @@ npm run setup
 npm run db:up
 npm run db:migrate
 npm run user:create
-npm run dev
+npm run build
+npm start
 ```
 
-Dashboard: http://127.0.0.1:5174. Service: http://127.0.0.1:3100/api/v1/health. PostgreSQL uses loopback port 15434 and its own named volume. Existing UTAPED services are not reused or modified.
+Compiled dashboard/API: **http://127.0.0.1:3100/**; health: `/api/v1/health`. Set `APP_PUBLIC_URL=http://127.0.0.1:3100` in private `.env` for compiled-mode email links and retain that origin in `APP_ORIGINS`.
 
-setup preserves existing .env values, appends missing settings with writes disabled, and restricts credential-file permissions to the current user, system and administrators on Windows (mode 600 on other platforms). If credentials change after database initialization, they must be rotated in PostgreSQL too; changing .env does not update existing roles. Do not remove the volume to repair credentials or reset data without reviewing what would be lost. Restart the service after changing environment settings.
+For development, use `npm run dev` instead of `npm start`: dashboard **5174**, API **3100**. Run only one service instance per database. Identify the existing project instance if a port is occupied; do not terminate unrelated processes.
 
-Checks: npm run typecheck, npm test, npm run test:db, and npm run build. Run all PostgreSQL suites: test:auth-db, test:trello-db, test:supervision-db, test:provider-db, test:proposals-db, test:executions-db, test:code-db, test:renewal-db, test:reports-db, and test:operations-db. Run npm run test:ui for manager/viewer workflows, synthetic execution/publication, alerts, scheduled settings, report printing and responsive themes. Database checks use rollback to avoid persisting test records. Authentication integration tests require the local migrated database and are skipped by the regular unit-test command. Build and run the dashboard/service together with npm run build followed by npm start at http://127.0.0.1:3100.
+Compose starts only PostgreSQL, on loopback **15434** with its own named volume. The service and workers form one application. Stop it with Ctrl+C; `npm run db:stop` preserves database data.
 
-Stop local development with Ctrl+C; stop this database with npm run db:stop. All interfaces are local only. Remote deployment, HTTPS termination, and distributed rate limiting remain outside this local milestone.
+Setup preserves existing `.env` values and restricts access. Changing a database password in `.env` does not rotate an existing role. Do not delete the volume to repair credentials. There is no default user/password or public signup. `user:create` and `user:reset` are local administrative commands.
 
-Trello checks: npm run test:trello-db. After migration, npm run trello:import imports the private docs/utaped-trello.json export; an optional file argument selects another local export. The dashboard distinguishes exports from live readings. Live synchronization requires TRELLO_API_KEY and TRELLO_TOKEN in the ignored .env, followed by a service restart. Generate a read-only token using the official Trello authorization flow described in docs/trello-integration.md. Never paste credentials into chat or commit them. Only the project manager can request a live sync; members can read saved snapshots. Controlled one-card due-date writes are separately gated, disabled by default, and require TRELLO_WRITES_ENABLED=true plus TRELLO_WRITE_TOKEN; the read token is not reused as a write credential. Do not enable real writes for demonstrations. See [controlled execution](docs/trello-execution.md).
+## Configure and operate
 
-Tracking settings are stored in PostgreSQL. The manager edits the due-soon window and stale-source threshold through “Configuración del seguimiento”; viewers can read them. Each save creates an audited version and immediately triggers reevaluation without restarting the service. Existing projects start with proposed values of 72 hours and 60 minutes, pending manager confirmation. See [tracking rules](docs/tracking-rules.md) for limits and API details.
+Use **Configuración** for integrations, tracking, automation, notifications, appearance and team. Follow the [operator guide](docs/first-release-guide.md).
 
-The supervision panel provides persistent manual source-reading and analysis jobs, immutable analysis history, explicit baseline confirmation, Trello descriptions/WBS/checklists/dependencies, and GitHub branch/commit/change metadata pinned to revisions. The worker starts with the service and recovers expired leases with bounded attempts. Periodic source synchronization is configurable; UTAPED currently uses a 60-minute interval. GitHub uses the configured read-only GITHUB_TOKEN when present. Scheduled review inspects bounded source without executing it. External writes are disabled in fresh configuration and require separate credentials, an exact manager decision and execution confirmation when enabled.
+- Sources use read credentials. Live writes require separate tokens and their explicit environment flags, exact manager approval and separate execution confirmation.
+- Connect ChatGPT through the dashboard. Renewable credentials are encrypted in PostgreSQL with `CHATGPT_CREDENTIAL_KEY` from `.env`; retain that key. Quota, revocation and availability still apply.
+- Configure Ollama with `OLLAMA_BASE_URL` on the server. Discovered compatible models have different quality, format support and resource needs. The agent does not download models or switch providers after failures.
+- Configure SMTP using [.env.example](.env.example). Save the manager recipient, verify SMTP and request a test before enabling automatic mail. SMTP acceptance and inbox receipt are distinct.
+- Open **Código → Cobertura del repositorio**. Prepare inventory, configure limits and optional AI consent, then start. Pause allows the current fragment to finish. Inspect partial results and exclusions before interpreting the percentage.
 
-Managers can connect ChatGPT through the dashboard, select an account-visible model and request a six-case synthetic evaluation. Use http://127.0.0.1:5174/ for the session-bound OAuth callback. Completed renewable credentials are encrypted with AES-256-GCM in PostgreSQL; the separate CHATGPT_CREDENTIAL_KEY is generated in the ignored .env by setup. Access renews near expiry, survives service restart and dashboard logout, and remains subject to current manager authority. Disconnect clears saved access and attempts remote revocation; the panel reports when remote revocation could not be confirmed. After upgrading from memory-only access, connect once to establish a renewable grant. Protect and retain the encryption key; do not replace it casually. See [renewal and recovery](docs/renewable-access.md). Interrupted evaluations are not replayed and passing them does not enable external changes. Check with npm run test:provider-db, npm run test:renewal-db and npm run test:ui.
+Fresh schedules, mail and writes start disabled. Existing installations retain saved settings. The browser may close, but the computer, PostgreSQL and service must stay active. No OS startup task or hosted 24/7 service is installed.
 
-Additional checks: npm run test:supervision-db, npm run test:executions-db, and npm run test:ui. The UI check uses Chromium and a temporary synthetic project on port 3133, rolls back its data, and saves screenshots under ignored work/ui/. Install its browser with npx playwright install chromium if needed. npm run sources:read performs an administrative read of the configured sources, stores snapshots and system audit, and never confirms a baseline. npm run ai:validate performs official interactive ChatGPT authorization and a small synthetic inference test; each run requires sign-in and tokens are not persisted. The first real inference passed; see [provider validation](docs/provider-validation.md) for evidence and scope.
+## Verify, back up and package
 
-## Local accounts
+```sh
+npm run typecheck
+npm run test:isolated
+npm run build
+npm run verify:install
+npm run db:backup
+```
 
-Run npm run user:create in an interactive terminal to create an account and its project membership. The first account defaults to manager; subsequent accounts default to viewer. Choose Steven's manager account explicitly. Password entry is masked, confirmation is required, and passwords must contain 15–128 characters. No default credentials or public registration endpoint exist. Administrative commands use the migration database role and must remain local.
+`test:isolated` creates/migrates a disposable database, uses the runtime role for permission checks, runs synthetic unit/integration tests and removes only that test database. No test workers initialize against operational data. `test:coverage-db` narrows this runner to coverage. Regular `npm test` omits opt-in PostgreSQL cases; omissions are not passes.
 
-Run npm run user:reset to change a password and revoke existing sessions. Password hashes use Argon2id. Sessions remain in PostgreSQL across service restarts, expire after 30 minutes of inactivity or eight hours from login, and use HttpOnly/SameSite cookies. Explicit loopback HTTP settings support local development; HTTPS configuration uses Secure cookies. Mutation endpoints require an allowed Origin and session CSRF token. Login is limited to ten attempts per minute per IP in this single-process version.
+`verify:install` starts compiled code on a free loopback port with another disposable database and no external credentials. It verifies dashboard delivery, health, authentication and safe defaults.
 
-The manager can read project membership; viewers cannot. Permissions and account activity are checked against PostgreSQL on each protected request. Audit records include successful/denied logins, logout, account creation, password changes, and denied membership reads. See [authentication operations](docs/authentication.md).
+`db:backup` creates a **private** restricted-access directory under ignored `backups/`, containing a dump, recovery configuration and manifest, then tests restoration in a temporary database. Keep it separate from distributable artifacts. See [backup/recovery](docs/backup-and-recovery.md).
 
-The first version runs locally. Scheduled jobs require the computer and service to be active. No additional API or hosting budget is available.
+From a clean reviewed commit, `npm run release:package` builds a source/build ZIP with file hashes and SHA-256 under ignored `work/packages/`. Its Windows helper uses PowerShell/.NET ZIP support. It excludes credentials, operational state, sessions, raw exports, private evidence, node_modules and defense files. Packaging does not publish or merge anything.
 
-## Proposal agents and manager decisions
+## Limits
 
-The proposal panel runs Executor, Reviewer, and Approver sequentially through the connected ChatGPT account. The initial scope is one proposed Trello due-date change. Each version freezes its source context, validated content, SHA-256 fingerprint, stage messages, model/effort, usage, and human decision. Review and policy checks must succeed before manager approval. Adjustments create a new version and repeat all stages; rejection is terminal. Source, baseline, or tracking policy changes invalidate the candidate. Approval records authorization only; execution is a separate gated request. See [implemented workflow](docs/agent-workflow.md).
+Coverage identifies checks over specific content. It does not guarantee defect-free code, execute repository scripts, compile Java, validate every dependency or navigate all screens. Fragmented files, incomplete context and unsupported syntax remain visibly partial. Truncated inventories do not replace a previous complete inventory. Corrections keep separate review/approval gates.
 
-Use `npm run db:migrate` after updating. Run `npm run test:proposals-db` for rollback-based PostgreSQL workflow checks and `npm run test:ui` for the synthetic browser journey. Explicit reasoning levels are currently verified only for `gpt-6.1-sol`: low, medium, high, xhigh, max. Other models use the provider default until their supported levels are verified. The UI records the requested setting, not measured internal reasoning.
+UTAPED is the configured and validated project. Generic identifiers and adapters prepare reuse; multi-organization SaaS, public hosting, ISO certification and exhaustive UTAPED functional validation are not claimed. Real Gemini/Groq and further Ollama quality evaluations remain deferred.
 
-## Code review and correction milestone
+## Documentation
 
-The dashboard now reads bounded source files from exact GitHub commits, runs isolated syntax and pattern checks, and optionally requests evidence-grounded analysis through the existing ChatGPT connection. Sending code requires separate explicit consent. The sequential Executor, Reviewer and Approver prepare a bounded diff and immutable versions; the manager decides on its exact content hash. Failed or interrupted workflows resume only on explicit request, preserving completed stages.
+- [Operator guide](docs/first-release-guide.md) · [Progressive coverage](docs/repository-coverage.md)
+- [Backup/recovery](docs/backup-and-recovery.md) · [Release notes](docs/release-notes.md) · [Release verification](docs/release-validation.md)
+- [Architecture](docs/architecture.md) · [Requirements](docs/requirements.md) · [Business rules](docs/business-rules.md)
+- [Academic matrix](docs/academic-acceptance-matrix.md) · [Real acceptance](docs/real-acceptance-validation.md)
+- [Providers](docs/agent-providers.md) · [Renewable access](docs/renewable-access.md)
+- [Code review](docs/code-review.md) · [GitHub publication](docs/github-publication.md)
+- [Trello execution](docs/trello-execution.md) · [Notifications](docs/notifications.md) · [Reports](docs/weekly-reports.md)
+- [Git conventions](docs/git-conventions.md) · [Implementation history](docs/implementation-status.md)
 
-GitHub publication is simulation-only. Approval records a demonstration, and the simulation records the planned `agent/<proposal-id>-v<version>` branch and PR destination without creating a remote commit, branch or PR. No merge capability or GitHub write adapter is implemented. Existing Trello write gates remain disabled locally; demonstrations cannot enable them. UTAPED builds and tests are not executed by this milestone. See [scope, API and evidence](docs/code-review.md).
-
-Additional checks: `npm run test:code-db` runs rollback-based PostgreSQL integration tests; `npm run test:ui` exercises both workflows using synthetic external services. `npm run code:inspect` lists eligible files; append selected repository-relative paths to read and statically check them without saving analysis or invoking AI.
-
-## Weekly reports
-
-Run `npm run setup` and `npm run db:migrate` after upgrading, then restart `npm run dev` so the newly generated encryption key is loaded. In the manager dashboard, activate the weekly report schedule (Friday 18:00, America/Guayaquil by default) or generate a manual report. Day and time are configurable and versioned. The service creates reports without an open browser and recovers missed cutoffs with their original periods. It must remain running; no Windows startup task is installed.
-
-Reports reuse identified evidence and code results with their original dates and limitations. Preparation, review and internal publication are explicitly deterministic; they do not consume ChatGPT or authorize external changes. Missing planning evidence leaves a draft. Corrections create another immutable version of the same period. Open the printable version and use browser printing to save A4 PDF. Report generation does not itself send messages. The separate notification queue can send manager-consented email when enabled. Periodic source synchronization and daily bounded code review are implemented; automatic AI review requires explicit provider/model consent and is currently disabled for UTAPED. See [report scope and API](docs/weekly-reports.md). Check with `npm run test:reports-db` and `npm run test:ui`.
-
-## Manager email and settings
-
-Settings now groups integrations, tracking, automation, notifications, appearance and team. Source intervals, code weekdays/hour/minute, weekly report timing, thresholds and email preferences are project settings. SMTP credentials stay in the ignored environment file; see [.env.example](.env.example). Use the manager-only Notifications tab to verify SMTP, save a recipient, request a confirmed test and activate selected events. SMTP acceptance and inbox delivery are distinct states. Automatic mail starts disabled. The October 14 test was accepted and inbox receipt was confirmed by the user. See [notification behavior and recovery](docs/notifications.md). Run `npm run test:notifications-db` after migrations.
-
-## Local candidate validation
-
-See [validation closeout](docs/validation-closeout.md) for the October 15 read-only Trello comparison, manager acceptance of one report, isolated client-module regression checks, historical exception and local package scope. A local candidate archive is not the final academic delivery. It excludes credentials, live database state and OAuth grants; do not start another instance against the live database for package tests.
+Repository: https://github.com/Andriu-Dex/dev-project-agent. Supervised repository: https://github.com/Andriu-Dex/utaped. The local folder name `utaped-agent` does not need to change.

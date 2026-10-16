@@ -1,10 +1,10 @@
-# Guía de instalación y operación
+# Guía de instalación, uso y operación · 1.0.0
 
-Actualización: 12 de octubre de 2026. Esta guía describe la implementación local de la primera versión. La aceptación académica se registra por separado en la [matriz de cierre](academic-acceptance-matrix.md).
+Actualizada el 15 de octubre de 2026. La aplicación es local e independiente de UTAPED. El registro académico conserva 38 comprobaciones superadas y una excepción histórica documentada, sin atribuir dispensa al profesor.
 
-## Instalar y arrancar
+## Instalar y actualizar
 
-Requisitos: Node.js 24.19, npm 11 y Docker Compose. Ejecutar desde la raíz del repositorio:
+Requiere Node 24.19+ dentro de 24.x, npm 11 y Docker con Compose. Desde la raíz ejecutar:
 
 ```sh
 npm ci
@@ -12,92 +12,76 @@ npm run setup
 npm run db:up
 npm run db:migrate
 npm run user:create
-npm run dev
+npm run build
+npm start
 ```
 
-El panel se abre en `http://127.0.0.1:5174`; el servicio escucha en `http://127.0.0.1:3100`. Para una ejecución compilada: `npm run build` y `npm start`; abrir entonces el puerto 3100. Mantener el servicio y PostgreSQL encendidos para la programación. Cerrar el navegador no detiene los trabajos; apagar el equipo sí.
+Abrir http://127.0.0.1:3100/. Configurar `APP_PUBLIC_URL` con ese origen para los correos y conservarlo en `APP_ORIGINS`. El modo de desarrollo usa `npm run dev` en lugar de `npm start`, con interfaz en 5174 y API en 3100. Docker Compose levanta únicamente PostgreSQL del agente en 15434, con volumen propio.
 
-`setup` conserva los valores existentes, agrega opciones ausentes con escrituras desactivadas y restringe `.env`: usuario actual, sistema y administradores en Windows; modo 600 en otros sistemas. No imprime claves. Las credenciales Trello/GitHub siguen almacenadas como texto local protegido por permisos; no se afirma cifrado en reposo de esos tokens. ChatGPT usa almacenamiento cifrado en PostgreSQL con la clave local. Respaldar base y clave de cifrado de manera protegida; cambiar o perder la clave puede impedir recuperar el acceso guardado.
+No iniciar dos servicios sobre la misma base. Si un puerto está ocupado, identificar la instancia del proyecto; no matar procesos ajenos. La salud está en `/api/v1/health`. Ctrl+C detiene el servicio; `npm run db:stop` conserva el volumen.
 
-PostgreSQL usa el puerto local 15434 y un volumen independiente. No eliminar ese volumen para reparar errores: contiene sesiones, fuentes, propuestas, decisiones y reportes. La modificación de contraseñas en `.env` no cambia automáticamente los roles existentes de la base. Las migraciones se ejecutan con el rol de administración; el servicio utiliza el rol restringido de aplicación.
+Antes de actualizar, hacer `npm run db:backup` y detener el servicio. Conservar `.env`, el volumen y `CHATGPT_CREDENTIAL_KEY`. Actualizar el código, instalar dependencias, ejecutar setup/migraciones/build y arrancar una sola instancia. Las configuraciones existentes se conservan; no asumir que sus escrituras están desactivadas. Editar una contraseña PostgreSQL en `.env` no rota el rol existente. No borrar datos para resolver credenciales.
 
-Configurar las credenciales de lectura en `.env` sin compartir su contenido. Reiniciar el servicio después de modificar variables del entorno. Las credenciales de escritura están separadas y las opciones `TRELLO_WRITES_ENABLED` y `GITHUB_WRITES_ENABLED` permanecen en `false` en el entorno actual. Consultar [ejecución Trello](trello-execution.md) y [publicación GitHub](github-publication.md) antes de preparar una validación real autorizada.
+Crear usuarios con `npm run user:create`; elegir conscientemente gestor o lector. No hay contraseña predeterminada ni registro público. `npm run user:reset` cambia una contraseña y revoca sesiones.
 
-## Navegar el proyecto
+## Pantallas
 
-| Página | Uso del gestor |
+| Pantalla | Uso |
 | --- | --- |
-| Resumen | Avance declarado, antigüedad de las fuentes, pendientes y accesos al trabajo prioritario. |
-| Planificación | Buscar actividades/hitos; contrastar fechas, estado, prioridad, asignados, dependencias y evidencia de Trello. |
-| Alertas | Revisar retrasos, próximos vencimientos, bloqueos, diferencias contra línea base y riesgos de dependencias; documentar seguimiento y causas. |
-| Propuestas | Preparar un cambio delimitado, revisar los tres dictámenes, solicitar ajustes, aprobar/rechazar y consultar ejecución. |
-| Código | Leer catálogo por commit, seleccionar archivos, analizar, preparar corrección y revisar diff, decisiones y publicación. |
-| Reportes | Generar/versionar un corte, programar reportes semanales y abrir salida imprimible A4 para guardar como PDF. |
-| Operación | Configurar lecturas y revisión diaria, confirmar línea base, actualizar fuentes y consultar trabajos/historial. |
-| Configuración | Conectar ChatGPT, evaluar proveedor, seleccionar capacidades verificadas y editar reglas del proyecto. |
+| Resumen | Avance declarado, atención prioritaria y fuentes. |
+| Planificación | Actividades/hitos, fechas, responsables, listas, checklists, dependencias y línea base. |
+| Alertas | Retrasos, bloqueos, riesgos, desviaciones, evidencia y seguimiento. |
+| Propuestas | Objetivos, versiones, dictámenes y decisiones sobre Trello. |
+| Código | Cambios/correcciones acotadas y cobertura progresiva en vistas separadas. |
+| Reportes | Cortes guardados, fuentes, limitaciones y versión imprimible A4. |
+| Operación | Lecturas, análisis, ejecuciones programadas y fallos. |
+| Configuración | Integraciones, políticas, automatización, notificaciones, apariencia y equipo. |
 
-La navegación conserva una página por tarea, con menú móvil, temas claro/oscuro y foco de teclado. Las fuentes y valores declarados conservan su procedencia; los estados no acreditan aceptación formal. El perfil de consulta puede leer resultados, pero no configurar, aprobar, ejecutar ni enviar datos a ChatGPT.
+El lector consulta recursos autorizados, sin configurar, aprobar ni ejecutar. La sesión del panel y la conexión de ChatGPT son independientes: salir del panel no elimina por sí solo una autorización renovable válida.
 
-## Primer recorrido de supervisión
+## Conexiones
 
-1. Ingresar como gestor; abrir Operación y actualizar fuentes.
-2. Revisar Planificación. Una ausencia de prioridad o bloqueo significa falta de información o mapeo, no prioridad baja ni ausencia de impedimentos.
-3. En Configuración, definir etiquetas exactas de prioridad, bloqueo y estado, y los umbrales de vencimiento/frescura. Guardar una versión. Las etiquetas contradictorias quedan señaladas.
-4. En Operación, confirmar una línea base después de revisar la lectura. No reemplazarla para esconder desviaciones; cada confirmación conserva historia.
-5. Actualizar y abrir el resultado. Planificación muestra el estado observado; supervisión muestra diferencias contra la referencia confirmada.
-6. Abrir Alertas. Una lectura reciente permite abrir, actualizar o resolver alertas; las lecturas viejas no las resuelven. Reconocer una alerta conserva evidencia y no autoriza cambios externos.
+Trello y GitHub usan credenciales de lectura en el entorno. Las credenciales de escritura son separadas y requieren sus indicadores explícitos, además de aprobación y confirmación por recurso y versión. No incluir tokens ni invitaciones privadas en propuestas o reportes.
 
-El avance cuenta actividades activas completadas declaradas sobre actividades activas. Los hitos, archivadas y referencias quedan fuera del denominador. Bloqueo y retraso pueden coexistir sin incrementar el total de actividades.
+En Configuración → Integraciones, conectar ChatGPT, seleccionar modelo y evaluar los casos sintéticos. La renovación es automática cuando procede; cuota, revocación o cambio de autoridad pueden exigir intervención. No se garantiza disponibilidad perpetua.
 
-## Causas, alternativas y propuestas
+Ollama es opcional: `OLLAMA_BASE_URL` identifica la instancia que atiende al servidor del agente, no necesariamente al navegador. Se descubren modelos compatibles instalados sin una lista fija de nombres. Conectado, evaluado y adecuado son conceptos distintos. Revisar suite, fecha y resultado. La calidad/velocidad dependen del modelo y equipo; el agente no descarga modelos ni cambia automáticamente de proveedor.
 
-Una descripción con `CAUSA:` o `CAUSA DE RETRASO:` proporciona una causa declarada. Si falta evidencia, se muestran hipótesis. El gestor puede confirmar una causa con nota; se conserva actor/fecha y el reporte recupera la confirmación disponible al corte. El análisis recorre sucesoras explícitas y explica efectos posibles; no inventa capacidad, duración restante, probabilidades ni ruta crítica.
+## Cobertura progresiva
 
-Las alternativas identifican actividad, beneficio, riesgo y datos necesarios. Conservar el plan conduce a registrar seguimiento; reprogramar, priorizar o redistribuir abre el formulario de la familia correspondiente. El gestor completa las fechas o integrantes concretos antes de iniciar los agentes.
+1. Código → Cobertura del repositorio → Preparar inventario. Lee GitHub y guarda commit y clasificación; no publica código.
+2. Revisar elegibles y exclusiones. El contenido potencialmente sensible no se guarda como resultado ni se envía a IA.
+3. En pausa, configurar fragmentos, bytes, contexto, tiempo objetivo, intervalo e intentos. La IA requiere modelo y consentimiento explícito de envío programado.
+4. Iniciar / continuar activa tandas en el servidor. Pausar impide empezar otro fragmento; el actual puede finalizar y conservarse.
+5. Filtrar por módulo, ruta y estado. El historial muestra hallazgos, líneas originales, método, comprobaciones, límites y commit.
+6. Cambios de contenido o dependencias identificadas invalidan resultados vigentes; el historial anterior permanece. Los sensibles no se reintentan automáticamente. Los fallos agotados admiten reintento expreso.
 
-Cada propuesta nueva es demostrativa por defecto. Para uso real hay que seleccionar ese propósito al crearla; es inmutable. Se admite una tarjeta y una acción exacta: vencimiento; inicio/vencimiento; prioridad; miembros asignados; estado declarado. Las etiquetas ajenas a la familia se conservan. El cambio de miembros no reescribe la descripción ni el responsable principal declarado en ella: revisar su coherencia antes de aprobar.
+El porcentaje cuenta solo elegibles revisados; los parciales y excluidos se muestran aparte. Un archivo puede terminar todos sus fragmentos y seguir parcial por faltar validación conjunta. Ampliar contexto o cambiar método solicita revisión nueva; si el contexto sigue fuera del presupuesto necesita revisión manual. No ocultar límites para alcanzar 100 %.
 
-La secuencia es Ejecutor → Revisor → Aprobador → decisión humana. El consentimiento para enviar contexto a ChatGPT no autoriza una escritura. Un ajuste produce otra versión, repite las etapas y no hereda la aprobación anterior. Comparar siempre los valores previos/nuevos, evidencia, riesgos y verificaciones. El rechazo impide ejecutar; una demostración nunca puede escribir, incluso si después se habilita el entorno.
+Desde el historial se puede preparar un análisis acotado para una corrección. Se selecciona el archivo si es admisible; no se convierten fragmentos directamente en parches. Los archivos fuera del alcance de corrección conservan su evidencia para revisión manual.
 
-Para una propuesta real autorizada, la ejecución requiere otra confirmación. El servicio vuelve a comprobar permisos, fuente, política, versión y huella; registra intención antes de escribir y relee el resultado. Un resultado incierto requiere reconciliación sin repetir la escritura. La antigua demostración del usuario permanece invalidada y conservada como historia.
+## Propuestas y decisiones
 
-## Revisar código y PR
+Elegir recurso, objetivo, valores, propósito, modelo y consentimiento. Ejecutor, Revisor y Aprobador actúan secuencialmente; pueden pedir ajustes. El gestor revisa versión/huella, alcance, riesgos y comprobaciones, y registra un motivo.
 
-Leer el catálogo y seleccionar archivos dentro de un commit fijo. La revisión diaria usa hashes de contenido para evitar revisar otra vez archivos ya cubiertos, con límite diario y lotes de hasta cuatro archivos. Los aplazados/excluidos se enumeran; cobertura parcial no se presenta como revisión de todo el repositorio.
+Aprobar no ejecuta. El uso real requiere confirmación separada y comparación de la fuente vigente. Ante resultado incierto, consultar reconciliación sin reenviar ciegamente. Las demostraciones no escriben. En código se publica rama y PR borrador a `develop`; la incorporación a `develop` y `main` es humana.
 
-El [catálogo de criterios](code-standard-catalog.md) cubre seis categorías mediante señales acotadas y casos controlados TS/Java. Los hallazgos citan archivo/líneas y distinguen hipótesis de comprobaciones. No se ejecuta código, dependencias, build ni scripts de UTAPED. Java requiere compilación y pruebas adicionales; una revisión aislada no demuestra seguridad ni corrección del producto completo.
+## Horarios, notificaciones y reportes
 
-Una corrección conserva fragmentos anteriores/nuevos, diff, huella, dictámenes y decisión. Descargar y revisar el diff. Para uso real, la publicación crea únicamente una rama `agent/<proposal-id>-v<version>` y PR borrador hacia `develop`, sujeto a configuración y nueva confirmación. El estado verificado incluye enlace al PR; la incorporación a `develop` y después a `main` sigue siendo humana. Consultar el [procedimiento de publicación y recuperación](github-publication.md).
+Configuración → Automatización permite cambiar intervalos, días, hora y minuto de revisiones y reportes. La cobertura tiene su intervalo propio en Código. Activar revisión de cambios y cobertura con IA puede repetir consumo: dar a cada recorrido un propósito definido.
 
-## Programar y publicar reportes
+Los horarios de calendario usan America/Guayaquil. El intervalo de cobertura comienza al terminar la tanda; el tiempo objetivo se comprueba entre fragmentos y una llamada puede superarlo. Equipo, PostgreSQL y servicio deben permanecer encendidos; no hay tarea de inicio de Windows instalada.
 
-Operación permite configurar intervalo de fuentes, hora diaria de código en Ecuador, límite de archivos y consentimiento de IA. Las programaciones comienzan desactivadas. El selector de modelo/razonamiento utiliza capacidades verificadas de la conexión. Sin IA, se realizan comprobaciones locales. Un fallo de conexión/cuota o tres fallos transitorios suspende la operación afectada; revisar el historial antes de guardar una configuración para reanudarla.
+En Configuración → Notificaciones guardar destinatario, comprobar SMTP y pedir prueba. Seleccionar eventos, resumen, recordatorios, máximo y silencio; activar el consentimiento automático cuando se desee. SMTP permanece en `.env`. Aceptado por SMTP no acredita llegada a Recibidos. Los avisos no aprueban cambios.
 
-Tras una pausa, las fuentes se actualizan al estado disponible; no se inventan observaciones históricas. Un análisis de IA pendiente reutiliza la solicitud idempotente y la cobertura ya confirmada. Los trabajos automáticos conservan gestor autorizante y versión de autoridad; su revocación detiene nuevos trabajos.
+Los reportes conservan evidencia anterior al corte. La cobertura usa un corte inmutable guardado antes de ese reporte y no lo sustituye con resultados futuros. Generación/publicación interna son deterministas y no consumen una inferencia nueva ni autorizan escrituras. Los avisos se tramitan por la cola SMTP separada. Para PDF: versión imprimible, Ctrl+P, Guardar como PDF, A4.
 
-En Reportes, configurar día/hora de corte o generar manualmente. El viernes 18:00 Ecuador es el valor inicial del proyecto. El reporte congela fuentes, política, línea base, causas disponibles, acciones/decisiones, revisión de código y recomendaciones; los periodos parciales y evidencias ausentes quedan explícitos. Ejecutor, Revisor y Aprobador deterministas comprueban el reporte antes de publicarlo en el panel. Publicar un reporte interno no autoriza modificaciones externas.
+Los listados antiguos de Código muestran los últimos 30 análisis; sus filtros no representan el historial completo. La cobertura pagina archivos desde el servidor y muestra últimas 30 tandas/hasta 100 fragmentos recientes por archivo. La evidencia completa permanece en la base.
 
-Una nueva versión conserva las anteriores del mismo periodo. Abrir la versión imprimible y usar la función del navegador para guardar como PDF. Revisar las nueve secciones principales, el anexo, las referencias y los límites antes de usarla como evidencia académica. Una aprobación, simulación y publicación de PR tienen resultados distintos; ninguna demuestra un merge.
+## Verificar y recuperar
 
-## Resolver incidencias
+Ejecutar `npm run typecheck`, `npm run test:isolated`, `npm run build` y `npm run verify:install`. Las pruebas aisladas evitan interrumpir trabajos reales y usan adaptadores externos sintéticos; no repiten las escrituras históricas autorizadas.
 
-Al confirmar una causa, el sistema la liga a la evidencia de la tarjeta que se revisó. Si la tarjeta cambia, actualizar el detalle: la explicación anterior permanece en el historial y solo se reutiliza cuando corresponde a la misma evidencia. Las solicitudes de publicación conservan al gestor solicitante; las escrituras y comprobaciones automáticas se identifican como acciones del servicio.
+`npm run db:backup` crea un dump y configuración privada con acceso restringido, y prueba restaurarlos en otra base. Seguir [respaldo y recuperación](backup-and-recovery.md) antes de restaurar la operación. El paquete distribuible excluye credenciales y respaldos.
 
-| Síntoma | Revisión |
-| --- | --- |
-| Error de proxy o conexión rechazada | Comprobar que el servicio y PostgreSQL están encendidos; actualizar el panel después de arrancarlos. |
-| ChatGPT vencido/revocado | Actualizar conexión; la renovación temporal usa espera, pero una revocación o renovación incierta requiere reconectar. No se garantiza sesión indefinida ni cuota disponible. |
-| Fuente modificada/conflicto | Actualizar fuentes y preparar nueva versión; no aprobar otra vez contenido antiguo. |
-| Revisión o cobertura parcial | Abrir límites, archivos omitidos y trabajos pendientes; no concluir que el proyecto completo fue revisado. |
-| Publicación o Trello sin resultado confirmado | Consultar el estado guardado y reconciliar por lectura; no repetir la acción desde otra propuesta para eludir el bloqueo. |
-| Programación suspendida | Revisar código de error, permisos/conexión y límites; reanudar explícitamente guardando configuración tras corregir la causa. |
-
-## Verificación antes de entregar
-
-Ejecutar `npm run typecheck`, `npm test`, `npm run build`, `npm run test:db`, las diez suites PostgreSQL documentadas en README y `npm run test:ui`. Los fixtures usan transporte sintético y rollback. Las capturas/PDF de prueba quedan en `work/ui/`, ignorado por Git.
-
-Después, realizar el guion de los 39 AC de la matriz con datos representativos, confirmar programación sin navegador, observar renovación real y preparar recursos de escritura autorizados con nuevas decisiones específicas. Registrar commit, configuración, resultado esperado/observado, evidencia y responsable por criterio. No marcar la entrega como aprobada solo por pasar pruebas automatizadas.
-
-## Correo y configuración del 14 de octubre
-
-En **Configuración**, usar Integraciones, Seguimiento, Automatización, Notificaciones, Apariencia y Equipo. Día/hora/minuto del reporte y días/hora/minuto de código se cambian en Automatización; los intervalos y umbrales se mantienen configurables. El historial de ejecución permanece en Operación. Consultar [puesta en marcha de SMTP, consentimiento y recuperación](notifications.md) antes de activar avisos. Las credenciales permanecen en .env; no se comparten en el chat. El primer correo de prueba real fue recibido por el gestor; los avisos automáticos siguen desactivados hasta que guarde su activación.
+La cobertura no compila Java, ejecuta scripts, recorre todas las pantallas ni valida funcionalmente todo UTAPED. Los hallazgos requieren contraste y los cambios conservan control humano.

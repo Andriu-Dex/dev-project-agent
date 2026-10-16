@@ -1,6 +1,6 @@
 {
   "name": "@dev-project-agent/server",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -8,7 +8,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@dev-project-agent/contracts": "0.1.0",
+    "@dev-project-agent/contracts": "1.0.0",
     "@fastify/cookie": "11.1.2",
     "@fastify/csrf-protection": "8.0.1",
     "@fastify/rate-limit": "11.2.0",

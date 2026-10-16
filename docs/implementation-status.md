@@ -1,5 +1,10 @@
 # Estado de implementación
 
+## Estado vigente · cierre local 1.0.0
+
+La versión añade revisión progresiva del repositorio, Ollama opcional con calidad dependiente del modelo, corte histórico de cobertura en reportes, pruebas e instalación en bases aisladas, respaldo privado/restauración y empaquetado desde commit limpio. Conserva el diseño moderno azul/neutro y modos claro/oscuro. El registro académico es 38 comprobaciones superadas más EX-01 histórica. El historial siguiente conserva resultados y limitaciones de sus fechas, no sustituye este estado vigente. Ver [validación](release-validation.md), [guía](first-release-guide.md) y [notas](release-notes.md).
+
+
 Fecha: 7 de octubre de 2026. El usuario autorizó iniciar implementación. El producto y repositorio remoto se llaman dev-project-agent; la carpeta local conserva utaped-agent. Se trabaja en develop. La planificación anterior describe el diseño objetivo y no acredita funcionalidades terminadas.
 
 ## Primera base

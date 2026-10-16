@@ -1,6 +1,6 @@
 {
   "name": "dev-project-agent",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -46,7 +46,12 @@
     "ollama:audit-evidence": "node --import tsx scripts/audit-ollama-evidence.ts",
     "ollama:benchmark": "node --env-file=.env --import tsx scripts/benchmark-ollama.ts",
     "ollama:benchmark-v2": "node --env-file=.env --import tsx scripts/benchmark-v2.ts",
-    "workflow:real": "node --env-file=.env --import tsx scripts/test-agent-workflow.ts"
+    "workflow:real": "node --env-file=.env --import tsx scripts/test-agent-workflow.ts",
+    "test:isolated": "node --env-file=.env scripts/test-isolated.mjs",
+    "test:coverage-db": "node --env-file=.env scripts/test-isolated.mjs --coverage",
+    "db:backup": "node --env-file=.env scripts/backup-local.mjs --verify",
+    "verify:install": "node --env-file=.env scripts/verify-install.mjs",
+    "release:package": "node --env-file=.env scripts/package-release.mjs"
   },
   "devDependencies": {
     "@inquirer/prompts": "8.7.3",
