@@ -4,6 +4,7 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.IO.Compression.FileSystem
+Add-Type -AssemblyName System.IO.Compression
 $releaseSource = (Resolve-Path -LiteralPath $Source).Path
 $releaseDestination = [System.IO.Path]::GetFullPath($Destination)
 if (Test-Path -LiteralPath $releaseDestination) { throw 'Release archive already exists.' }
