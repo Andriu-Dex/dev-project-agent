@@ -1,0 +1,97 @@
+import {CoverageService,startCoverageWorker} from './modules/code-review/coverage.js';
+import {AgentProviders} from './providers/agents.js';
+import {NotificationService,startNotificationWorker} from './modules/notifications/service.js';
+import {smtpFromEnvironment} from './modules/notifications/smtp.js';
+import { existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import fastifyStatic from '@fastify/static';
+import pg from 'pg';
+import { buildApp } from './app.js';
+import { authConfigFromEnvironment } from './modules/auth/config.js';
+import { credentialsFromEnvironment } from './integrations/trello/client.js';
+import { githubToken } from './integrations/github/client.js';
+import { startSupervisionWorker } from './modules/supervision/worker.js';
+import { ChatGPTService } from './providers/chatgpt/service.js';
+import { OllamaService } from './providers/ollama/service.js';
+import {ExecutionService} from './modules/proposals/execution.js';
+import {executionConfiguration,trelloExecutionRemote} from './integrations/trello/execution-client.js';
+import {CodeReviewService} from './modules/code-review/service.js';
+import { ProposalService } from './modules/proposals/service.js';
+import {credentialKey} from './providers/chatgpt/vault.js';
+import {ReportService,startReportWorker} from './modules/reports/service.js';
+import {OperationService,startOperationWorker} from './modules/operations/service.js';
+import {PublicationService} from './modules/code-review/publication.js';
+import {publicationConfiguration} from './integrations/github/publication-client.js';
+
+const connectionString = process.env.APP_DATABASE_URL;
+if (!connectionString) throw new Error('APP_DATABASE_URL is required. Run npm run setup first.');
+const port = Number(process.env.PORT ?? 3100);
+if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error('PORT must be an integer between 1024 and 65535.');
+
+const pool = new pg.Pool({
+  connectionString,
+  max: 5,
+  connectionTimeoutMillis: 3000,
+  query_timeout: 3000,
+  statement_timeout: 3000,
+  application_name: 'dev-project-agent',
+});
+const supervision={database:pool,trelloCredentials:credentialsFromEnvironment(process.env),githubToken:githubToken(process.env)};
+const chatgpt=new ChatGPTService({database:pool,callbackOrigin:`http://127.0.0.1:${port}`,credentialKey:credentialKey(process.env.CHATGPT_CREDENTIAL_KEY??''),onFailure:()=>app.log.error('Provider operation could not persist its result.')});
+const ollama=new OllamaService({database:pool,baseUrl:process.env.OLLAMA_BASE_URL,onFailure:()=>app.log.error('Ollama operation could not persist its result.')});
+const agentProviders=new AgentProviders(chatgpt,ollama);
+const reports=new ReportService(pool);
+const proposals=new ProposalService(pool,agentProviders,()=>app.log.error('Agent workflow could not publish its result.'));
+const writeConfig=executionConfiguration(process.env);
+const executions=new ExecutionService(pool,{enabled:writeConfig.enabled,remote:writeConfig.credentials?trelloExecutionRemote(writeConfig.credentials):null,onFailure:()=>app.log.error('Execution result could not be persisted. Reconciliation is required before any further write.')});
+const githubWriteConfiguration=publicationConfiguration(process.env);
+const codeReview=new CodeReviewService(pool,agentProviders,supervision.githubToken,fetch,()=>app.log.error('Code review could not persist its result.'),githubWriteConfiguration);
+const publications=new PublicationService(pool,codeReview,githubWriteConfiguration,fetch,()=>app.log.error('GitHub publication requires reconciliation.'));
+const coverage=new CoverageService(pool,agentProviders,supervision.githubToken);
+const operations=new OperationService(pool,supervision,codeReview);
+const smtp=smtpFromEnvironment(process.env);
+const mailBase=process.env.APP_PUBLIC_URL??'http://127.0.0.1:5174';
+const parsedMailBase=new URL(mailBase);
+if(!['http:','https:'].includes(parsedMailBase.protocol)||parsedMailBase.username||parsedMailBase.password||parsedMailBase.search||parsedMailBase.hash)throw new Error('APP_PUBLIC_URL must be an HTTP origin without credentials.');
+const notifications=new NotificationService(pool,smtp.transport,smtp.status,parsedMailBase.origin,Object.entries(process.env).filter(([key,value])=>/(TOKEN|SECRET|PASSWORD|SMTP_PASS|CREDENTIAL_KEY|API_KEY)/.test(key)&&!!value).map(([,value])=>value!));
+const app = buildApp({
+  checkDatabase: async () => { await pool.query('SELECT 1'); },
+  logger: true,
+  auth: { ...authConfigFromEnvironment(process.env), database: pool, trello: { database: pool, credentials: supervision.trelloCredentials },supervision,chatgpt,ollama,proposals,executions,codeReview,reports,operations,publications,notifications,coverage },
+});
+pool.on('error', () => { app.log.error('Idle database connection failed.'); });
+let worker:ReturnType<typeof startSupervisionWorker>|undefined;
+let reportWorker:ReturnType<typeof startReportWorker>|undefined;
+let operationWorker:ReturnType<typeof startOperationWorker>|undefined;
+let coverageWorker:ReturnType<typeof startCoverageWorker>|undefined;
+let notificationWorker:ReturnType<typeof startNotificationWorker>|undefined;
+app.addHook('onClose', async () => {await coverageWorker?.close();await notificationWorker?.close();await operationWorker?.close();await reportWorker?.close();await publications.close();await ollama.close();await chatgpt.close();await proposals.close();await executions.close();await codeReview.close();await worker?.close();await pool.end(); });
+
+const webRoot = fileURLToPath(new URL('../../web/dist/', import.meta.url));
+if (existsSync(webRoot)) {
+  await app.register(fastifyStatic, { root: webRoot });
+}
+
+for (const signal of ['SIGINT', 'SIGTERM'] as const) {
+  process.once(signal, () => {
+    void app.close().catch(() => { process.exitCode = 1; });
+  });
+}
+try {
+  await chatgpt.initialize();
+  await ollama.initialize();
+  await proposals.initialize();
+  await executions.initialize();
+  await codeReview.initialize();
+  await publications.initialize();
+  await app.listen({ host: '127.0.0.1', port });
+  worker=startSupervisionWorker(supervision,()=>app.log.error('Supervision worker could not access storage.'));
+  reportWorker=startReportWorker(reports,()=>app.log.error('Report worker could not access storage.'));
+  notificationWorker=startNotificationWorker(notifications,()=>app.log.error('Notification worker could not complete a storage operation.'));
+  coverageWorker=startCoverageWorker(coverage,()=>app.log.error('Coverage worker could not access storage.'));
+  operationWorker=startOperationWorker(operations,()=>app.log.error('Operation worker could not access storage.'));
+} catch {
+  app.log.error('Server startup failed.');
+  await app.close();
+  process.exitCode = 1;
+}

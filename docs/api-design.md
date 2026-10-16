@@ -1,97 +1,36 @@
-# API prevista del panel y servicio
+# API implementada del panel y servicio
 
-Diseño documental del 7 de octubre de 2026; sin rutas implementadas ni esquemas ejecutables. Complementa [diseño técnico](technical-design.md), [contratos](data-contracts.md) y [pantallas](manager-screens.md).
+Prefijo `/api/v1`. El servicio Fastify registra rutas y esquemas de cada módulo; esos archivos son la referencia ejecutable. La [API prevista inicialmente](archive/planning/api-design.md) conserva propuestas históricas que no deben usarse como lista actual de endpoints.
 
 ## Convenciones
 
-Base /api/v1. JSON, campos técnicos en inglés y mensajes de usuario en español. IDs internos opacos; instantes ISO 8601 UTC y zona del proyecto por separado. Listados paginados con cursor y límite acotado, filtros permitidos explícitamente. No exponer respuestas crudas de proveedores.
+Lecturas requieren sesión y membresía cuando corresponda; las mutaciones del proyecto exigen gestor, origen permitido y CSRF. Login y operaciones sensibles tienen límites de frecuencia. Las rutas validan esquemas y rechazan propiedades adicionales. Los errores mostrados al usuario están en español y no exponen secretos o trazas internas.
 
-Autenticación mediante sesión en cookie, CSRF en operaciones de modificación y permiso por proyecto. GET no modifica datos externos. La creación de un trabajo requiere POST y permiso manager; no ejecutar análisis costoso al abrir una pantalla.
+Las mutaciones versionadas utilizan `expectedVersion` o `expectedRevision`; las operaciones idempotentes usan `requestKey`. Reutilizar una clave con otro contenido produce conflicto. Recibir una aprobación no implica ejecutar un cambio ni publicar un reporte externamente.
 
-Los resultados de consulta incluyen fecha de captura, estado de actualización y limitaciones donde corresponda. Error con code, message y requestId; details solo para errores de campos seguros. Registro del servidor puede ampliar contexto saneado, sin devolver stack al navegador.
+## Familias de rutas
 
-## Sesión y proyecto
-
-| Método y ruta | Permiso | Resultado |
-| --- | --- | --- |
-| GET /session | Público, información mínima | Usuario y capacidades si autenticado; en otro caso authenticated=false; token CSRF según sesión |
-| POST /session/login | Público con origen y límite de intentos | Crea/rota sesión; no devuelve token de acceso en JSON |
-| POST /session/logout | Autenticado + CSRF | Invalida sesión y cookie |
-| GET /projects/current | Autenticado con membresía | Proyecto UTAPED y capacidades; no alta de proyectos |
-| GET /projects/:projectId/summary | Miembro | Indicadores, alertas, pendientes y estado de fuentes |
-
-El acceso inicial y recuperación son procedimientos de administración local, no endpoints públicos de registro o reset. Una sesión anónima mínima para CSRF no otorga membresía ni acceso a datos.
-
-## Actividades, hallazgos y análisis
-
-| Método y ruta | Permiso | Resultado |
-| --- | --- | --- |
-| GET /projects/:projectId/work-items | Miembro | Actividades/hitos filtrados, con estado, fecha y responsable |
-| GET /projects/:projectId/work-items/:itemId | Miembro | Observación actual, línea base, dependencias y evidencia |
-| GET /projects/:projectId/findings | Miembro | Hallazgos por tipo, gravedad y situación |
-| GET /projects/:projectId/findings/:findingId | Miembro | Evidencias, límites y propuestas relacionadas |
-| POST /projects/:projectId/supervision-runs | Gestor + CSRF | 202, trabajo de actualización/análisis con alcance permitido |
-| GET /projects/:projectId/runs/:runId | Miembro | Progreso, errores saneados y resultados |
-| POST /projects/:projectId/code-analyses | Gestor + CSRF | 202, análisis de referencias/archivos permitidos |
-| GET /projects/:projectId/code-analyses | Miembro | Historial paginado de análisis |
-| GET /projects/:projectId/code-analyses/:analysisId | Miembro | Commits comparados, hallazgos y comprobaciones realizadas |
-
-No aceptar comandos libres, rutas de sistema arbitrarias o URLs de repositorio elegidas por el modelo. Un requestId de trabajo no demuestra ejecución exitosa.
-
-## Propuestas y decisiones
-
-| Método y ruta | Permiso | Resultado |
-| --- | --- | --- |
-| GET /projects/:projectId/proposals | Miembro | Bandeja con filtros de tipo/estado |
-| GET /projects/:projectId/proposals/:proposalId | Miembro | Versión activa y referencias a historial |
-| GET /projects/:projectId/proposals/:proposalId/versions/:version | Miembro | Contenido sellado, revisión, política, decisiones y resultado |
-| POST /projects/:projectId/proposals/:proposalId/versions/:version/decisions | Gestor + CSRF | Decisión approved/rejected/changes_requested sobre huella y estado concretos |
-| POST /projects/:projectId/authorizations/:authorizationId/revocations | Gestor + CSRF | Revocación solo antes de iniciar ejecución; conflicto si ya empezó |
-| POST /projects/:projectId/executions/:executionId/retry-requests | Gestor + CSRF | 202 si el servicio valida ausencia de efectos y autorización vigente |
-| POST /projects/:projectId/executions/:executionId/reconciliation-requests | Gestor + CSRF | 202, comprobación del resultado sin repetir escritura |
-| GET /projects/:projectId/executions/:executionId | Miembro | Intentos, acciones y verificaciones; integración humana aparte |
-
-La decisión incluye expectedContentHash, expectedState, decision y motivo obligatorio para rechazar/pedir ajustes. El actor y la autoridad se derivan de sesión y membresía; nunca se confía en actorId o role enviados por cliente.
-
-Cabecera Idempotency-Key en decisiones y solicitudes de trabajos: misma clave, usuario, proyecto, operación y cuerpo devuelve el resultado previamente registrado; reutilizar clave con otro cuerpo produce conflicto. No confundir esta deduplicación HTTP con la idempotencia de ejecución externa, que tiene registro propio.
-
-La aprobación registra decisión, autorización y trabajo de ejecución en la misma transacción local. Devuelve la decisión y referencia al trabajo pendiente; la escritura externa ocurre después. Si se rechaza o pide ajustar, no se agenda modificación externa. Un intento concurrente o versión obsoleta devuelve 409 y exige refrescar el detalle, sin reaplicar la decisión a otra versión.
-
-No hay endpoint genérico para cambiar state, ejecutar herramientas arbitrarias, escribir directo a Trello, modificar diferencias selladas o integrar ramas.
-
-## Reportes, auditoría y configuración
-
-| Método y ruta | Permiso | Resultado |
-| --- | --- | --- |
-| GET /projects/:projectId/reports | Miembro | Periodos, ediciones y estado de publicación |
-| GET /projects/:projectId/reports/:reportId/versions/:version | Miembro | Reporte congelado y estado de revisión |
-| POST /projects/:projectId/report-recovery-requests | Gestor + CSRF | 202, recuperación de un corte ya previsto y faltante; no publicar sin revisión |
-| GET /projects/:projectId/audit-events | Miembro | Historial funcional saneado y paginado |
-| GET /projects/:projectId/config | Miembro | Configuración vigente sin secretos; campos administrativos filtrados |
-| POST /projects/:projectId/config-versions | Gestor + CSRF | Nueva configuración con versión esperada; invalidaciones y trabajos relacionados |
-| GET /projects/:projectId/connections | Miembro, detalle limitado por rol | Recursos y estado; sin credenciales |
-| POST /projects/:projectId/connections/:connectionId/checks | Gestor + CSRF | 202, comprobación de conexión permitida |
-
-Las rutas de conectar/renovar credenciales se definirán tras validar el flujo oficial de cada proveedor y el almacén seguro. No crear una ruta genérica que capture tokens de navegador ni pretender que la configuración saneada contiene credenciales utilizables.
-
-## Respuestas y permisos
-
-| Código | Uso previsto |
+| Familia | Función y referencia |
 | --- | --- |
-| 200 / 201 | Consulta/decisión registrada o recurso creado |
-| 202 | Trabajo persistido, pendiente o en ejecución; no significa efecto externo completado |
-| 400 | Estructura, enum o campo inválido |
-| 401 | Sesión ausente o vencida |
-| 403 | Miembro sin capacidad, CSRF u origen inválido |
-| 404 | Recurso inexistente o fuera del proyecto accesible, sin filtrar existencia ajena |
-| 409 | Versión/estado desactualizado, clave repetida con otro contenido o concurrencia |
-| 429 | Límite de solicitudes propias alcanzado |
-| 503 | Servicio requerido no disponible para una operación síncrona |
+| `/health` | Salud del servicio y conexión a PostgreSQL. |
+| `/session` | Estado de sesión; login/logout bajo esa familia. [Autenticación](authentication.md). |
+| `/projects/:projectId` | Recursos limitados por membresía del proyecto. |
+| Trello y seguimiento | Consultas/importación/sincronización, configuración e indicadores. [Trello](trello-integration.md), [reglas](tracking-rules.md). |
+| Supervisión y línea base | Solicitudes persistidas, resultados e historial. [Supervisión](supervision.md). |
+| `/projects/:projectId/proposals` | Preparación, versiones, recuperación, decisiones y vigencia. [Agentes](agent-workflow.md). |
+| Ejecución Trello | Solicitud confirmada, detalle y reconciliación. [Ejecución](trello-execution.md). |
+| `/projects/:projectId/code-review` | Catálogo, análisis, propuestas de código, decisiones, simulación y publicación real separadas. [Código](code-review.md), [GitHub](github-publication.md). |
+| `/projects/:projectId/code-review/coverage` | Inventario, paginación, límites, start/pause/retry y evidencia. [Cobertura](repository-coverage.md#api). |
+| `/projects/:projectId/reports` | Cortes, revisiones, programación y salida imprimible. [Reportes](weekly-reports.md). |
+| `/projects/:projectId/operations` | Programación de lecturas y revisión de código. [Operación](project-operations.md). |
+| `/projects/:projectId/alerts` | Alertas y seguimiento con evidencia vigente. [Operación](project-operations.md). |
+| `/projects/:projectId/notifications` | Preferencias, verificación SMTP y prueba confirmada. [Notificaciones](notifications.md). |
+| ChatGPT y Ollama | Estado, autorización cuando procede, modelos y evaluaciones. [Proveedores](agent-providers.md), [renovación](renewable-access.md). |
 
-Errores de proveedores durante trabajo asíncrono quedan en el estado del trabajo; no se transforma un trabajo creado en una respuesta HTTP retroactiva. Si no se puede persistir el trabajo, no devolver 202.
+Los nombres de familias descriptivas de la tabla no inventan endpoints: consultar el documento del módulo o sus `routes.ts` para verbos, parámetros y cuerpos exactos. No existe una ruta de ejecución libre de comandos del repositorio ni una ruta de merge automático.
 
-## Actualización del panel y validación futura
+## Contratos y permisos
 
-Consultar estado de trabajos mediante polling acotado mientras la pantalla lo necesite; detener al completar o abandonar. No incorporar WebSockets en esta versión. Solicitudes concurrentes no deben sustituir contenido nuevo por una respuesta vieja.
+[packages/contracts/src/index.ts](../packages/contracts/src/index.ts) comparte vistas/tipos; los esquemas de rutas y validadores del servidor aplican los controles en ejecución. No confiar en tipos TypeScript como autorización. El frontend oculta acciones de gestor a lectores, pero la decisión final siempre la toma el servidor.
 
-Antes de implementar: crear esquemas de entrada/salida, validar estados y permisos, probar idempotencia y casos 401/403/404/409, y verificar que ningún JSON de respuesta exponga secretos. El catálogo puede ajustarse al detallar cada módulo, conservando las condiciones y la trazabilidad aquí definidas.
+Las claves, versiones y estados se enlazan con proyecto, actor y contenido sellado. Fuente modificada, aprobación obsoleta, revocación o resultado incierto impiden un reintento ciego. Los límites y la paginación de cada listado son explícitos; el historial completo de la base no implica que todos sus registros estén en una sola respuesta.

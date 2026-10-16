@@ -1,5 +1,9 @@
 # Requisitos y criterios de aceptación
 
+Este documento conserva los requisitos normativos. El estado de implementación y las evidencias se consultan en [aceptación real](validation/real-acceptance-validation.md): 38 criterios superados y una excepción histórica EX-01; no implica dispensa académica.
+
+La descomposición vigente punto por punto, las brechas y las pruebas de cierre de la primera versión están en la [matriz de aceptación académica](academic-acceptance-matrix.md), revisada el 11 de octubre de 2026. Sus 39 criterios desarrollan el detalle completo del PDF y se cruzan con los once REQ siguientes. La aceptación final permanece pendiente.
+
 ## Fuentes y alcance
 
 Fuente normativa académica: «Agente inteligente para seguimiento y control de proyectos de desarrollo de software», PDF del profesor de cinco páginas, matriz REQ-01 a REQ-11. Fuente complementaria: transcripción de clase facilitada por el usuario. Las decisiones del usuario concretan la solución; no sustituyen la matriz de evaluación del profesor.

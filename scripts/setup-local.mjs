@@ -1,0 +1,63 @@
+import { randomBytes } from 'node:crypto';
+import { readFile, writeFile, chmod } from 'node:fs/promises';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+import { fileURLToPath } from 'node:url';
+
+const adminPassword = randomBytes(32).toString('hex');
+const appPassword = randomBytes(32).toString('hex');
+const connection = '127.0.0.1:15434/dev_project_agent';
+const content = [
+  'POSTGRES_PASSWORD=' + adminPassword,
+  'APP_DATABASE_PASSWORD=' + appPassword,
+  'DATABASE_URL=postgresql://dev_project_agent_migrator:' + adminPassword + '@' + connection,
+  'APP_DATABASE_URL=postgresql://dev_project_agent_app:' + appPassword + '@' + connection,
+  'PORT=3100',
+  'SESSION_SECRET=' + randomBytes(48).toString('hex'),
+  'CHATGPT_CREDENTIAL_KEY=' + randomBytes(32).toString('hex'),
+  'APP_ORIGINS=http://127.0.0.1:5174,http://127.0.0.1:3100',
+  'ALLOW_INSECURE_LOCAL_HTTP=true',
+  'TRELLO_API_KEY=',
+  'TRELLO_TOKEN=',
+  'GITHUB_TOKEN=',
+  'TRELLO_WRITES_ENABLED=false',
+  'TRELLO_WRITE_TOKEN=',
+  'GITHUB_WRITES_ENABLED=false',
+  'GITHUB_WRITE_TOKEN=',
+  '',
+].join('\n');
+
+try {
+  await writeFile(new URL('../.env', import.meta.url), content, { flag: 'wx', mode: 0o600 });
+  console.log('Local configuration created. Credentials were not printed.');
+} catch (error) {
+  if (error.code === 'EEXIST') {
+    const envFile = new URL('../.env', import.meta.url);
+    const existing = await readFile(envFile, 'utf8');
+    const additions = [];
+    for (const [key, value] of [
+      ['SESSION_SECRET', randomBytes(48).toString('hex')],
+      ['CHATGPT_CREDENTIAL_KEY', randomBytes(32).toString('hex')],
+      ['APP_ORIGINS', 'http://127.0.0.1:5174,http://127.0.0.1:3100'],
+      ['ALLOW_INSECURE_LOCAL_HTTP', 'true'],
+      ['TRELLO_API_KEY', ''],
+      ['TRELLO_TOKEN', ''],
+      ['GITHUB_TOKEN', ''],
+      ['TRELLO_WRITES_ENABLED', 'false'],
+      ['TRELLO_WRITE_TOKEN', ''],
+      ['GITHUB_WRITES_ENABLED', 'false'],
+      ['GITHUB_WRITE_TOKEN', ''],
+    ]) {
+      if (!new RegExp('^' + key + '=', 'm').test(existing)) additions.push(key + '=' + value);
+    }
+    if (additions.length) await writeFile(envFile, existing.trimEnd() + '\n' + additions.join('\n') + '\n', { mode: 0o600 });
+    console.log('Local configuration checked; existing credentials were preserved.');
+  } else {
+    throw error;
+  }
+}
+if(process.platform==='win32'){
+  const shellEnvironment=Object.fromEntries(Object.entries(process.env).filter(([key])=>key.toLowerCase()!=='psmodulepath'));
+  await promisify(execFile)('powershell.exe',['-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',fileURLToPath(new URL('./protect-local-config.ps1',import.meta.url))],{windowsHide:true,env:shellEnvironment});
+}else await chmod(new URL('../.env',import.meta.url),0o600);
+console.log('Local credential file permissions restricted to the current user and system administrators.');

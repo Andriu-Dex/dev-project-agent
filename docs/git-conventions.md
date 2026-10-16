@@ -35,7 +35,7 @@ For incompatible changes, place ! after the type/scope and explain the change an
 
 ## Branches and integration
 
-- utaped-agent: develop for development and main for a validated release. Both may contain the initial documentation baseline, which does not represent a finished application. Subsequent development happens on develop or working branches merged into develop.
+- dev-project-agent: develop for development and main for a validated release. Both may contain the initial documentation baseline, which does not represent a finished application. Subsequent development happens on develop or working branches merged into develop.
 - Supervised UTAPED: agent/<proposal-id>-v<version>, PR to develop, specific human approval required. Humans merge into develop and later main.
 
 The initial commit groups planning and minimum Git configuration as a single foundation without implementation. No push is included.
