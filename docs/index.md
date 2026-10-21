@@ -2,6 +2,10 @@
 
 Este índice separa las guías de la versión actual, sus evidencias académicas y los documentos históricos. El código, contratos y migraciones son la referencia ejecutable; los documentos del archivo describen su fecha y no sustituyen el comportamiento vigente.
 
+## Próxima versión
+
+- [Especificación 1.1 y criterios de aceptación](version-1.1-specification.md): planificación, no funciones ya entregadas.
+
 ## Para usar y operar
 
 - [Instalación, pantallas y recorridos del gestor](first-release-guide.md).
