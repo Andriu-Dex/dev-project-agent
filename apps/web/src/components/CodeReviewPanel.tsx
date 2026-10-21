@@ -1,3 +1,4 @@
+import {RecoveryPanel} from './RecoveryPanel';
 import {RepositoryCoverage} from './RepositoryCoverage';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type {
@@ -1875,7 +1876,7 @@ export function CodeReviewPanel({
                       <span className="proposal-card-date">{dates(item.createdAt)}</span>
                     </header>
 
-                    <div className="code-publication-body">
+                    <div className="code-publication-body">{item.status==='succeeded'&&<RecoveryPanel project={project} csrfToken={csrfToken} originalId={item.id} target="github" onChanged={()=>void refresh()}/>}
                       <p className="code-pub-status-msg">
                         {item.status === 'simulated'
                           ? 'No se creó ninguna rama, commit ni PR real en GitHub.'
@@ -2197,7 +2198,7 @@ export function CodeReviewPanel({
                     <strong className="objective-title">{detail.candidate.correction.objective}</strong>
                     <div className="objective-justification-wrap">
                       <span className="justification-heading">Justificación técnica del cambio:</span>
-                      <p className="code-justification-p">{detail.candidate.correction.justification}</p>
+                      <p className="code-justification-p">{detail.candidate.correction.justification}</p>{detail.candidate.documentation&&<details className="change-documentation"><summary>Documentación y justificación de esta versión</summary><pre style={{whiteSpace:'pre-wrap',overflowWrap:'anywhere'}}>{detail.candidate.documentation}</pre></details>}
                     </div>
                   </div>
 
@@ -2520,7 +2521,7 @@ export function CodeReviewPanel({
                   </header>
 
                   {/* Reason Textarea */}
-                  {['pending_human_approval', 'authorized'].includes(detail.state) && (
+                  {['pending_human_approval', 'authorized', 'executing', 'execution_failed'].includes(detail.state) && (
                     <div className="editor-field" style={{ marginBottom: '14px' }}>
                       <label htmlFor="code-reason">
                         Motivo de la decisión {detail.state === 'pending_human_approval' ? '(obligatorio)' : ''}
@@ -2648,7 +2649,7 @@ export function CodeReviewPanel({
                   )}
 
                   {/* Recheck & Withdraw actions */}
-                  {['draft', 'pending_review', 'pending_policy_check', 'pending_human_approval', 'authorized'].includes(
+                  {['draft', 'pending_review', 'pending_policy_check', 'pending_human_approval', 'authorized', 'executing', 'execution_failed'].includes(
                     detail.state
                   ) && (
                     <div style={{ display: 'flex', gap: '10px', marginTop: '14px', flexWrap: 'wrap' }}>
@@ -2667,7 +2668,7 @@ export function CodeReviewPanel({
                         <span>Comprobar vigencia del código en GitHub</span>
                       </button>
 
-                      {['pending_human_approval', 'authorized'].includes(detail.state) && (
+                      {['pending_human_approval', 'authorized', 'executing', 'execution_failed'].includes(detail.state) && (
                         <button
                           type="button"
                           className="editor-cancel-btn"

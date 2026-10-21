@@ -1,6 +1,6 @@
 {
   "name": "dev-project-agent",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -52,7 +52,8 @@
     "db:backup": "node --env-file=.env scripts/backup-local.mjs --verify",
     "verify:install": "node --env-file=.env scripts/verify-install.mjs",
     "release:package": "node --env-file=.env scripts/package-release.mjs",
-    "docs:check": "node scripts/check-docs.mjs"
+    "docs:check": "node scripts/check-docs.mjs",
+    "verify:upgrade": "node --env-file=.env scripts/verify-upgrade.mjs"
   },
   "devDependencies": {
     "@inquirer/prompts": "8.7.3",

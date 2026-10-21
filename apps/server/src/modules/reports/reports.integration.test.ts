@@ -33,6 +33,26 @@ describe.skipIf(process.env.RUN_REPORTS_DB_TESTS!=='true')('PostgreSQL weekly re
   async function generate(){const job=await service.request(projectId,actor,randomUUID());while(await service.processNext()){}return (await service.detail(projectId,job.id))!;}
   async function activate(){return service.configure(projectId,actor,{expectedVersion:0,enabled:true,weekday:5,hour:18,minute:0});}
   async function historicalSchedule(){await activate();await client.query("UPDATE report_schedule_cursors SET period_start='2026-09-25T23:00:00Z',next_cutoff='2026-10-02T23:00:00Z' WHERE project_id=$1",[projectId]);}
+  it('freezes institutional branding and increments document versions without rewriting history',async()=>{
+    await snapshot();const template=await service.configureTemplate(projectId,actor,0,{organization:'Organización de prueba',process:'TIC',subprocess:'Seguimiento',title:'Informe institucional',codePrefix:'AP-TIC-INF'});
+    expect(template.version).toBe(1);
+    const first=await generate();const printed=renderReport(first);expect(printed).toContain('11. Anexos');expect(printed).toContain('Actividades por estado');expect(printed).toContain('size:letter');expect(printed).not.toContain('Firma digital válida');expect(first.data!.presentation!.code).toBe('AP-TIC-INF-001');expect(first.data!.presentation!.logoDataUrl).toMatch(/^data:image\/jpeg;base64,/);
+    await service.configureTemplate(projectId,actor,1,{...template.settings,organization:'Nueva organización'});
+    await client.query('SET LOCAL ROLE dev_project_agent_app');
+    const revised=await service.request(projectId,actor,randomUUID(),first.id,'Actualizar la identificación institucional.');while(await service.processNext()){}await client.query('RESET ROLE');
+    const second=(await service.detail(projectId,revised.id))!;
+    expect(second.data!.presentation!.code).toBe(first.data!.presentation!.code);
+    expect(second.data!.presentation!.settings.organization).toBe('Nueva organización');
+    expect(first.renderHash).toBe(fingerprint(first.renderedHtml));expect((await service.detail(projectId,first.id))!.renderedHtml).toBe(first.renderedHtml);
+    expect((await service.detail(projectId,first.id))!.data!.presentation!.settings.organization).toBe('Organización de prueba');
+    await expect(service.configureTemplate(projectId,viewer,2,template.settings)).rejects.toHaveProperty('code','FORBIDDEN');
+  });
+  it('paginates and filters the entire report history, including older cuts',async()=>{
+    await client.query("INSERT INTO report_jobs(project_id,kind,cutoff,period_start,requested_by,auth_version,request_key,request_hash,version,status) SELECT $1,'manual',clock_timestamp()-n*interval '1 day',clock_timestamp()-(n+7)*interval '1 day',$2,$3,gen_random_uuid(),'fixture-'||n,1,'failed' FROM generate_series(1,65) n",[projectId,actor.id,actor.auth_version]);
+    const first=await service.overview(projectId);expect(first.reports).toHaveLength(60);expect(first.total).toBe(65);expect(first.nextOffset).toBe(60);
+    const older=await service.overview(projectId,{offset:60,status:'failed'});expect(older.reports).toHaveLength(5);expect(older.nextOffset).toBeNull();
+    const date=older.reports.at(-1)!.cutoff.slice(0,10);expect((await service.overview(projectId,{to:date})).reports.length).toBeGreaterThan(0);
+  });
   it('starts disabled and versions manager-controlled dynamic schedules',async()=>{
     expect(await service.schedule(projectId)).toMatchObject({enabled:false,version:0,weekday:5,hour:18,minute:0});const configured=await activate();expect(configured.version).toBe(1);expect(configured.nextCutoff).toMatch(/23:00:00.000Z$/);
     await expect(service.configure(projectId,actor,{expectedVersion:0,enabled:false,weekday:5,hour:18,minute:0})).rejects.toHaveProperty('code','CONFLICT');

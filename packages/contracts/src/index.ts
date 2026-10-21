@@ -221,7 +221,7 @@ export type ProposalState='draft'|'pending_review'|'in_review'|'pending_policy_c
 export type AgentStage='executor'|'reviewer'|'approver';
 export type TrelloAction =
   | {type:'trello_due_change';cardId:string;expectedDue:string|null;proposedDue:string}
-  | {type:'trello_dates_change';cardId:string;expectedStart:string|null;expectedDue:string|null;proposedStart:string;proposedDue:string}
+  | {type:'trello_dates_change';cardId:string;expectedStart:string|null;expectedDue:string|null;proposedStart:string|null;proposedDue:string|null}
   | {type:'trello_members_change';cardId:string;expectedMembers:string[];proposedMembers:string[]}
   | {type:'trello_priority_change'|'trello_state_change';cardId:string;expectedLabels:string[];proposedLabels:string[];expectedDueComplete:boolean;proposedDueComplete:boolean};
 export type RequestedTrelloChange = {family:'dates';start:string;due:string}|{family:'members';memberIds:string[]}|{family:'priority'|'state';label:string};
@@ -269,7 +269,7 @@ export interface CodeAnalysisResult {summary:string;findings:CodeFinding[];check
 export interface CodeAnalysisView {id:string;status:'queued'|'running'|'ready'|'failed'|'interrupted';errorCode:string|null;createdAt:string;finishedAt:string|null;model:string|null;reasoningEffort:ReasoningEffort|null;source:CodeSource|null;result:CodeAnalysisResult|null}
 export interface CodeEdit {path:string;expectedBlob:string;startLine:number;endLine:number;before:string;after:string}
 export interface CodeCorrection {objective:string;justification:string;impact:string;risks:string[];verificationPlan:string;recoveryPlan:string;unresolvedQuestions:string[];findingIds:string[];edits:CodeEdit[]}
-export interface CodeCandidate {correction:CodeCorrection;files:CodeFile[];patch:string;checks:CodeCheck[]}
+export interface CodeCandidate {documentation?:string;correction:CodeCorrection;files:CodeFile[];patch:string;checks:CodeCheck[]}
 export interface CodeMessage {id:string;jobId:string;stage:AgentStage;status:'succeeded'|'failed';output:CodeCorrection|AgentVerdict|null;errorCode:string|null;durationMs:number|null;usage:Record<string,number>|null;createdAt:string;model:string;reasoningEffort:ReasoningEffort|null}
 export interface CodeProposalView {id:string;version:number;latestVersion:number;purpose:'demonstration'|'live';state:ProposalState;analysisId:string;goal:string;findingIds:string[];createdAt:string;candidate:CodeCandidate|null;contentHash:string|null;messages:CodeMessage[];decisions:{id:string;decision:'approved'|'rejected'|'changes_requested';reason:string;createdAt:string}[]}
 export interface CodePublicationView {id:string;proposalId:string;version:number;status:'simulated'|'queued'|'running'|'succeeded'|'blocked'|'failed'|'reconciliation_required';errorCode:string|null;branch:string;commitSha:string|null;pullNumber:number|null;pullUrl:string|null;createdAt:string;finishedAt:string|null;integrationStatus:'not_requested'|'pending_human';plan?:{repository:string;baseBranch:string;baseSha:string;branch:string;contentHash:string;title:string;body:string;files:{path:string;beforeBlob:string;afterBlob:string}[]};events:{stage:string;outcome:string;errorCode:string|null;createdAt:string}[]}
@@ -277,7 +277,10 @@ export interface CodeOverview {analyses:Omit<CodeAnalysisView,'source'|'result'>
 
 export interface ReportSchedule {version:number;enabled:boolean;weekday:number;hour:number;minute:number;timeZone:'America/Guayaquil';changedAt:string|null;nextCutoff:string|null;errorCode?:string|null}
 export interface ReportSummary {id:string;version:number;kind:'scheduled'|'manual';status:'queued'|'published'|'draft'|'failed';periodStart:string;cutoff:string;createdAt:string;finishedAt:string|null;errorCode:string|null}
+export interface ReportTemplateSettings {organization:string;process:string;subprocess:string;title:string;codePrefix:string}
+export interface ReportPresentation {changes?:{version:number;description:string;responsible:string;date:string}[];templateVersion:number;settings:ReportTemplateSettings;code:string;logoDataUrl:string|null;previousProgress:{cutoff:string;percent:number}|null}
 export interface WeeklyReport {
+  presentation?:ReportPresentation;
   codeCoverage?: import('./coverage.js').ReportCoverage | null;
   riskAssessments?:{itemId:string;name:string;causeStatus:string;cause:string;impact:string;alternatives:{title:string;goal:string;eligible:boolean}[]}[];
   schemaVersion:1;project:{id:string;name:string};responsible:{id:string;name:string};periodStart:string;cutoff:string;generatedAt:string;partialPeriod:boolean;late:boolean;
@@ -293,6 +296,6 @@ export interface WeeklyReport {
   limitations:string[];activityUniverse:string[];
   stages:{stage:AgentStage;engine:'deterministic';outcome:'pass'|'fail';checkedAt:string;checks:{code:string;passed:boolean;message:string}[]}[];
 }
-export interface ReportDetail extends ReportSummary {contentHash:string|null;data:WeeklyReport|null}
-export interface ReportsOverview {schedule:ReportSchedule;reports:ReportSummary[]}
+export interface ReportDetail extends ReportSummary {renderedHtml?:string|null;renderHash?:string|null;contentHash:string|null;data:WeeklyReport|null}
+export interface ReportsOverview {total?:number;nextOffset?:number|null;schedule:ReportSchedule;reports:ReportSummary[]}
 export * from './coverage.js';

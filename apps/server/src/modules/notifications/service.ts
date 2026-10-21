@@ -1,3 +1,5 @@
+import type {TrelloSnapshot} from '@dev-project-agent/contracts';
+import {recipients} from './recipients.js';
 import {randomUUID} from 'node:crypto';
 import type pg from 'pg';
 import type {TrelloDatabase} from '../../integrations/trello/service.js';
@@ -23,6 +25,12 @@ export class NotificationService {
     const history=(await this.database.query('SELECT version,changed_at FROM notification_configurations WHERE project_id=$1 ORDER BY version DESC LIMIT 20',[projectId])).rows;
     const active=(await this.database.query("SELECT count(*)::int AS count FROM project_alerts WHERE project_id=$1 AND status<>'resolved'",[projectId])).rows[0]?.count??0;
     return {version:config?.version??0,settings:config?.settings??defaultSettings,smtpStatus:this.smtpStatus,deliveries,history,activeAlerts:active,timeZone:'America/Guayaquil',nextDigest:config?.settings.enabled&&config.settings.mode==='digest'?deliveryTime(config.settings,new Date()).toISOString():null};
+  }
+  async preview(projectId:string,settings:NotificationSettings){
+    validateSettings(settings);
+    const source=(await this.database.query<{data:TrelloSnapshot}>('SELECT data FROM trello_snapshots WHERE project_id=$1 ORDER BY imported_at DESC,id DESC LIMIT 1',[projectId])).rows[0]?.data??null;
+    const alerts=(await this.database.query<{item_id:string|null;code:string;payload:{finding:{itemName:string}}}>("SELECT item_id,code,payload FROM project_alerts WHERE project_id=$1 AND status<>'resolved' AND code=ANY($2::text[]) ORDER BY last_seen DESC LIMIT 30",[projectId,settings.events])).rows;
+    return {preview:[...alerts.map(alert=>({itemName:this.protect(alert.payload.finding.itemName),event:alert.code,recipients:recipients(settings,source,alert.item_id,alert.code)})),...settings.events.filter(kind=>['report_ready','source_failure'].includes(kind)).map(kind=>({itemName:'Aviso general sin actividad',event:kind,recipients:recipients(settings,source,null,kind)}))],note:'Vista previa con las últimas lecturas guardadas; la entrega vuelve a comprobar destinatarios. No se enviaron correos.'};
   }
   async configure(projectId:string,actor:AuthUser,expectedVersion:number,settings:NotificationSettings,includeExisting=false){
     validateSettings(settings);if(settings.enabled&&!this.transport)throw new MailError(this.smtpStatus);
@@ -70,11 +78,20 @@ export class NotificationService {
       const rows=(await db.query<{id:string;code:string;payload:{finding:{itemName:string}};last_seen:Date}>(`SELECT a.* FROM project_alerts a WHERE a.project_id=$1 AND a.status='open' AND a.code=ANY($2::text[]) AND EXISTS(SELECT 1 FROM notification_events previous WHERE previous.project_id=a.project_id AND previous.source_id=a.id::text AND previous.created_at>=$4) AND NOT EXISTS(SELECT 1 FROM notification_events e WHERE e.project_id=a.project_id AND e.source_id=a.id::text AND e.created_at>$3) LIMIT 100`,[config.project_id,config.settings.events,new Date(now.getTime()-config.settings.reminderHours*3600000),config.changed_at])).rows;
       for(const row of rows)await this.addEvent(db,config,'reminder:'+row.id+':'+Math.floor((now.getTime()-config.changed_at.getTime())/(config.settings.reminderHours*3600000)),row.code,row.id,`Recordatorio: ${names[row.code]} · ${row.payload.finding.itemName}. Última evidencia: ${row.last_seen.toISOString()}. Comprueba su vigencia en el panel.`,now);
     }
-    const events=(await db.query<{id:string}>(`SELECT e.id FROM notification_events e WHERE e.project_id=$1 AND e.created_at>=$2 AND NOT EXISTS(SELECT 1 FROM notification_deliveries d WHERE d.project_id=e.project_id AND e.id=ANY(d.event_ids)) ORDER BY e.occurred_at LIMIT 50`,[config.project_id,config.changed_at])).rows;
-    const queued=(await db.query<{id:string}>("SELECT id FROM notification_deliveries WHERE project_id=$1 AND configuration_version=$2 AND kind='notification' AND status='queued' AND cardinality(event_ids)<500 ORDER BY created_at LIMIT 1",[config.project_id,config.version])).rows[0];
-    if(events.length&&queued){await db.query('UPDATE notification_deliveries SET event_ids=event_ids||$2::uuid[] WHERE id=$1',[queued.id,events.map(e=>e.id)]);return;}
-    if(events.length)await db.query("INSERT INTO notification_deliveries(project_id,configuration_version,request_key,recipient,kind,event_ids,status,next_attempt) VALUES($1,$2,$3,$4,'notification',$5,'queued',$6)",[config.project_id,config.version,randomUUID(),config.settings.recipient,events.map(e=>e.id),deliveryTime(config.settings,now)]);
+    const snapshot=(await db.query<{data:TrelloSnapshot}>('SELECT data FROM trello_snapshots WHERE project_id=$1 ORDER BY imported_at DESC,id DESC LIMIT 1',[config.project_id])).rows[0]?.data??null;
+    const events=(await db.query<{id:string;item_id:string|null;source_id:string;kind:string}>(`SELECT e.id,e.source_id,e.kind,a.item_id FROM notification_events e LEFT JOIN project_alerts a ON a.project_id=e.project_id AND a.id::text=e.source_id WHERE e.project_id=$1 AND e.created_at>=$2 ORDER BY e.occurred_at DESC LIMIT 500`,[config.project_id,config.changed_at])).rows;
+    const groups=new Map<string,string[]>();
+    for(const event of events)for(const recipient of recipients(config.settings,snapshot,event.item_id,event.kind)){
+      const previous=await db.query('SELECT id FROM notification_deliveries WHERE project_id=$1 AND lower(recipient)=$2 AND $3::uuid=ANY(event_ids)',[config.project_id,recipient,event.id]);
+      if(!previous.rowCount)groups.set(recipient,[...(groups.get(recipient)??[]),event.id]);
+    }
+    for(const [recipient,ids] of groups){
+      const queued=(await db.query<{id:string}>("SELECT id FROM notification_deliveries WHERE project_id=$1 AND configuration_version=$2 AND lower(recipient)=$3 AND kind='notification' AND status='queued' AND cardinality(event_ids)+$4<=500 ORDER BY created_at LIMIT 1",[config.project_id,config.version,recipient,ids.length])).rows[0];
+      if(queued)await db.query('UPDATE notification_deliveries SET event_ids=event_ids||$2::uuid[] WHERE id=$1',[queued.id,ids]);
+      else await db.query("INSERT INTO notification_deliveries(project_id,configuration_version,request_key,recipient,kind,event_ids,status,next_attempt) VALUES($1,$2,$3,$4,'notification',$5,'queued',$6)",[config.project_id,config.version,randomUUID(),recipient,ids,deliveryTime(config.settings,now)]);
+    }
   }
+
   async tick(onlyProject?:string,now=new Date()){
     const configs=(await this.database.query<Configuration>('SELECT DISTINCT ON(project_id) * FROM notification_configurations WHERE ($1::uuid IS NULL OR project_id=$1) ORDER BY project_id,version DESC',[onlyProject??null])).rows;
     for(const config of configs){
@@ -92,11 +109,12 @@ export class NotificationService {
         if(delivery.kind!=='test'&&!config.settings.enabled)continue;
         const allowed=deliveryTime({...config.settings,mode:'immediate'},now);if(delivery.kind!=='test'&&allowed>now){await db.query('UPDATE notification_deliveries SET next_attempt=$2 WHERE id=$1',[delivery.id,allowed]);continue;}
         const dayStart=new Date(now);dayStart.setUTCHours(5,0,0,0);if(dayStart>now)dayStart.setUTCDate(dayStart.getUTCDate()-1);
-        const sent=(await db.query<{count:number}>("SELECT count(*)::int AS count FROM notification_deliveries WHERE project_id=$1 AND status IN ('accepted','sending','uncertain') AND finished_at>=$2",[config.project_id,dayStart])).rows[0]!.count;
+        const sent=(await db.query<{count:number}>("SELECT count(*)::int AS count FROM notification_deliveries WHERE project_id=$1 AND status IN ('accepted','sending','uncertain') AND finished_at>=$2 AND lower(recipient)=lower($3)",[config.project_id,dayStart,delivery.recipient])).rows[0]!.count;
         if(sent>=config.settings.maxPerDay){await db.query('UPDATE notification_deliveries SET next_attempt=$2 WHERE id=$1',[delivery.id,new Date(dayStart.getTime()+86400000)]);continue;}
         const events=(await db.query<{summary:string;source_id:string;kind:string}>('SELECT summary,source_id,kind FROM notification_events WHERE project_id=$1 AND id=ANY($2::uuid[]) ORDER BY occurred_at',[config.project_id,delivery.event_ids])).rows;
         const active=[];
-        for(const event of events){if(names[event.kind]){const alert=(await db.query("SELECT id FROM project_alerts WHERE project_id=$1 AND id=$2 AND status<>'resolved'",[config.project_id,event.source_id])).rows[0];if(!alert)continue;}active.push(event.summary);}
+        const latest=(await db.query<{data:TrelloSnapshot}>('SELECT data FROM trello_snapshots WHERE project_id=$1 ORDER BY imported_at DESC,id DESC LIMIT 1',[config.project_id])).rows[0]?.data??null;
+        for(const event of events){if(delivery.kind!=='test'){const related=(await db.query<{item_id:string}>('SELECT item_id FROM project_alerts WHERE project_id=$1 AND id::text=$2',[config.project_id,event.source_id])).rows[0];if(!recipients(config.settings,latest,related?.item_id??null,event.kind).includes(delivery.recipient.toLowerCase()))continue;}if(names[event.kind]){const alert=(await db.query("SELECT id FROM project_alerts WHERE project_id=$1 AND id=$2 AND status<>'resolved'",[config.project_id,event.source_id])).rows[0];if(!alert)continue;}active.push(event.summary);}
         if(delivery.kind!=='test'&&!active.length){await db.query("UPDATE notification_deliveries SET status='cancelled',error_code='ALERT_RESOLVED',finished_at=clock_timestamp() WHERE id=$1",[delivery.id]);continue;}
         const project=(await db.query<{name:string}>('SELECT name FROM projects WHERE id=$1',[config.project_id])).rows[0]!;
         // Commit sending intent before SMTP. A crash must never trigger an automatic duplicate.

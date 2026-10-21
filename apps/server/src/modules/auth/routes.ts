@@ -1,3 +1,6 @@
+import {registerAssistantRoutes} from '../assistant/routes.js';
+import type {AgentProvider} from '../../providers/agents.js';
+import {workProgress} from '../operations/progress.js';
 import type {CoverageService} from '../code-review/coverage.js';
 import {registerCoverageRoutes} from '../code-review/coverage-routes.js';
 import type {NotificationService} from '../notifications/service.js';
@@ -35,7 +38,7 @@ import {registerPublicationRoutes} from '../code-review/publication-routes.js';
 import type { OllamaService } from '../../providers/ollama/service.js';
 import { registerOllamaRoutes } from '../../providers/ollama/routes.js';
 
-export interface AuthOptions extends AuthConfig { database: AuthDatabase; trello?: TrelloOptions; supervision?:SupervisionOptions; chatgpt?:ChatGPTService; ollama?:OllamaService; proposals?:ProposalService; executions?:ExecutionService; codeReview?:CodeReviewService; reports?:ReportService; operations?:OperationService; publications?:PublicationService; notifications?:NotificationService; coverage?:CoverageService }
+export interface AuthOptions extends AuthConfig { assistantProvider?:AgentProvider; database: AuthDatabase; trello?: TrelloOptions; supervision?:SupervisionOptions; chatgpt?:ChatGPTService; ollama?:OllamaService; proposals?:ProposalService; executions?:ExecutionService; codeReview?:CodeReviewService; reports?:ReportService; operations?:OperationService; publications?:PublicationService; notifications?:NotificationService; coverage?:CoverageService }
 
 export async function registerAuth(app: FastifyInstance, options: AuthOptions) {
   const repository = new AuthRepository(options.database);
@@ -101,6 +104,11 @@ export async function registerAuth(app: FastifyInstance, options: AuthOptions) {
     return user;
   }
 
+  app.get<{Params:{projectId:string}}>('/projects/:projectId/work-progress',{schema:{params:{type:'object',required:['projectId'],properties:{projectId:{type:'string',format:'uuid'}}}}},async(request,reply)=>{
+    const actor=await requireUser(request,reply);if(!actor)return reply;const project=await repository.projectForUser(actor.id,request.params.projectId);if(!project)return reply.code(404).send({code:'NOT_FOUND',message:'No se encontró el proyecto.'});
+    return workProgress(options.database,project.id);
+  });
+  registerAssistantRoutes(app,options,requireUser,repository);
   if(options.notifications)registerNotificationRoutes(app,options.notifications,requireUser,repository);
   if (options.trello) registerTrelloRoutes(app, options.trello, requireUser, repository);
   if (options.supervision) registerSupervisionRoutes(app, options.supervision, requireUser, repository);

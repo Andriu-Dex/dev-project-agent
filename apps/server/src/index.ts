@@ -57,7 +57,7 @@ const notifications=new NotificationService(pool,smtp.transport,smtp.status,pars
 const app = buildApp({
   checkDatabase: async () => { await pool.query('SELECT 1'); },
   logger: true,
-  auth: { ...authConfigFromEnvironment(process.env), database: pool, trello: { database: pool, credentials: supervision.trelloCredentials },supervision,chatgpt,ollama,proposals,executions,codeReview,reports,operations,publications,notifications,coverage },
+  auth: { ...authConfigFromEnvironment(process.env), database: pool, assistantProvider:agentProviders, trello: { database: pool, credentials: supervision.trelloCredentials },supervision,chatgpt,ollama,proposals,executions,codeReview,reports,operations,publications,notifications,coverage },
 });
 pool.on('error', () => { app.log.error('Idle database connection failed.'); });
 let worker:ReturnType<typeof startSupervisionWorker>|undefined;

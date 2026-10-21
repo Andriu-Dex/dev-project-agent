@@ -1,3 +1,4 @@
+import {RecoveryPanel} from './RecoveryPanel';
 import {useEffect,useRef,useState} from 'react';
 import type {ExecutionOverview,ExecutionJobView,ExecutionEventView,ProposalVersionView,ProjectAccess} from '@dev-project-agent/contracts';
 
@@ -30,7 +31,7 @@ export function ExecutionPanel({project,csrfToken,proposal,isLatest,onChanged}:{
   }
   const path=`/proposals/${proposal.proposalId}/versions/${proposal.version}`;
   return <div className="execution-panel">
-    <h4>Ejecución en Trello</h4>
+    <h4>Ejecución en Trello</h4>{jobs.filter(job=>job.status==='succeeded').map(job=><RecoveryPanel key={job.id} project={project} csrfToken={csrfToken} originalId={job.id} target="trello" onChanged={onChanged}/>)}
     {proposal.purpose==='demonstration'?<p><strong>Demostración: esta propuesta nunca puede modificar Trello.</strong> Las nuevas versiones conservarán este propósito.</p>:<p>Propuesta de uso real. Aprobarla y solicitar su ejecución son acciones separadas.</p>}
     {overview&&!overview.writesEnabled&&<p>Las escrituras reales están desactivadas en este entorno.</p>}
     {overview?.writesEnabled&&!overview.credentialsConfigured&&<p>Falta configurar una credencial de escritura independiente.</p>}
@@ -39,7 +40,7 @@ export function ExecutionPanel({project,csrfToken,proposal,isLatest,onChanged}:{
       <label className="confirmation"><input type="checkbox" checked={confirmed} onChange={event=>setConfirmed(event.target.checked)} disabled={busy||pending||!overview?.writesEnabled||!overview.credentialsConfigured}/>Confirmo que quiero aplicar en Trello el vencimiento exacto de esta versión aprobada.</label>
       <button disabled={busy||pending||!confirmed||!overview?.writesEnabled||!overview.credentialsConfigured} onClick={()=>{requestKey.current??=crypto.randomUUID();void mutate(path+'/execute',{contentHash:proposal.contentHash,confirmed:true,requestKey:requestKey.current});}}>Solicitar ejecución real</button>
     </>}
-    {project.canManageProject&&isLatest&&['authorized','execution_failed'].includes(proposal.state)&&<>
+    {project.canManageProject&&isLatest&&['authorized','execution_failed','executing'].includes(proposal.state)&&<>
       <label htmlFor="withdraw-reason">Motivo para retirar la autorización</label><textarea id="withdraw-reason" maxLength={1000} value={reason} onChange={event=>setReason(event.target.value)} disabled={busy}/>
       <button disabled={busy||!reason.trim()} onClick={()=>void mutate(path+'/withdraw',{reason})}>Retirar autorización</button>
     </>}

@@ -23,9 +23,10 @@ export function buildAction(item:TrelloItem,snapshot:TrelloSnapshot,policy:Track
   }
   return action;
 }
-export function validateActionDate(action:TrelloAction,start:string|null) {
+export function validateActionDate(action:TrelloAction,start:string|null,reversal=false) {
+  if(reversal){if(action.type==='trello_dates_change'&&action.proposedStart&&action.proposedDue&&Date.parse(action.proposedDue)<Date.parse(action.proposedStart))throw new ProposalError('TARGET_BEFORE_START');return;}
   if(action.type==='trello_due_change')assertTargetDate(action.proposedDue,start);
-  if(action.type==='trello_dates_change')assertTargetDate(action.proposedDue,action.proposedStart);
+  if(action.type==='trello_dates_change')assertTargetDate(action.proposedDue??'',action.proposedStart);
 }
 export function matchesAction(item:TrelloItem,action:TrelloAction):boolean {
   if(action.type==='trello_due_change')return item.due===action.proposedDue;
@@ -41,4 +42,12 @@ export function restoreExpected(item:TrelloItem,action:TrelloAction,expectedStat
 }
 export function actionEvidence(action:TrelloAction) {
   return action.type==='trello_members_change'?'card.memberIds':action.type==='trello_priority_change'||action.type==='trello_state_change'?'card.labelNames':'card.due';
+}
+
+export function reverseAction(action:TrelloAction,item:TrelloItem):TrelloAction {
+  if(!matchesAction(item,action))throw new ProposalError('SOURCE_CHANGED');
+  if(action.type==='trello_due_change')return {type:'trello_dates_change',cardId:item.id,expectedStart:item.start,expectedDue:item.due,proposedStart:item.start,proposedDue:action.expectedDue};
+  if(action.type==='trello_dates_change')return {...action,expectedStart:item.start,expectedDue:item.due,proposedStart:action.expectedStart,proposedDue:action.expectedDue};
+  if(action.type==='trello_members_change')return {...action,expectedMembers:[...item.memberIds].sort(),proposedMembers:action.expectedMembers};
+  return {...action,expectedLabels:[...item.labelNames].sort(),proposedLabels:action.expectedLabels,expectedDueComplete:item.dueComplete,proposedDueComplete:action.expectedDueComplete};
 }

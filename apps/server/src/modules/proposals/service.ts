@@ -1,5 +1,5 @@
 import type {AgentProvider} from '../../providers/agents.js';
-import {buildAction,validateActionDate} from './actions.js';
+import {reverseAction,buildAction,validateActionDate} from './actions.js';
 import {readTrackingPolicy} from '../tracking/policy.js';
 import type {RequestedTrelloChange} from '@dev-project-agent/contracts';
 import type pg from 'pg';
@@ -13,7 +13,7 @@ import type {ConnectionBinding} from '../../providers/chatgpt/connection.js';
 import {supportedEfforts} from '../../providers/chatgpt/validation.js';
 import {assertTargetDate,fingerprint,instructions,parseContent,parseVerdict,ProposalError,safeText,stageSchema,type ProposalContext} from './contracts.js';
 
-export interface ProposalRequest {sourceRunId:string;cardId:string;requestedDue?:string;requestedChange?:RequestedTrelloChange;goal:string;model:string;reasoningEffort?:ReasoningEffort;requestKey:string;purpose?:'demonstration'|'live';proposalId?:string;expectedVersion?:number}
+export interface ProposalRequest {reversalOf?:string;sourceRunId:string;cardId:string;requestedDue?:string;requestedChange?:RequestedTrelloChange;goal:string;model:string;reasoningEffort?:ReasoningEffort;requestKey:string;purpose?:'demonstration'|'live';proposalId?:string;expectedVersion?:number}
 interface VersionRow {project_id:string;proposal_id:string;version:number;purpose:'demonstration'|'live';state:ProposalState;source_run_id:string;context:ProposalContext;goal:string;requested_due:Date|null;created_at:Date;content:ProposalContent|null;content_hash:string|null}
 interface JobRow {id:string;project_id:string;proposal_id:string;version:number;model:string;reasoning_effort:ReasoningEffort|null;status:AgentJobView['status'];error_code:string|null;created_at:Date;request_hash:string}
 const versionSelect='SELECT v.*,p.purpose,c.content,c.content_hash FROM proposal_versions v JOIN proposals p ON p.project_id=v.project_id AND p.id=v.proposal_id LEFT JOIN proposal_contents c ON c.project_id=v.project_id AND c.proposal_id=v.proposal_id AND c.version=v.version';
@@ -71,7 +71,7 @@ export class ProposalService {
   async prepare(binding:ConnectionBinding,actor:AuthUser,request:ProposalRequest) {
     await assertManager(this.database,binding.projectId,actor);await this.provider.ensureConnection(binding,request.model);
     const effort=request.reasoningEffort??null,due=request.requestedDue?new Date(request.requestedDue):null;
-    if(this.closed||!request.requestedChange&&(!due||!Number.isFinite(due.getTime())||due.getTime()<=Date.now()))throw new ProposalError('INVALID_TARGET_DATE');
+    if(this.closed||!request.reversalOf&&!request.requestedChange&&(!due||!Number.isFinite(due.getTime())||due.getTime()<=Date.now()))throw new ProposalError('INVALID_TARGET_DATE');
     safeText(request.goal);if(!request.goal.trim())throw new ProposalError('INVALID_REQUEST');
     const {requestKey:ignoredKey,...payload}=request;const hash=fingerprint({...payload,requestedDue:due?.toISOString()??null,reasoningEffort:effort});
     let created=false;
@@ -83,7 +83,16 @@ export class ProposalService {
       if((await client.query("SELECT id FROM agent_jobs WHERE project_id=$1 AND status='running'",[binding.projectId])).rows.length)throw new ProposalError('CONFLICT');
       const context=await this.context(client,binding.projectId,request.sourceRunId,request.cardId);
       if(!await this.current(client,context))throw new ProposalError('SOURCE_CHANGED');
-      if(request.requestedChange){const snapshot=(await client.query<{data:TrelloSnapshot}>('SELECT data FROM trello_snapshots WHERE project_id=$1 AND id=$2',[binding.projectId,context.trelloSnapshotId])).rows[0]!.data;context.requestedAction=buildAction(snapshot.items.find(item=>item.id===request.cardId)!,snapshot,(await readTrackingPolicy(client,binding.projectId,context.policyVersion))!,request.requestedChange);}else {assertTargetDate(due!.toISOString(),context.card.start);if(context.card.due===due!.toISOString())throw new ProposalError('NO_CHANGE');}
+      if(request.reversalOf){
+        const original=(await client.query<{content:ProposalContent}>('SELECT c.content FROM execution_jobs e JOIN proposal_contents c ON c.project_id=e.project_id AND c.proposal_id=e.proposal_id AND c.version=e.version WHERE e.project_id=$1 AND e.id=$2 AND e.status=\'succeeded\'',[binding.projectId,request.reversalOf])).rows[0];
+        if(!original)throw new ProposalError('CONFLICT');
+        const snapshot=(await client.query<{data:TrelloSnapshot}>('SELECT data FROM trello_snapshots WHERE project_id=$1 AND id=$2',[binding.projectId,context.trelloSnapshotId])).rows[0]!.data;
+        const item=snapshot.items.find(value=>value.id===request.cardId)!;
+        if(original.content.actions[0]!.cardId!==item.id)throw new ProposalError('INVALID_SCOPE');
+        context.requestedAction=reverseAction(original.content.actions[0]!,item);context.reversalOf=request.reversalOf;
+        if(context.requestedAction.type==='trello_members_change'&&context.requestedAction.proposedMembers.some(id=>!snapshot.members.some(member=>member.id===id)))throw new ProposalError('INVALID_SCOPE');
+        validateActionDate(context.requestedAction,item.start,true);
+      }else if(request.requestedChange){const snapshot=(await client.query<{data:TrelloSnapshot}>('SELECT data FROM trello_snapshots WHERE project_id=$1 AND id=$2',[binding.projectId,context.trelloSnapshotId])).rows[0]!.data;context.requestedAction=buildAction(snapshot.items.find(item=>item.id===request.cardId)!,snapshot,(await readTrackingPolicy(client,binding.projectId,context.policyVersion))!,request.requestedChange);}else {assertTargetDate(due!.toISOString(),context.card.start);if(context.card.due===due!.toISOString())throw new ProposalError('NO_CHANGE');}
       let proposalId=request.proposalId,version=1;
       if(proposalId){
         const latest=(await client.query<{latest_version:number;purpose:'demonstration'|'live';state:ProposalState}>('SELECT p.latest_version,p.purpose,v.state FROM proposals p JOIN proposal_versions v ON v.proposal_id=p.id AND v.project_id=p.project_id AND v.version=p.latest_version WHERE p.project_id=$1 AND p.id=$2 FOR UPDATE OF p,v',[binding.projectId,proposalId])).rows[0];
@@ -93,6 +102,7 @@ export class ProposalService {
       }else proposalId=(await client.query<{id:string}>('INSERT INTO proposals (project_id,created_by,purpose) VALUES ($1,$2,$3) RETURNING id',[binding.projectId,actor.id,request.purpose??'demonstration'])).rows[0]!.id;
       await client.query('INSERT INTO proposal_versions (project_id,proposal_id,version,source_run_id,context,goal,requested_due,created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)',[binding.projectId,proposalId,version,request.sourceRunId,JSON.stringify(context),request.goal,due?.toISOString()??null,actor.id]);
       const inserted=(await client.query<JobRow>('INSERT INTO agent_jobs (project_id,proposal_id,version,requested_by,request_key,request_hash,model,reasoning_effort) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *',[binding.projectId,proposalId,version,actor.id,request.requestKey,hash,request.model,effort])).rows[0]!;
+      if(request.reversalOf)await client.query('INSERT INTO reversal_links(project_id,original_job_id,proposal_id,version,created_by) VALUES($1,$2,$3,$4,$5)',[binding.projectId,request.reversalOf,proposalId,version,actor.id]);
       await this.audit(client,binding.projectId,actor.id,'proposal.prepare',proposalId,'requested');created=true;return inserted;
     });
     if(created)this.launch(binding,actor,job);return jobView(job);

@@ -120,6 +120,44 @@ describe.skipIf(process.env.RUN_CODE_DB_TESTS!=='true')('PostgreSQL pinned code 
       const count=transport.writes.length;expect((await publication.request(projectId,actor,result.job.proposalId,1,result.detail.contentHash!,key,true)).id).toBe(job.id);expect(transport.writes).toHaveLength(count);expect(transport.writes).not.toContain('/merge');
     }finally{await publication.close();if(transportMode==='ok')await client.query('RESET ROLE');}
   });
+  it('withdraws a GitHub authorization during preflight without publishing any object',async()=>{
+    const transport=publicationFixture();let entered:()=>void=()=>{},release:()=>void=()=>{};const reached=new Promise<void>(resolve=>{entered=resolve;}),waiting=new Promise<void>(resolve=>{release=resolve;});
+    const held:typeof fetch=async(input,init)=>{if(String(input).endsWith('/commits/develop')){entered();await waiting;}return transport.fetcher(input,init);};
+    const publication=new PublicationService(database,service,{enabled:true,token:'synthetic-write-token'},held),initial=await prepare({purpose:'live'});
+    await service.decide(projectId,actor,initial.job.proposalId,1,initial.detail.contentHash!,'approved','Original reviewed.',randomUUID());
+    const job=await publication.request(projectId,actor,initial.job.proposalId,1,initial.detail.contentHash!,randomUUID(),true);await reached;
+    await service.withdraw(projectId,actor,initial.job.proposalId,1,'Cancelar antes de escribir.');release();await publication.waitForIdle();
+    expect(transport.writes).toHaveLength(0);expect((await publicationOverview(database,projectId)).find(row=>row.id===job.id)).toMatchObject({status:'failed',errorCode:'AUTHORIZATION_WITHDRAWN'});await publication.close();
+  });
+  it('prepares an exact inverse on the current merged HEAD and repeats review without granting approval',async()=>{
+    const transport=publicationFixture(),publication=new PublicationService(database,service,{enabled:true,token:'synthetic-write-token'},transport.fetcher);
+    const initial=await prepare({purpose:'live'});await service.decide(projectId,actor,initial.job.proposalId,1,initial.detail.contentHash!,'approved','Original patch reviewed.',randomUUID());
+    const published=await publication.request(projectId,actor,initial.job.proposalId,1,initial.detail.contentHash!,randomUUID(),true);await publication.waitForIdle();
+    const saved=(await publicationOverview(database,projectId)).find(row=>row.id===published.id)!;
+    const pull=transport.pulls[0]!;pull.merged_at=new Date().toISOString();pull.state='closed';
+    const commit=transport.commits.get(saved.commitSha!)!;
+    const mergedFetcher:typeof fetch=async(input,init)=>String(input).endsWith('/commits/develop')?Response.json({sha:saved.commitSha,commit:{tree:{sha:commit.tree}}}):transport.fetcher(input,init);
+    const recoveryService=new CodeReviewService(database,provider,'synthetic-read-token',mergedFetcher);
+    const reversed=await recoveryService.prepareReversal(binding,actor,published.id,'Revertir la corrección de prueba.','gpt-6.1-sol','high',true,randomUUID());await recoveryService.waitForIdle();
+    const detail=await recoveryService.version(projectId,reversed.proposalId,1);
+    expect(detail.state).toBe('pending_human_approval');expect(detail.decisions).toHaveLength(0);
+    expect(detail.messages.map(message=>message.stage)).toEqual(['executor','reviewer','approver']);
+    for(const file of detail.candidate!.files)expect(file.content).toBe(codeFixture().files.find(original=>original.path===file.path)!.content);
+    expect(detail.candidate!.documentation).toContain('Revertir');expect(transport.writes).not.toContain('/merge');await recoveryService.close();await publication.close();
+  });
+  it('retires only the verified open PR after separate exact-plan approval and execution',async()=>{
+    const transport=publicationFixture('ok',true),publication=new PublicationService(database,service,{enabled:true,token:'synthetic-write-token'},transport.fetcher);
+    const result=await prepare({purpose:'live'});await service.decide(projectId,actor,result.job.proposalId,1,result.detail.contentHash!,'approved','Reviewed live patch.',randomUUID());
+    const job=await publication.request(projectId,actor,result.job.proposalId,1,result.detail.contentHash!,randomUUID(),true);await publication.waitForIdle();
+    const plan=await publication.prepareRecovery(binding,actor,job.id,'Retirar PR de prueba.',randomUUID(),'gpt-6.1-sol','high',true);
+    expect(plan.status).toBe('prepared');const count=transport.writes.length;
+    await expect(publication.recoveryAction(projectId,actor,plan.id,plan.content_hash,'execute','Retiro revisado.',true)).rejects.toHaveProperty('code','CONFLICT');
+    expect(transport.writes).toHaveLength(count);
+    await publication.recoveryAction(projectId,actor,plan.id,plan.content_hash,'approve','Plan revisado.',true);
+    expect(await publication.recoveryAction(projectId,actor,plan.id,plan.content_hash,'execute','Confirmo cierre.',true)).toMatchObject({status:'succeeded'});
+    expect(transport.pulls[0]!.state).toBe('closed');expect(transport.refs.size).toBe(1);expect(transport.writes.at(-1)).toBe('PATCH /pulls/1');
+    await expect(publication.recoveryAction(projectId,actor,plan.id,plan.content_hash,'execute','Repetir.',true)).rejects.toHaveProperty('code','CONFLICT');await publication.close();
+  });
   it('blocks permanent demonstrations and disabled publication with no transport calls',async()=>{
     const transport=publicationFixture(),publication=new PublicationService(database,service,{enabled:true,token:'synthetic-write-token'},transport.fetcher),result=await prepare();
     await service.decide(projectId,actor,result.job.proposalId,1,result.detail.contentHash!,'approved','Demonstration reviewed.',randomUUID());

@@ -1,3 +1,6 @@
+import {ThemeToggle} from './ThemeToggle';
+import {AssistantChat} from './AssistantChat';
+import {WorkProgress} from './WorkProgress';
 import { useEffect, useState, type FormEvent } from 'react';
 import type { SessionResponse, ProjectRole } from '@dev-project-agent/contracts';
 import {Workspace, Icon} from './Workspace';
@@ -91,8 +94,8 @@ export function SessionPanel() {
     if(page==='overview')return <OverviewPage project={project}/>;
     if(page==='planning')return <PlanningPage key={sourceRevision} project={project}/>;
     if(page==='alerts')return <AlertsPage {...props}/>;
-    if(page==='proposals')return <ProposalPanel {...props} sourceRevision={sourceRevision}/>;
-    if(page==='code')return <CodeReviewPanel {...props}/>;
+    if(page==='proposals')return <><WorkProgress projectId={project.id}/><ProposalPanel {...props} sourceRevision={sourceRevision}/></>;
+    if(page==='code')return <><WorkProgress projectId={project.id}/><CodeReviewPanel {...props}/></>;
     if(page==='reports')return <ReportsPanel {...props}/>;
     if(page==='operations')return <OperationsPage {...props} onCompleted={()=>setSourceRevision(value=>value+1)}/>;
     return (
@@ -177,12 +180,12 @@ export function SessionPanel() {
         }}
       </SettingsPage>
     );
-  }}/>{error&&<div className="global-notice" role="alert">{error}</div>}</>;
+  }}/><AssistantChat project={session.project} csrfToken={session.csrfToken}/>{error&&<div className="global-notice" role="alert">{error}</div>}</>;
   return (
     <main className="login-layout">
       <div className="login-story">
         <div className="login-story-header">
-          <a className="workspace-brand" href="#overview">
+          <ThemeToggle/><a className="workspace-brand" href="#overview">
             <img src="/favicon.jpg" alt="Dev Project Agent" className="brand-mark" />
             <span>Dev Project Agent</span>
           </a>
