@@ -1,3 +1,4 @@
+import {ThemeToggle} from './ThemeToggle';
 import { hasUnsavedChanges, getUnsavedSections, discardUnsavedChanges } from '../hooks/useUnsavedChanges';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { ProjectAccess, SessionResponse } from '@dev-project-agent/contracts';
@@ -294,7 +295,7 @@ export function Workspace({
               <span className="breadcrumb-page">{pages[page].title}</span>
             </div>
           </div>
-          <div className="topbar-actions">
+          <div className="topbar-actions"><ThemeToggle/>
             <div className="topbar-status-badge" title="Panel del proyecto; consulta la fecha y el estado de las fuentes en Resumen">
               <span className="live-pulse-dot" />
               <span className="status-badge-text">Panel del proyecto</span>

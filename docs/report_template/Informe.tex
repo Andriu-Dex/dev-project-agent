@@ -1,0 +1,358 @@
+\documentclass[10pt,letterpaper]{article}
+
+% =========================================================================
+% PAQUETES Y CONFIGURACIÓN TIPOGRÁFICA
+% =========================================================================
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[spanish]{babel} % Por defecto usa "Cuadro" según la norma institucional y el ejemplo
+\usepackage{lmodern}        % Tipografía Latin Modern idéntica al documento de referencia
+\usepackage{amssymb}        % Símbolos matemáticos y geométricos
+\usepackage{indentfirst}    % Sangría en el primer párrafo tras los títulos
+
+% Nota: Si algún evaluador le exige expresamente Times New Roman 12pt según Formato (1),
+% descomente la siguiente línea y cambie 10pt por 12pt en \documentclass:
+% \usepackage{mathptmx}
+
+% Configuración de márgenes: 2.0 cm en los cuatro bordes según Ejemplo_formato_entregables.pdf
+\usepackage[letterpaper,top=2.0cm,bottom=2.0cm,left=2.0cm,right=2.0cm,footskip=1.0cm]{geometry}
+
+\usepackage{graphicx}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{multirow}
+\usepackage{longtable}
+\usepackage{booktabs}       % Tablas de calidad tipográfica formal (toprule, midrule, bottomrule)
+\usepackage{colortbl}
+\usepackage[table]{xcolor}
+\usepackage{fancyhdr}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage{setspace}
+\usepackage{lastpage}
+\usepackage[hidelinks]{hyperref}
+
+% =========================================================================
+% FORMATO DE PÁRRAFOS Y LISTAS
+% =========================================================================
+% Viñetas cuadradas rellenas de 3pt x 3pt idénticas al PDF de referencia
+\setlist[itemize]{
+  label=\rule[0.2ex]{3pt}{3pt},
+  leftmargin=1.5em,
+  topsep=3pt,
+  itemsep=3pt,
+  parsep=0pt
+}
+\setlist[enumerate]{
+  leftmargin=1.5em,
+  topsep=3pt,
+  itemsep=3pt,
+  parsep=0pt
+}
+
+% Sangría e interlineado idénticos al documento de referencia
+\setlength{\parindent}{15pt} % Sangría estándar de párrafo (~0.5 cm)
+\setlength{\parskip}{0pt}    % Sin salto extra entre párrafos estándar
+\setstretch{1.25}            % Interlineado equivalente a 1.25 / 1.5 líneas (14.95 pt entre líneas base)
+
+% =========================================================================
+% FORMATO DE TÍTULOS DE SECCIÓN
+% =========================================================================
+% Numeración con punto final (1., 8.1., 8.1.1.)
+\renewcommand{\thesection}{\arabic{section}.}
+\renewcommand{\thesubsection}{\arabic{section}.\arabic{subsection}.}
+\renewcommand{\thesubsubsection}{\arabic{section}.\arabic{subsection}.\arabic{subsubsection}.}
+
+% Jerarquía de tamaños estándar LaTeX (14.35pt, 11.96pt, 9.96pt)
+\titleformat{\section}{\Large\bfseries}{\thesection}{0.6em}{}
+\titlespacing*{\section}{0pt}{18pt}{8pt}
+
+\titleformat{\subsection}{\large\bfseries}{\thesubsection}{0.6em}{}
+\titlespacing*{\subsection}{0pt}{14pt}{6pt}
+
+\titleformat{\subsubsection}{\normalsize\bfseries}{\thesubsubsection}{0.6em}{}
+\titlespacing*{\subsubsection}{0pt}{10pt}{4pt}
+
+% =========================================================================
+% METADATOS Y PARÁMETROS CONFIGURABLES DE LA PLANTILLA
+% Reemplace los valores dentro de las llaves con los datos de su entregable.
+% Parámetros estandarizados según Formato (1).pdf y Ejemplo formato entregables.pdf
+% =========================================================================
+\newcommand{\NombreOrganizacion}{[NOMBRE DE LA ORGANIZACIÓN / EMPRESA]}
+\newcommand{\NombreProceso}{[NOMBRE DEL PROCESO]}
+\newcommand{\TemaSubproceso}{[SUBPROCESO O ÁREA TEMÁTICA]}
+\newcommand{\TituloDocumentoEncabezado}{[TÍTULO CORTO DEL DOCUMENTO]}
+
+% Estructura oficial del código documental según Formato (1): TIPO_PROCESO-PROCESO-TIPO_DOC-SECUENCIAL
+% Tipos de proceso: DI (Directivo), MI (Misional), AS (Asesor), AP (Apoyo)
+% Procesos: TIC, DAF, SSO, ATH, PRE, TES, MAN, CPU, etc.
+% Tipos doc: INF (Informe), PRO (Procedimiento), PLA (Planes), ESP (Especificaciones), etc.
+\newcommand{\CodigoDoc}{XX-YYY-ZZZ-001}
+\newcommand{\VersionDoc}{1.0}
+\newcommand{\FechaElaboracion}{DD/MM/AAAA}
+\newcommand{\FechaRevision}{DD/MM/AAAA}
+\newcommand{\TituloCompleto}{[TÍTULO COMPLETO Y DESCRIPTIVO DEL INFORME / ENTREGABLE]}
+\newcommand{\ArchivoLogo}{logo_devnova.png} % Logotipo institucional (3.0 cm x 3.0 cm)
+
+% =========================================================================
+% ESTILO DE PÁGINAS (ENCABEZADOS Y PIES)
+% El documento de referencia mantiene las páginas limpias, sin encabezado
+% superior, únicamente con el número de página centrado en el pie.
+% =========================================================================
+\pagestyle{plain}
+
+% En caso de que en su carrera le soliciten encabezado formal en cada página:
+% \pagestyle{fancy}
+% \fancyhf{}
+% \fancyhead[L]{\small\itshape\NombreOrganizacion}
+% \fancyhead[R]{\small\itshape\CodigoDoc}
+% \renewcommand{\headrulewidth}{0.4pt}
+% \fancyfoot[C]{\thepage}
+
+% =========================================================================
+% INICIO DEL DOCUMENTO
+% =========================================================================
+\begin{document}
+
+% -------------------------------------------------------------------------
+% MEMBRETE INSTITUCIONAL OFICIAL (TABLA DE ENCABEZADO SEGÚN FORMATO 1)
+% Tabla centrada de ancho fijo (~16.3 cm) con proporción oficial.
+% -------------------------------------------------------------------------
+\noindent
+\begin{center}
+\renewcommand{\arraystretch}{1.35}
+\begin{tabular}{|>{\centering\arraybackslash}m{3.1cm}|>{\centering\arraybackslash}m{8.1cm}|>{\raggedright\arraybackslash}m{4.1cm}|}
+\hline
+\multirow{4}{3.1cm}{%
+  \centering
+  \IfFileExists{\ArchivoLogo}{%
+    \includegraphics[width=3.0cm,height=3.0cm,keepaspectratio]{\ArchivoLogo}%
+  }{%
+    \fbox{\parbox[c][2.6cm][c]{2.8cm}{\centering\textbf{LOGO}}}%
+  }%
+}
+& \textbf{\NombreOrganizacion} & \textbf{CÓDIGO:} \CodigoDoc \\ \cline{2-3}
+& \textbf{PROCESO:} \NombreProceso & \textbf{VERSIÓN:} \VersionDoc \\ \cline{2-3}
+& \TemaSubproceso & \textbf{ELABORACIÓN:} \FechaElaboracion \\ \cline{2-3}
+& \TituloDocumentoEncabezado & \textbf{ÚLTIMA REVISIÓN:} \FechaRevision \\ \hline
+\end{tabular}
+\end{center}
+
+\vspace{0.4cm}
+
+% =========================================================================
+% 1. TÍTULO
+% =========================================================================
+\section{Título}
+
+\TituloCompleto
+
+% =========================================================================
+% 2. INTRODUCCIÓN
+% =========================================================================
+\section{Introducción}
+
+[Describa aquí el contexto general del proyecto o área de trabajo, los antecedentes relevantes, la motivación u oportunidad abordada y una síntesis clara del propósito y contenido del informe. La introducción debe orientar al lector sobre la temática y los resultados que se presentan a continuación.]
+
+[Puede continuar con un segundo párrafo describiendo la estructura del documento o las fuentes principales empleadas en el análisis.]
+
+% =========================================================================
+% 3. OBJETIVO
+% =========================================================================
+\section{Objetivo}
+
+[Redacte el objetivo principal del documento comenzando con un verbo en infinitivo. Debe reflejar con precisión el propósito que se busca alcanzar con el informe o entregable, considerando la parte organizativa y técnica.]
+
+% En caso de requerir desglose en objetivo general y específicos:
+% \subsection{Objetivo General}
+% [Redacte el objetivo general...]
+%
+% \subsection{Objetivos Específicos}
+% \begin{itemize}
+%     \item [Primer objetivo específico...]
+%     \item [Segundo objetivo específico...]
+%     \item [Tercer objetivo específico...]
+% \end{itemize}
+
+% =========================================================================
+% 4. ALCANCE
+% =========================================================================
+\section{Alcance}
+
+Este documento comprende:
+\begin{itemize}
+    \item La descripción y aplicación de los componentes, metodologías o normas abordadas.
+    \item La integración de marcos de trabajo y herramientas técnicas utilizadas.
+    \item La adopción de estándares de calidad, seguridad y gestión operativa.
+    \item La incorporación de lineamientos institucionales y organizacionales del proyecto.
+\end{itemize}
+
+No se incluyen procesos administrativos externos ni evaluaciones fuera del marco temporal o técnico definido para el presente informe.
+
+% =========================================================================
+% 5. DEFINICIONES
+% =========================================================================
+\section{Definiciones}
+
+\begin{itemize}
+    \item \textbf{[Término o Concepto 1]:} [Definición clara y concisa en el contexto del proyecto o trabajo.]
+    \item \textbf{[Término o Concepto 2]:} [Definición clara y concisa en el contexto del proyecto o trabajo.]
+    \item \textbf{[Sigla o Acrónimo]:} [Significado de la sigla y breve explicación de su uso en el documento.]
+\end{itemize}
+
+% =========================================================================
+% 6. RESPONSABILIDADES
+% =========================================================================
+\section{Responsabilidades}
+
+[Detalle los miembros del equipo y sus responsabilidades directas relacionadas con las actividades o artefactos descritos en este documento.]
+
+\begin{center}
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{lp{10.5cm}}
+\toprule
+\textbf{Responsable} & \textbf{Descripción de la responsabilidad} \\
+\midrule
+{[Nombre y Apellidos 1]} & [Coordinar la planificación, aplicación y seguimiento general del entregable.] \\
+{[Nombre y Apellidos 2]} & [Evaluar la infraestructura técnica y garantizar la aplicación de estándares técnicos.] \\
+{[Nombre y Apellidos 3]} & [Supervisar la adopción de buenas prácticas de desarrollo y estándares de calidad.] \\
+{[Nombre y Apellidos 4]} & [Documentar la implementación normativa y elaborar informes de cumplimiento.] \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+% =========================================================================
+% 7. NORMATIVA LEGAL Y TÉCNICA APLICABLE
+% =========================================================================
+\section{Normativa Legal y Técnica Aplicable}
+
+[Liste las leyes, normativas institucionales y estándares técnicos internacionales que sustentan la elaboración del documento o rigen las actividades del proyecto.]
+
+\begin{itemize}
+    \item \textbf{[Normativa legal 1]:} [Descripción de la ley, decreto o código institucional aplicable.]
+    \item \textbf{[Estándar Técnico 1 (ej. ISO/IEC 27001)]:} [Directrices para la seguridad de la información.]
+    \item \textbf{[Estándar Técnico 2 (ej. ISO/IEC 25010)]:} [Criterios de evaluación de calidad del producto de software.]
+    \item \textbf{[Marco de Referencia (ej. OWASP ASVS)]:} [Estándar de verificación de seguridad en aplicaciones.]
+\end{itemize}
+
+% =========================================================================
+% 8. MÉTODO / POLÍTICAS / CONTENIDO
+% =========================================================================
+\section{Método / Políticas / Contenido}
+
+\subsection{Metodología}
+
+Se empleó un enfoque estructurado que combina análisis técnico y metodologías ágiles. La implementación se realizó aplicando principios de:
+
+\begin{itemize}
+    \item \textbf{Scrum:} con sprints definidos, revisión continua y roles asignados.
+    \item \textbf{Gestión de Riesgos:} mediante matriz de riesgos y plan de contingencia.
+    \item \textbf{Evaluación de Cumplimiento:} verificando conformidad con estándares técnicos.
+\end{itemize}
+
+\subsection{Políticas}
+
+[Establezca las políticas, directrices o reglas obligatorias que rigen la ejecución de las actividades, la seguridad, la calidad o la toma de decisiones.]
+
+\begin{itemize}
+    \item \textbf{Política de Calidad:} [Directriz obligatoria sobre aseguramiento de calidad del entregable.]
+    \item \textbf{Política de Seguridad:} [Directriz sobre protección de información y control de acceso.]
+    \item \textbf{Política de Control de Versiones:} [Directriz sobre revisión y aprobación de artefactos.]
+\end{itemize}
+
+\subsection{Contenido}
+
+[Desarrolle en esta sección el núcleo técnico del informe o entregable. Puede crear las subdivisiones temáticas que requiera mediante \texttt{\textbackslash subsubsection\{...\}}.]
+
+\subsubsection{[Componente o Subtema Técnico 1]}
+
+[Desarrollo detallado del componente, análisis, requerimientos, diseño o artefacto según el tipo de entregable.]
+
+% -------------------------------------------------------------------------
+% EJEMPLO FORMAL DE TABLA (Booktabs):
+% -------------------------------------------------------------------------
+% \begin{table}[htbp]
+% \centering
+% \caption{[Título descriptivo de la tabla o cuadro]}
+% \label{tab:ejemplo}
+% \renewcommand{\arraystretch}{1.2}
+% \begin{tabular}{llcc}
+% \toprule
+% \textbf{Elemento} & \textbf{Descripción} & \textbf{Módulo} & \textbf{Estado} \\
+% \midrule
+% Módulo A & Procesamiento de autenticación & Backend & Conforme \\
+% Módulo B & Interfaz de usuario interactiva & Frontend & En revisión \\
+% \bottomrule
+% \end{tabular}
+% \end{table}
+
+\subsubsection{[Componente o Subtema Técnico 2]}
+
+[Continuación del desarrollo del contenido técnico.]
+
+% =========================================================================
+% 9. FIRMAS DE RESPONSABILIDAD
+% =========================================================================
+\section{Firmas de responsabilidad}
+
+Indica la validez formal del documento y la identificación de las personas responsables de su elaboración, revisión y aprobación.
+
+\begin{center}
+\renewcommand{\arraystretch}{2.4}
+\begin{tabular}{p{3.8cm}p{4.2cm}>{\centering\arraybackslash}p{4.0cm}>{\centering\arraybackslash}p{2.8cm}}
+\toprule
+\textbf{Rol} & \textbf{Nombre / Representante} & \textbf{Firma / Aprobación (QR)} & \textbf{Fecha} \\
+\midrule
+Gestor del proyecto & {[Nombre y Apellidos 1]} & & \FechaElaboracion \\
+Desarrollador backend & {[Nombre y Apellidos 2]} & & \FechaElaboracion \\
+Desarrollador frontend & {[Nombre y Apellidos 3]} & & \FechaElaboracion \\
+Documentador & {[Nombre y Apellidos 4]} & & \FechaRevision \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+% =========================================================================
+% 10. CONTROL DE CAMBIOS
+% =========================================================================
+\section{Control de Cambios}
+
+Al final del documento se registra el cuadro de control de cambios para mantener el historial de versiones y trazabilidad de revisiones.
+
+\begin{table}[htbp]
+\centering
+\caption{Historial de control de cambios}
+\label{tab:control_cambios}
+\renewcommand{\arraystretch}{1.25}
+\begin{tabular}{|c|p{8.0cm}|p{3.8cm}|c|}
+\hline
+\textbf{Versión} & \textbf{Descripción del Cambio} & \textbf{Responsable} & \textbf{Fecha} \\ \hline
+1.0 & [Creación inicial y emisión del documento.] & {[Nombre del Responsable]} & \FechaElaboracion \\ \hline
+% 1.1 & [Ajuste o modificación realizada] & {[Nombre del Responsable]} & [DD/MM/AAAA] \\ \hline
+\end{tabular}
+\end{table}
+
+% =========================================================================
+% 11. ANEXOS
+% =========================================================================
+\section{Anexos}
+
+[Incluya aquí material de soporte, diagramas extensos, actas de reunión, especificaciones complementarias o evidencias que sirvan de sustento al informe.]
+
+\appendix
+\renewcommand{\thesection}{\Alph{section}.}
+
+\section{[Nombre del Anexo o Documento de Soporte]}
+
+[Descripción y contenido del Anexo A (diagramas de arquitectura, modelos de base de datos, actas, etc.).]
+
+% -------------------------------------------------------------------------
+% EJEMPLO DE FIGURA EN ANEXO:
+% -------------------------------------------------------------------------
+% \begin{figure}[htbp]
+% \centering
+% \includegraphics[width=0.85\textwidth]{nombre_imagen.png}
+% \caption{Diagrama representativo del componente técnico.}
+% \label{fig:diagrama_anexo}
+% \end{figure}
+
+\end{document}

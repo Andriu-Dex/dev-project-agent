@@ -2,6 +2,8 @@
 
 Actualizada el 15 de octubre de 2026. La aplicación es local e independiente de UTAPED. El registro académico conserva 38 comprobaciones superadas y una excepción histórica documentada, sin atribuir dispensa al profesor.
 
+Esta guía conserva el recorrido base 1.0. Para las ampliaciones y migraciones actuales consultar [uso de la versión 1.1](version-1.1-guide.md).
+
 ## Instalar y actualizar
 
 Requiere Node 24.19+ dentro de 24.x, npm 11 y Docker con Compose. Desde la raíz ejecutar:

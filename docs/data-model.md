@@ -35,3 +35,7 @@ En cobertura, la generación cambia al invalidar contenido o contexto y cada fra
 ## Conservación y recuperación
 
 Los respaldos contienen estado operativo y datos privados. Mantener la clave de cifrado separada lógicamente de los sobres ChatGPT y proteger la copia de recuperación. No limpiar tablas, eliminar migraciones ni reconstruir decisiones para ordenar el repositorio. Ver [respaldo y recuperación](backup-and-recovery.md) y [EX-01 histórica](validation/validation-closeout.md#ex-01-dato-histórico-ausente).
+
+## Datos añadidos en 1.1
+
+`report_template_versions` conserva metadatos versionados; `report_document_keys` asigna consecutivos por periodo/tipo/proyecto; `report_results` añade HTML y huella de presentación sin cambiar datos históricos. `assistant_messages` vincula petición/respuesta a usuario y proyecto con clave de reenvío. `reversal_links` enlaza propuestas Trello con ejecuciones originales. `github_recovery_requests` y sus eventos conservan planes inmutables, motivo, autoridad y ciclo de preparación/aprobación/ejecución/retirada/reconciliación. El rol de aplicación no puede reescribir planes ni evidencias; las transiciones y sus eventos se guardan transaccionalmente.

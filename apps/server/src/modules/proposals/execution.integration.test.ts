@@ -67,6 +67,23 @@ describe.skipIf(process.env.RUN_EXECUTIONS_DB_TESTS!=='true')('PostgreSQL contro
     const execution=await execute(result);expect(execution.job.status).toBe('succeeded');expect(writeCalls).toBe(1);
     expect((await service.version(projectId,result.job.proposalId,1))!.state).toBe('executed');
   });
+  it('withdraws atomically while preflight is reading and prevents the durable write boundary',async()=>{
+    const approvedProposal=await approved();let entered:()=>void=()=>{},release:()=>void=()=>{};
+    const reached=new Promise<void>(resolve=>{entered=resolve;}),waiting=new Promise<void>(resolve=>{release=resolve;});permissionHook=async()=>{entered();await waiting;};
+    const job=await executor.request(projectId,actor,approvedProposal.job.proposalId,1,approvedProposal.detail.contentHash!,randomUUID(),true);await reached;
+    await executor.withdraw(projectId,actor,approvedProposal.job.proposalId,1,'Retirar antes de iniciar efectos externos.');release();await executor.waitForIdle();
+    expect(writeCalls).toBe(0);expect((await executor.detail(projectId,job.id))!.job).toMatchObject({status:'blocked',errorCode:'AUTHORIZATION_WITHDRAWN'});
+  });
+  it('creates a separately reviewed and approved reversal of a verified member change',async()=>{
+    board.members.push({id:'e'.repeat(24),fullName:'Second member',username:'second'});await refresh();
+    const originalMembers=[...board.cards[0]!.idMembers];
+    const first=await approved({requestedDue:undefined,requestedChange:{family:'members',memberIds:['e'.repeat(24)]}});const applied=await execute(first);await refresh();
+    const reverse=await prepare({requestedDue:undefined,reversalOf:applied.job.id,goal:'Restaurar la asignación anterior; revisar sus riesgos.'});
+    expect(reverse.detail.state).toBe('pending_human_approval');expect(reverse.detail.content!.actions[0]).toMatchObject({type:'trello_members_change',proposedMembers:originalMembers});
+    await expect(executor.request(projectId,actor,reverse.job.proposalId,1,reverse.detail.contentHash!,randomUUID(),true)).rejects.toHaveProperty('code','CONFLICT');
+    await service.decide(projectId,actor,reverse.job.proposalId,1,reverse.detail.contentHash!,'approved','Reviewed reversal with a separate authorization.',randomUUID());
+    const result=await execute(reverse);expect(result.job.status).toBe('succeeded');expect(board.cards[0]!.idMembers).toEqual(originalMembers);expect(writeCalls).toBe(2);
+  });
   it('blocks demonstration proposals permanently, including later versions, with zero remote requests',async()=>{
     const result=await approved({purpose:'demonstration'});await expect(executor.request(projectId,actor,result.job.proposalId,1,result.detail.contentHash!,randomUUID(),true)).rejects.toMatchObject({code:'DEMONSTRATION_ONLY'});expect(remoteCalls).toBe(0);
     await executor.withdraw(projectId,actor,result.job.proposalId,1,'Demonstration only.');expect((await service.version(projectId,result.job.proposalId,1))!.state).toBe('invalidated');

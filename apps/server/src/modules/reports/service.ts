@@ -1,6 +1,8 @@
+import {renderReport} from './render.js';
+import {readFileSync} from 'node:fs';
 import {randomUUID} from 'node:crypto';
 import type pg from 'pg';
-import type {CodeAnalysisResult,CodeSource,GitHubSnapshot,ReportDetail,ReportSchedule,ReportSummary,TrelloOverview,TrelloSnapshot,TrackingPolicyResponse,WeeklyReport} from '@dev-project-agent/contracts';
+import type {ReportTemplateSettings,CodeAnalysisResult,CodeSource,GitHubSnapshot,ReportDetail,ReportSchedule,ReportSummary,TrelloOverview,TrelloSnapshot,TrackingPolicyResponse,WeeklyReport} from '@dev-project-agent/contracts';
 import {riskAssessment} from '../operations/risks.js';
 import type {TrelloDatabase} from '../../integrations/trello/service.js';
 import type {AuthUser} from '../auth/repository.js';
@@ -11,7 +13,7 @@ import {nextWeeklyCutoff} from './schedule.js';
 
 export class ReportError extends Error {constructor(readonly code:string){super('Report operation failed.');}}
 interface ScheduleRow {project_id:string;version:number;enabled:boolean;weekday:number;hour:number;minute:number;changed_at:Date;changed_by:string;auth_version:number;period_start:Date;next_cutoff:Date;error_code:string|null}
-interface Job {id:string;project_id:string;kind:'scheduled'|'manual';cutoff:Date;period_start:Date;schedule_version:number|null;requested_by:string;auth_version:number;version:number;status:ReportSummary['status'];created_at:Date;finished_at:Date|null;error_code:string|null;request_hash:string}
+interface Job {revision_reason:string;id:string;project_id:string;kind:'scheduled'|'manual';cutoff:Date;period_start:Date;schedule_version:number|null;requested_by:string;auth_version:number;version:number;status:ReportSummary['status'];created_at:Date;finished_at:Date|null;error_code:string|null;request_hash:string}
 const summary=(job:Job):ReportSummary=>({id:job.id,version:job.version,kind:job.kind,status:job.status,periodStart:job.period_start.toISOString(),cutoff:job.cutoff.toISOString(),createdAt:job.created_at.toISOString(),finishedAt:job.finished_at?.toISOString()??null,errorCode:job.error_code});
 const defaultSchedule:ReportSchedule={version:0,enabled:false,weekday:5,hour:18,minute:0,timeZone:'America/Guayaquil',changedAt:null,nextCutoff:null};
 export function reportText(value:string) {
@@ -31,8 +33,27 @@ export class ReportService {
   private async lock(client:pg.PoolClient,projectId:string){await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',['reports:'+projectId]);}
   private async scheduleRow(client:Pick<pg.PoolClient,'query'>,projectId:string) {return (await client.query<ScheduleRow>('SELECT s.*,c.period_start,c.next_cutoff,c.error_code FROM report_schedule_cursors c JOIN report_schedule_versions s ON s.project_id=c.project_id AND s.version=c.version WHERE c.project_id=$1',[projectId])).rows[0]??null;}
   async schedule(projectId:string):Promise<ReportSchedule>{const row=await this.scheduleRow(this.database,projectId);return row?{version:row.version,enabled:row.enabled,weekday:row.weekday,hour:row.hour,minute:row.minute,timeZone:'America/Guayaquil',changedAt:row.changed_at.toISOString(),nextCutoff:row.enabled?row.next_cutoff.toISOString():null,errorCode:row.error_code}:defaultSchedule;}
-  async overview(projectId:string) {return {schedule:await this.schedule(projectId),reports:(await this.database.query<Job>('SELECT * FROM report_jobs WHERE project_id=$1 ORDER BY cutoff DESC,version DESC,id DESC LIMIT 60',[projectId])).rows.map(summary)};}
-  async detail(projectId:string,id:string):Promise<ReportDetail|null>{const row=(await this.database.query<Job&{data:WeeklyReport|null;content_hash:string|null}>('SELECT j.*,r.data,r.content_hash FROM report_jobs j LEFT JOIN report_results r ON r.project_id=j.project_id AND r.report_id=j.id WHERE j.project_id=$1 AND j.id=$2',[projectId,id])).rows[0];return row?{...summary(row),contentHash:row.content_hash,data:row.data}:null;}
+  async overview(projectId:string,filter:{offset?:number;status?:string;from?:string;to?:string}={}) {
+    const values=[projectId,filter.status??null,filter.from?filter.from+'T00:00:00-05:00':null,filter.to?new Date(Date.parse(filter.to+'T00:00:00-05:00')+86400000):null];
+    const where='project_id=$1 AND ($2::text IS NULL OR status=$2) AND ($3::timestamptz IS NULL OR cutoff>=$3) AND ($4::timestamptz IS NULL OR cutoff<$4)';
+    const offset=filter.offset??0,total=(await this.database.query<{count:number}>('SELECT count(*)::int AS count FROM report_jobs WHERE '+where,values)).rows[0]!.count;
+    const reports=(await this.database.query<Job>('SELECT * FROM report_jobs WHERE '+where+' ORDER BY cutoff DESC,version DESC,id DESC LIMIT 60 OFFSET $5',[...values,offset])).rows.map(summary);
+    return {schedule:await this.schedule(projectId),reports,total,nextOffset:offset+reports.length<total?offset+reports.length:null};
+  }
+  async template(projectId:string) {
+    const row=(await this.database.query<{version:number;settings:ReportTemplateSettings}>('SELECT version,settings FROM report_template_versions WHERE project_id=$1 ORDER BY version DESC LIMIT 1',[projectId])).rows[0];
+    return row??{version:0,settings:{organization:'',process:'',subprocess:'',title:'Informe de seguimiento del proyecto',codePrefix:''}};
+  }
+  async configureTemplate(projectId:string,actor:AuthUser,expectedVersion:number,settings:ReportTemplateSettings) {
+    if(Object.values(settings).some(value=>typeof value!=='string'||value.length>160||reportText(value)!==value)||settings.codePrefix&&!/^[A-Z0-9-]{1,40}$/.test(settings.codePrefix))throw new ReportError('INVALID_REQUEST');
+    await this.transaction(async db=>{await this.lock(db,projectId);await assertManager(db,projectId,actor);
+      const current=(await db.query<{version:number}>('SELECT version FROM report_template_versions WHERE project_id=$1 ORDER BY version DESC LIMIT 1',[projectId])).rows[0];
+      if((current?.version??0)!==expectedVersion)throw new ReportError('CONFLICT');
+      await db.query('INSERT INTO report_template_versions(project_id,version,settings,changed_by) VALUES($1,$2,$3,$4)',[projectId,expectedVersion+1,JSON.stringify(settings),actor.id]);
+      await this.audit(db,projectId,actor.id,'report.template','succeeded',String(expectedVersion+1));
+    });return this.template(projectId);
+  }
+  async detail(projectId:string,id:string):Promise<ReportDetail|null>{const row=(await this.database.query<Job&{data:WeeklyReport|null;content_hash:string|null;rendered_html:string|null;render_hash:string|null}>('SELECT j.*,r.data,r.content_hash,r.rendered_html,r.render_hash FROM report_jobs j LEFT JOIN report_results r ON r.project_id=j.project_id AND r.report_id=j.id WHERE j.project_id=$1 AND j.id=$2',[projectId,id])).rows[0];return row?{...summary(row),contentHash:row.content_hash,data:row.data,renderedHtml:row.rendered_html,renderHash:row.render_hash}:null;}
   async configure(projectId:string,actor:AuthUser,request:{expectedVersion:number;enabled:boolean;weekday:number;hour:number;minute:number}) {
     nextWeeklyCutoff(new Date(),request.weekday,request.hour,request.minute);
     return this.transaction(async client=>{
@@ -60,9 +81,9 @@ export class ReportService {
     const schedules=await this.database.query<{project_id:string}>("SELECT c.project_id FROM report_schedule_cursors c JOIN report_schedule_versions s ON s.project_id=c.project_id AND s.version=c.version WHERE s.enabled AND c.error_code IS NULL AND c.next_cutoff<=$1 ORDER BY c.next_cutoff LIMIT 20",[now]);
     for(const row of schedules.rows)await this.transaction(async client=>{await this.lock(client,row.project_id);const schedule=await this.scheduleRow(client,row.project_id);if(schedule?.enabled&&!schedule.error_code){try{await assertManager(client,row.project_id,{id:schedule.changed_by,auth_version:schedule.auth_version});}catch(error){if(!error||typeof error!=='object'||!('code' in error)||error.code!=='FORBIDDEN')throw error;await client.query("UPDATE report_schedule_cursors SET error_code='FORBIDDEN' WHERE project_id=$1",[row.project_id]);await this.audit(client,row.project_id,null,'report.schedule','denied',String(schedule.version));return;}await this.enqueueDue(client,schedule,now,20);}});
   }
-  async request(projectId:string,actor:AuthUser,requestKey:string,revisionOf?:string) {
+  async request(projectId:string,actor:AuthUser,requestKey:string,revisionOf?:string,reason='') {
     return this.transaction(async client=>{
-      await this.lock(client,projectId);await assertManager(client,projectId,actor);const hash=fingerprint({revisionOf:revisionOf??null});
+      await this.lock(client,projectId);await assertManager(client,projectId,actor);const hash=fingerprint({revisionOf:revisionOf??null,...(reason?{reason}:{})});if(reason.length>1000||reportText(reason)!==reason)throw new ReportError('INVALID_REQUEST');
       const prior=(await client.query<Job>('SELECT * FROM report_jobs WHERE project_id=$1 AND requested_by=$2 AND request_key=$3',[projectId,actor.id,requestKey])).rows[0];
       if(prior){if(prior.request_hash!==hash)throw new ReportError('CONFLICT');return summary(prior);}
       const original=revisionOf?(await client.query<Job>('SELECT * FROM report_jobs WHERE project_id=$1 AND id=$2',[projectId,revisionOf])).rows[0]:null;
@@ -72,7 +93,7 @@ export class ReportService {
       const activation=await this.scheduleRow(client,projectId);
       const start=original?.period_start??previous?.cutoff??(activation?.period_start&&activation.period_start<cutoff?activation.period_start:new Date(Math.max(cutoff.getTime()-7*86_400_000,(await client.query<{created_at:Date}>('SELECT created_at FROM projects WHERE id=$1',[projectId])).rows[0]!.created_at.getTime())));
       const version=(await client.query<{version:number}>('SELECT COALESCE(MAX(version),0)+1 AS version FROM report_jobs WHERE project_id=$1 AND kind=$2 AND cutoff=$3',[projectId,kind,cutoff])).rows[0]!.version;
-      const inserted=(await client.query<Job>('INSERT INTO report_jobs(project_id,kind,cutoff,period_start,schedule_version,requested_by,auth_version,request_key,request_hash,version) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *',[projectId,kind,cutoff,start,original?.schedule_version??activation?.version??null,actor.id,actor.auth_version,requestKey,hash,version])).rows[0]!;
+      const inserted=(await client.query<Job>('INSERT INTO report_jobs(project_id,kind,cutoff,period_start,schedule_version,requested_by,auth_version,request_key,request_hash,version,revision_reason) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *',[projectId,kind,cutoff,start,original?.schedule_version??activation?.version??null,actor.id,actor.auth_version,requestKey,hash,version,reason])).rows[0]!;
       await this.audit(client,projectId,actor.id,'report.request','requested',inserted.id);return summary(inserted);
     });
   }
@@ -82,7 +103,8 @@ export class ReportService {
       const job=(await client.query<Job>("SELECT * FROM report_jobs WHERE status='queued' ORDER BY cutoff,id FOR UPDATE SKIP LOCKED LIMIT 1")).rows[0];if(!job)return false;jobId=job.id;
       await assertManager(client,job.project_id,{id:job.requested_by,auth_version:job.auth_version});
       const data=await this.build(client,job),published=data.stages.every(stage=>stage.outcome==='pass'),hash=fingerprint(data);
-      await client.query('INSERT INTO report_results(project_id,report_id,content_hash,data) VALUES($1,$2,$3,$4)',[job.project_id,job.id,hash,JSON.stringify(data)]);
+      const html=renderReport({...summary(job),status:published?'published':'draft',data,contentHash:hash});
+      await client.query('INSERT INTO report_results(project_id,report_id,content_hash,data,rendered_html,render_hash) VALUES($1,$2,$3,$4,$5,$6)',[job.project_id,job.id,hash,JSON.stringify(data),html,fingerprint(html)]);
       await client.query('UPDATE report_jobs SET status=$2,finished_at=clock_timestamp() WHERE id=$1',[job.id,published?'published':'draft']);
       await this.audit(client,job.project_id,null,'report.publish',published?'succeeded':'failed',job.id);return true;
     });}catch(error){
@@ -148,14 +170,27 @@ export class ReportService {
     const now=generatedAt.toISOString(),hasData=!!tracking?.summary;
     const checks=[{code:'evidence',passed:hasData,message:hasData?'Indicadores vinculados a una lectura identificada.':'Falta evidencia de Trello para calcular avance.'},{code:'progress',passed:!tracking?.summary||tracking.summary.progress.numerator<=tracking.summary.progress.denominator,message:'Se distingue avance declarado de aceptación y se conserva el universo de actividades.'},{code:'period',passed:job.period_start<=cutoff,message:'Eventos filtrados en el intervalo de inicio inclusive y corte exclusivo.'}];
     const reviewed=checks.every(check=>check.passed);
-    return protect({schemaVersion:1,project,responsible:{id:manager.id,name:manager.display_name},periodStart:job.period_start.toISOString(),cutoff:cutoff.toISOString(),generatedAt:now,partialPeriod:cutoff.getTime()-job.period_start.getTime()<7*86_400_000,late:job.kind==='scheduled'&&generatedAt.getTime()-cutoff.getTime()>60_000,policyVersion:policy?.version??null,scheduleVersion:job.schedule_version,baselineVersion:baseline?.version??null,
-      executiveSummary:tracking?.summary?`Avance declarado: ${tracking.summary.progress.percent??'no calculable'} %. Actividades vencidas: ${tracking.summary.activities.overdue}; próximas: ${tracking.summary.activities.dueSoon}. ${observedAfter?'Observación posterior al corte.':'Indicadores calculados desde la lectura disponible al corte.'}`:'No hay evidencia suficiente para calcular el avance; el reporte permanece en borrador.',
+    const template=await this.template(projectId);
+    let logoDataUrl:string|null=null;
+    try{logoDataUrl='data:image/jpeg;base64,'+readFileSync(new URL('../../../../web/public/brand-logo.jpg',import.meta.url)).toString('base64');}catch{/* Missing branding must not prevent a report. */}
+    const originalPresentation=(await client.query<{data:WeeklyReport}>('SELECT r.data FROM report_results r JOIN report_jobs j ON j.id=r.report_id WHERE j.project_id=$1 AND j.cutoff=$2 AND j.kind=$3 ORDER BY j.version LIMIT 1',[projectId,cutoff,job.kind])).rows[0]?.data.presentation;
+    await this.lock(client,projectId);
+    await client.query('INSERT INTO report_document_keys(project_id,kind,cutoff,sequence) SELECT $1,$2,$3,COALESCE(MAX(sequence),0)+1 FROM report_document_keys WHERE project_id=$1 ON CONFLICT(project_id,kind,cutoff) DO NOTHING',[projectId,job.kind,cutoff]);
+    const sequential=String((await client.query<{sequence:number}>('SELECT sequence FROM report_document_keys WHERE project_id=$1 AND kind=$2 AND cutoff=$3',[projectId,job.kind,cutoff])).rows[0]!.sequence);
+    const previousForChart=(await client.query<{cutoff:Date;data:WeeklyReport}>("SELECT j.cutoff,r.data FROM report_jobs j JOIN report_results r ON r.report_id=j.id WHERE j.project_id=$1 AND j.cutoff<$2 AND j.status='published' ORDER BY j.cutoff DESC,j.version DESC LIMIT 1",[projectId,cutoff])).rows[0];
+    const previousProgress=progressChangePoints!==null&&previousForChart?.data.tracking?.summary?.progress.percent!==null&&previousForChart?.data.tracking?.summary?{cutoff:previousForChart.cutoff.toISOString(),percent:previousForChart.data.tracking.summary.progress.percent!}:null;
+    const changes=(await client.query<{version:number;revision_reason:string;display_name:string;created_at:Date}>('SELECT j.version,j.revision_reason,u.display_name,j.created_at FROM report_jobs j JOIN users u ON u.id=j.requested_by WHERE j.project_id=$1 AND j.cutoff=$2 AND j.kind=$3 AND j.version<=$4 ORDER BY j.version',[projectId,cutoff,job.kind,job.version])).rows.map(row=>({version:row.version,description:row.version===1?'Emisión inicial':row.revision_reason||'Nueva versión solicitada; motivo no registrado',responsible:row.display_name,date:row.created_at.toISOString()}));
+    const presentation={changes,templateVersion:template.version,settings:template.settings,code:(originalPresentation?.code&&originalPresentation.code!=='No configurado'?originalPresentation.code:null)??(template.settings.codePrefix?template.settings.codePrefix+'-'+sequential.padStart(3,'0'):'No configurado'),logoDataUrl,previousProgress};
+    const result=protect<WeeklyReport>({presentation:{...presentation,logoDataUrl:null},schemaVersion:1,project,responsible:{id:manager.id,name:manager.display_name},periodStart:job.period_start.toISOString(),cutoff:cutoff.toISOString(),generatedAt:now,partialPeriod:cutoff.getTime()-job.period_start.getTime()<7*86_400_000,late:job.kind==='scheduled'&&generatedAt.getTime()-cutoff.getTime()>60_000,policyVersion:policy?.version??null,scheduleVersion:job.schedule_version,baselineVersion:baseline?.version??null,
+      executiveSummary:tracking?.summary?`Avance declarado: ${tracking.summary.progress.percent?.toLocaleString('es-EC',{maximumFractionDigits:2})??'no calculable'} %. Actividades vencidas: ${tracking.summary.activities.overdue}; próximas: ${tracking.summary.activities.dueSoon}. ${observedAfter?'Observación posterior al corte.':'Indicadores calculados desde la lectura disponible al corte.'}`:'No hay evidencia suficiente para calcular el avance; el reporte permanece en borrador.',
       tracking,riskAssessments,progressChangePoints,comparisonNote:progressChangePoints===null?'No se comparan porcentajes: falta un reporte comparable o cambió el universo o el momento de observación.':`Variación: ${progressChangePoints} puntos porcentuales entre universos comparables.`,
       activities:items.map(item=>{const status=tracking?.items.find(value=>value.itemId===item.id);return {id:item.id,name:item.name,kind:item.kind,state:item.state,due:item.due,principal:item.planning?.principal??null,responsibles:item.memberIds.map(id=>trello!.data.members.find(member=>member.id===id)?.displayName??'Responsable no resuelto'),schedule:status?.schedule??null,overdueHours:status?.overdueHours??null,blocked:status?.blocked??null};}),
       codeCoverage,dependencies:analysis?.dependencies??[],deviations:analysis?.deviations??[],code:code?{id:code.id,commit:code.source.head,observedAt:code.source.observedAt,finishedAt:code.finished_at.toISOString(),files:code.source.files.map(file=>file.path),result:code.result}:null,
       events:events.slice(0,1000).map(event=>({...event,createdAt:event.createdAt.toISOString()})),actions:actions.slice(0,1000).map(item=>({id:item.id,proposalId:item.proposalId,version:item.version,purpose:item.purpose,target:item.target,action:item.action,outcome:item.outcome,actor:item.actor,createdAt:item.createdAt.toISOString()})),recommendations,
       nextWeek:items.filter(item=>item.state!=='completed'&&item.due&&Date.parse(item.due)>=cutoff.getTime()&&Date.parse(item.due)<=cutoff.getTime()+7*86_400_000).map(item=>({id:item.id,name:item.name,kind:item.kind,due:item.due!})),sources,limitations:[...new Set(limitations)],activityUniverse:universe,
       stages:[{stage:'executor',engine:'deterministic',outcome:'pass',checkedAt:now,checks:[{code:'snapshot',passed:true,message:'Contenido preparado desde lecturas persistidas y campos delimitados.'}]},{stage:'reviewer',engine:'deterministic',outcome:reviewed?'pass':'fail',checkedAt:now,checks},{stage:'approver',engine:'deterministic',outcome:reviewed?'pass':'fail',checkedAt:now,checks:[{code:'internal_publication',passed:reviewed,message:reviewed?'La revisión permite publicar el reporte dentro del panel.':'La revisión requiere evidencia adicional; se conserva un borrador.'},{code:'no_external_changes',passed:true,message:'La publicación interna no ejecuta propuestas ni envía mensajes externos.'}]}]});
+    result.presentation!.logoDataUrl=logoDataUrl;
+    return result;
   }
 }
 export function startReportWorker(service:ReportService,onError:()=>void) {

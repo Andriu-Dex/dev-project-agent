@@ -1,3 +1,4 @@
+import {ReportTemplateSettings} from './ReportTemplateSettings';
 import { useUnsavedChanges } from '../hooks/useUnsavedChanges';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ProjectAccess, ReportDetail, ReportsOverview, ReportSummary } from '@dev-project-agent/contracts';
@@ -86,6 +87,7 @@ export function ReportsPanel({
 
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [revisionReason,setRevisionReason]=useState('');
   const [busy, setBusy] = useState(false);
 
   // Schedule configuration
@@ -107,12 +109,13 @@ export function ReportsPanel({
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
+  const reportQuery=new URLSearchParams({...((statusFilter!=='all')?{status:statusFilter}:{}),...(fromDate?{from:fromDate}:{}),...(toDate?{to:toDate}:{})}).toString();
   const requestKey = useRef<{ revisionOf: string | null; key: string } | null>(null);
   const settingsVersion = useRef<number | null>(null);
 
   const load = useCallback(
     async (signal?: AbortSignal) => {
-      const response = await fetch(prefix, signal ? { signal } : {});
+      const response = await fetch(prefix+'?'+reportQuery, signal ? { signal } : {});
       if (!response.ok) throw new Error();
       const next = (await response.json()) as ReportsOverview;
       if (signal?.aborted) return;
@@ -137,7 +140,7 @@ export function ReportsPanel({
         );
       }
     },
-    [prefix, selected]
+    [prefix, selected, reportQuery]
   );
 
   useEffect(() => {
@@ -187,6 +190,7 @@ export function ReportsPanel({
 
   async function generate(revisionOf: string | null = null) {
     if (busy) return;
+    if(revisionOf&&!revisionReason.trim()){setError('Indica el motivo de la nueva versión del informe.');return;}
     setBusy(true);
     setError('');
     setNotice('');
@@ -199,7 +203,7 @@ export function ReportsPanel({
         headers: { 'Content-Type': 'application/json', 'x-csrf-token': csrfToken },
         body: JSON.stringify({
           requestKey: requestKey.current!.key,
-          ...(revisionOf ? { revisionOf } : {}),
+          ...(revisionOf ? { revisionOf, reason:revisionReason.trim() } : {}),
         }),
       });
       const body = await response.json();
@@ -827,6 +831,8 @@ export function ReportsPanel({
         )}
       </section>
 
+      {data?.nextOffset!==null&&data?.nextOffset!==undefined&&<div className="settings-actions"><p>{data.reports.length} informes cargados de {data.total}. Los filtros consultan todo el historial.</p><button className="secondary-button" disabled={busy} onClick={async()=>{setBusy(true);try{const response=await fetch(prefix+'?'+reportQuery+'&offset='+data.nextOffset);if(!response.ok)throw new Error();const more=await response.json() as ReportsOverview;setData({...more,reports:[...new Map([...data.reports,...more.reports].map(item=>[item.id,item])).values()]});}catch{setError('No se pudo cargar la siguiente página del historial.');}finally{setBusy(false);}}}>Cargar más informes</button></div>}
+      <ReportTemplateSettings project={project} csrfToken={csrfToken}/>
       {/* Slide-over Inspection Drawer for Reports matching proposals-detail-drawer */}
       {selected && (
         <div
@@ -952,6 +958,7 @@ export function ReportsPanel({
                           <span>Abrir versión imprimible / Guardar PDF</span>
                         </a>
 
+                        {project.canManageProject&&detail.status!=='queued'&&<label style={{flexBasis:'100%'}}>Motivo de una nueva versión<input maxLength={1000} value={revisionReason} onChange={event=>setRevisionReason(event.target.value)} placeholder="Qué debe corregirse o actualizarse en este informe"/></label>}
                         {project.canManageProject && detail.status !== 'queued' && (
                           <button
                             type="button"

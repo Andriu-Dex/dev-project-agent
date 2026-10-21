@@ -1,7 +1,7 @@
 import type {AgentProvider} from '../../providers/agents.js';
 import {publicationOverview} from './publication.js';
 import type pg from 'pg';
-import type {AgentStage,CodeAnalysisResult,CodeAnalysisView,CodeCandidate,CodeOverview,CodeProposalView,CodePublicationView,CodeSource,ProposalState,ReasoningEffort} from '@dev-project-agent/contracts';
+import type {AgentStage,CodeAnalysisResult,CodeAnalysisView,CodeCandidate,CodeOverview,CodeProposalView,CodePublicationView,CodeSource,ProposalState,ReasoningEffort,CodeFinding,CodeCorrection} from '@dev-project-agent/contracts';
 import type {TrelloDatabase} from '../../integrations/trello/service.js';
 import type {AuthDatabase,AuthUser} from '../auth/repository.js';
 import {assertManager} from '../supervision/access.js';
@@ -11,7 +11,7 @@ import {supportedEfforts} from '../../providers/chatgpt/validation.js';
 import {GitHubError,type GitHubConnection} from '../../integrations/github/client.js';
 import {githubApi,gitSha,readCodeCatalog,readCodeSource} from '../../integrations/github/code-client.js';
 import {fingerprint,safeText,ProposalError} from '../proposals/contracts.js';
-import {CodeError,analysisInstructions,buildCandidate,codeAnalysisSchema,codeCorrectionStageSchema,correctionInstructions,deterministicAnalysis,modelSource,parseAnalysis,parseCodeVerdict} from './evidence.js';
+import {CodeError,analysisInstructions,buildCandidate,lines,codeAnalysisSchema,codeCorrectionStageSchema,correctionInstructions,deterministicAnalysis,modelSource,parseAnalysis,parseCodeVerdict} from './evidence.js';
 
 export interface AnalysisRequest {paths:string[];expectedHead:string;mode:'files'|'comparison';baseSha?:string;withAi:boolean;consent?:boolean;model?:string;reasoningEffort?:ReasoningEffort;requestKey:string}
 export interface CorrectionRequest {purpose?:'demonstration'|'live';analysisId:string;findingIds:string[];goal:string;model:string;reasoningEffort?:ReasoningEffort;consent:boolean;requestKey:string;proposalId?:string;expectedVersion?:number}
@@ -133,6 +133,44 @@ export class CodeReviewService {
     });
     if(created)this.launch(this.pipeline(binding,actor,job));return {id:job.id,proposalId:job.proposal_id,version:job.version};
   }
+  async prepareReversal(binding:ConnectionBinding,actor:AuthUser,publicationId:string,reason:string,model:string,effort:ReasoningEffort|null,consent:boolean,key:string) {
+    await assertManager(this.database,binding.projectId,actor);safeText(reason);if(!reason.trim())throw new CodeError('REASON_REQUIRED');
+    if(consent)await this.provider.ensureConnection(binding,model);this.validateProvider(binding,model,effort,consent);
+    const requestHash=fingerprint({publicationId,reason,model,effort,reversal:true});
+    const prior=(await this.database.query<JobRow>('SELECT * FROM code_jobs WHERE project_id=$1 AND requested_by=$2 AND request_key=$3',[binding.projectId,actor.id,key])).rows[0];if(prior){if(prior.request_hash!==requestHash)throw new CodeError('CONFLICT');return {id:prior.id,proposalId:prior.proposal_id,version:prior.version};}
+    const original=(await this.database.query<{source:CodeSource;candidate:CodeCandidate;pull_number:number;commit_sha:string}>("SELECT s.source,c.candidate,j.pull_number,j.commit_sha FROM github_publication_jobs j JOIN code_versions v ON v.project_id=j.project_id AND v.proposal_id=j.proposal_id AND v.version=j.version JOIN code_sources s ON s.project_id=v.project_id AND s.analysis_id=v.analysis_id JOIN code_candidates c ON c.project_id=v.project_id AND c.proposal_id=v.proposal_id AND c.version=v.version WHERE j.project_id=$1 AND j.id=$2 AND j.status='succeeded'",[binding.projectId,publicationId])).rows[0];
+    if(!original)throw new CodeError('NOT_FOUND');
+    const connection=await this.connection(this.database,binding.projectId),pull=await githubApi(connection,this.token,this.fetcher).get('/pulls/'+original.pull_number) as {merged_at:string|null;head:{sha:string;repo:{full_name:string}};base:{ref:string;repo:{full_name:string}}};
+    if(!pull.merged_at||pull.head?.sha!==original.commit_sha||pull.base?.ref!==connection.branch||pull.base.repo.full_name!==connection.owner+'/'+connection.repository||fingerprint(connection)!==fingerprint(original.source.connection))throw new CodeError('UNSUPPORTED_REVERSAL');
+    const catalog=await readCodeCatalog(connection,this.token,this.fetcher),source=await readCodeSource(connection,{paths:original.candidate.files.map(file=>file.path),mode:'files',expectedHead:catalog.head,baseSha:null},this.token,this.fetcher);
+    if(source.files.some(file=>file.blobSha!==original.candidate.files.find(changed=>changed.path===file.path)?.blobSha))throw new CodeError('SOURCE_CHANGED');
+    const edits:CodeCorrection['edits']=[],findings:CodeFinding[]=[];
+    for(const file of source.files){
+      const previous=original.source.files.find(item=>item.path===file.path);if(!previous)throw new CodeError('UNSUPPORTED_REVERSAL');
+      const current=lines(file.content),restored=lines(previous.content);let first=0,last=current.length,oldLast=restored.length;
+      while(first<last&&first<oldLast&&current[first]===restored[first])first++;
+      while(last>first&&oldLast>first&&current[last-1]===restored[oldLast-1]){last--;oldLast--;}
+      // Include one unchanged neighbor for insertions so evidence remains a valid line range.
+      if(first===last){if(first>0)first--;else if(last<current.length){last++;oldLast++;}}
+      if(last<=first||last-first>40)throw new CodeError('UNSUPPORTED_REVERSAL');
+      edits.push({path:file.path,expectedBlob:file.blobSha,startLine:first+1,endLine:last,before:current.slice(first,last).join('\n'),after:restored.slice(first,oldLast).join('\n')});
+      findings.push({id:'revert-'+fingerprint({publicationId,path:file.path}).slice(0,16),path:file.path,startLine:first+1,endLine:last,category:'correctness',severity:'medium',confidence:'hypothesis',origin:'deterministic',title:'Reversión solicitada del cambio publicado',explanation:reason,evidence:current.slice(first,last).join('\n'),recommendation:'Revisar la restauración del contenido anterior y sus dependencias.'});
+    }
+    const candidate=buildCandidate({objective:'Revertir la corrección publicada '+publicationId,justification:reason,impact:'Restaurar únicamente los archivos afectados sobre el HEAD actual. No revierte datos ni efectos externos.',risks:['La restauración puede reintroducir el defecto original.','Se requieren pruebas funcionales y revisión humana antes de integrar.'],verificationPlan:'Comprobar diff, pruebas funcionales, permisos y HEAD antes de publicar; verificar rama/PR después. No se ejecutan pruebas del repositorio automáticamente.',recoveryPlan:'Una nueva corrección requiere otra revisión y autorización; no hacer reset ni force-push.',unresolvedQuestions:[],findingIds:findings.map(item=>item.id),edits},source,findings);
+    const goal='Revertir publicación '+publicationId+': '+reason,hash=fingerprint({schemaVersion:1,source,goal,findingIds:findings.map(item=>item.id),candidate});
+    const job=await this.transaction(async client=>{
+      await this.lock(client,binding.projectId,actor);await this.idle(client,binding.projectId);
+      const analysis=(await client.query<{id:string}>("INSERT INTO code_analyses(project_id,requested_by,request_key,request_hash,status,finished_at) VALUES($1,$2,$3,$4,'ready',clock_timestamp()) RETURNING id",[binding.projectId,actor.id,key,requestHash])).rows[0]!;
+      await client.query('INSERT INTO code_sources(project_id,analysis_id,source) VALUES($1,$2,$3)',[binding.projectId,analysis.id,JSON.stringify(source)]);
+      await client.query('INSERT INTO code_results(project_id,analysis_id,result) VALUES($1,$2,$3)',[binding.projectId,analysis.id,JSON.stringify({summary:'Preparación determinista de reversión enlazada a '+publicationId,findings,checks:candidate.checks,limitations:['Reversión de contenido; no deshace datos ni efectos externos.']})]);
+      const proposal=(await client.query<{id:string}>("INSERT INTO code_proposals(project_id,created_by,purpose) VALUES($1,$2,'live') RETURNING id",[binding.projectId,actor.id])).rows[0]!;
+      await client.query("INSERT INTO code_versions(project_id,proposal_id,version,analysis_id,goal,finding_ids,state) VALUES($1,$2,1,$3,$4,$5,'pending_review')",[binding.projectId,proposal.id,analysis.id,goal,JSON.stringify(findings.map(item=>item.id))]);
+      await client.query('INSERT INTO code_candidates(project_id,proposal_id,version,content_hash,candidate) VALUES($1,$2,1,$3,$4)',[binding.projectId,proposal.id,hash,JSON.stringify(candidate)]);
+      const saved=(await client.query<JobRow>('INSERT INTO code_jobs(project_id,proposal_id,version,requested_by,request_key,request_hash,model,reasoning_effort) VALUES($1,$2,1,$3,$4,$5,$6,$7) RETURNING *',[binding.projectId,proposal.id,actor.id,key,requestHash,model,effort])).rows[0]!;
+      await client.query("INSERT INTO code_messages(project_id,proposal_id,version,job_id,stage,status,input_hash,output,duration_ms,model) VALUES($1,$2,1,$3,'executor','succeeded',$4,$5,0,'deterministic-reversal-v1')",[binding.projectId,proposal.id,saved.id,requestHash,JSON.stringify(candidate.correction)]);
+      await client.query("INSERT INTO audit_events(project_id,actor_type,actor_id,action,resource_type,resource_id,outcome,details) VALUES($1,'user',$2,'code.reversal.prepare','code_review',$3,'succeeded',$4)",[binding.projectId,actor.id,proposal.id,JSON.stringify({publicationId,reason})]);return saved;
+    });this.launch(this.pipeline(binding,actor,job));return {id:job.id,proposalId:job.proposal_id,version:job.version};
+  }
   async resume(binding:ConnectionBinding,actor:AuthUser,id:string,version:number,model:string,effort:ReasoningEffort|null,consent:boolean,key:string) {
     await assertManager(this.database,binding.projectId,actor);if(this.closed)throw new CodeError('SERVICE_CLOSED');
     if(consent)await this.provider.ensureConnection(binding,model);
@@ -187,7 +225,7 @@ export class CodeReviewService {
     });return this.version(projectId,id,version);
   }
   async withdraw(projectId:string,actor:AuthUser,id:string,version:number,reason:string) {
-    safeText(reason);if(!reason.trim())throw new CodeError('REASON_REQUIRED');await this.transaction(async client=>{await this.lock(client,projectId,actor);await this.idle(client,projectId);const row=await this.versionRow(client,projectId,id,version);if(row.latest_version!==version||!['authorized','pending_human_approval','execution_failed'].includes(row.state))throw new CodeError('CONFLICT');await client.query("UPDATE code_versions SET state='invalidated' WHERE project_id=$1 AND proposal_id=$2 AND version=$3",[projectId,id,version]);await client.query("INSERT INTO audit_events(project_id,actor_type,actor_id,action,resource_type,resource_id,outcome,details) VALUES($1,'user',$2,'code.withdraw','code_review',$3,'invalidated',$4)",[projectId,actor.id,id,JSON.stringify({version,reason})]);});return this.version(projectId,id,version);
+    safeText(reason);if(!reason.trim())throw new CodeError('REASON_REQUIRED');await this.transaction(async client=>{await this.lock(client,projectId,actor);await this.idle(client,projectId);const row=await this.versionRow(client,projectId,id,version);if(row.latest_version!==version||!['authorized','pending_human_approval','execution_failed','executing'].includes(row.state))throw new CodeError('CONFLICT');const publication=(await client.query("SELECT id,status,write_started_at FROM github_publication_jobs WHERE project_id=$1 AND proposal_id=$2 AND version=$3 AND status IN ('queued','running','reconciliation_required') FOR UPDATE",[projectId,id,version])).rows[0];if(publication?.write_started_at||publication?.status==='reconciliation_required')throw new CodeError('CONFLICT');if(publication){await client.query("UPDATE github_publication_jobs SET status='failed',error_code='AUTHORIZATION_WITHDRAWN',finished_at=clock_timestamp() WHERE id=$1",[publication.id]);await client.query("INSERT INTO github_publication_events(project_id,job_id,stage,outcome,detail) VALUES($1,$2,'withdraw','denied',$3)",[projectId,publication.id,JSON.stringify({reason,actorId:actor.id})]);}await client.query("UPDATE code_versions SET state='invalidated' WHERE project_id=$1 AND proposal_id=$2 AND version=$3",[projectId,id,version]);await client.query("INSERT INTO audit_events(project_id,actor_type,actor_id,action,resource_type,resource_id,outcome,details) VALUES($1,'user',$2,'code.withdraw','code_review',$3,'invalidated',$4)",[projectId,actor.id,id,JSON.stringify({version,reason})]);});return this.version(projectId,id,version);
   }
   async simulate(projectId:string,actor:AuthUser,id:string,version:number,hash:string,key:string) {
     await assertManager(this.database,projectId,actor);

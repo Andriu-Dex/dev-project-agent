@@ -2,6 +2,11 @@
 
 Este índice separa las guías de la versión actual, sus evidencias académicas y los documentos históricos. El código, contratos y migraciones son la referencia ejecutable; los documentos del archivo describen su fecha y no sustituyen el comportamiento vigente.
 
+## Versión 1.1
+
+- [Especificación 1.1 y criterios de aceptación](version-1.1-specification.md).
+- [Uso y actualización 1.1](version-1.1-guide.md) y [comprobaciones y límites de aceptación](validation/version-1.1-validation.md).
+
 ## Para usar y operar
 
 - [Instalación, pantallas y recorridos del gestor](first-release-guide.md).
@@ -19,7 +24,6 @@ La guía operativa reúne las pantallas y recorridos que antes estaban repartido
 - [Arquitectura implementada](architecture.md), [modelo de datos](data-model.md) y [API](api-design.md).
 - [Reglas de negocio](business-rules.md), [normas de referencia](standards-and-quality.md) y [catálogo de revisión de código](code-standard-catalog.md).
 - [Convenciones Git](git-conventions.md), [herramientas de mantenimiento](../scripts/README.md) y [notas de versión](release-notes.md).
-- [Diagrama de arquitectura](diagrams/agent-architecture.md).
 
 ## Requisitos y evidencia académica
 

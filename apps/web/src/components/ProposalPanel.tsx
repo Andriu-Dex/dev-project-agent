@@ -1780,8 +1780,8 @@ export function ProposalPanel({
                             };
                             if (action?.type === 'trello_dates_change') {
                               setFamily('dates');
-                              setStart(local(action.proposedStart));
-                              setDue(local(action.proposedDue));
+                              setStart(local(action.proposedStart??''));
+                              setDue(local(action.proposedDue??''));
                             } else if (action?.type === 'trello_members_change') {
                               setFamily('members');
                               setMemberIds(action.proposedMembers);

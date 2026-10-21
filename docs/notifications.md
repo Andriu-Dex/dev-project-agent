@@ -1,4 +1,6 @@
-# Correo al gestor y configuración dinámica
+# Correo y configuración dinámica
+
+La versión 1.1 amplía destinatarios por responsabilidad, reglas por evento y vista previa. Consultar [uso 1.1](version-1.1-guide.md); las indicaciones siguientes describen la configuración base original.
 
 Implementación del 14 de octubre de 2026, autorizada por el usuario. El correo es un requisito adicional del proyecto (USER-08); no se atribuye como obligación textual nueva al PDF ni cambia sus 39 criterios.
 

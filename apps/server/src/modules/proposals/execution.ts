@@ -74,7 +74,7 @@ export class ExecutionService {
       const previous=(await db.query<JobRow>('SELECT * FROM execution_jobs WHERE project_id=$1 AND requested_by=$2 AND request_key=$3',[projectId,actor.id,requestKey])).rows[0];if(previous){if(previous.request_hash!==requestHash)throw new ExecutionError('CONFLICT');return previous;}
       const row=await this.candidate(db,projectId,proposalId,version,hash,['authorized','execution_failed']);
       if(this.closed||!this.options.enabled||!this.options.remote)throw new ExecutionError('WRITES_DISABLED');
-      await this.configuration(db,projectId,row);validateActionDate(row.content.actions[0]!,row.context.card.start);
+      await this.configuration(db,projectId,row);validateActionDate(row.content.actions[0]!,row.context.card.start,Boolean(row.context.reversalOf));
       if((await db.query("SELECT id FROM execution_jobs WHERE project_id=$1 AND status IN ('queued','running','reconciliation_required')",[projectId])).rowCount)throw new ExecutionError('CONFLICT');
       const inserted=(await db.query<JobRow>('INSERT INTO execution_jobs (project_id,proposal_id,version,approval_id,requested_by,requested_auth_version,request_key,request_hash,content_hash) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *',[projectId,proposalId,version,row.approval_id,actor.id,actor.auth_version,requestKey,requestHash,hash])).rows[0]!;
       await db.query("UPDATE proposal_versions SET state='executing' WHERE project_id=$1 AND proposal_id=$2 AND version=$3",[projectId,proposalId,version]);await this.event(db,inserted,'request','requested');created=true;return inserted;
@@ -101,10 +101,11 @@ export class ExecutionService {
       const before=(await remote.read(destination.board_id,destination.operational_list_ids)).items.find(item=>item.id===row.context.card.id);
       if(!this.matches(before,row))throw new ExecutionError('SOURCE_CHANGED');
       await this.transaction(async db=>{
+        await db.query('SELECT pg_advisory_xact_lock(hashtext($1))',['agent:'+job.project_id]);
         await assertManager(db,job.project_id,{id:job.requested_by,auth_version:job.requested_auth_version});
         const checked=await this.candidate(db,job.project_id,job.proposal_id,job.version,job.content_hash,['executing']);
         if(checked.approval_id!==job.approval_id)throw new ExecutionError('MISSING_APPROVAL');
-        await this.configuration(db,job.project_id,checked);validateActionDate(checked.content.actions[0]!,before!.start);
+        await this.configuration(db,job.project_id,checked);validateActionDate(checked.content.actions[0]!,before!.start,Boolean(checked.context.reversalOf));
         await this.event(db,job,'preflight','succeeded',null,this.evidence(before!,destination.board_id));
         const marked=await db.query("UPDATE execution_jobs SET write_started_at=clock_timestamp() WHERE id=$1 AND status='running'",[job.id]);if(!marked.rowCount)throw new ExecutionError('CONFLICT');await this.event(db,job,'write','started');
       });
@@ -119,6 +120,7 @@ export class ExecutionService {
       if(this.matches(after,row,true))await this.finish(job,'succeeded','executed','verification',null,this.evidence(after!,destination.board_id));
       else await this.finish(job,'reconciliation_required','reconciliation_required','verification','REMOTE_DISCREPANCY',after?this.evidence(after,destination.board_id):null);
     });}catch(error){
+      const withdrawn=(await this.database.query("SELECT id FROM execution_jobs WHERE id=$1 AND status='blocked' AND error_code='AUTHORIZATION_WITHDRAWN'",[job.id])).rows[0];if(withdrawn)return;
       const code=errorCode(error),invalid=['SOURCE_CHANGED','FORBIDDEN','HASH_MISMATCH','MISSING_APPROVAL','MISSING_REVIEW','BLOCKING_QUESTIONS'].includes(code);
       await this.finish(job,writeStarted?'reconciliation_required':invalid?'blocked':'failed',writeStarted?'reconciliation_required':invalid?'invalidated':'execution_failed',writeStarted?'verification':'preflight',code);
     }
@@ -141,7 +143,10 @@ export class ExecutionService {
     safeText(reason);if(!reason.trim()||reason.length>1000)throw new ExecutionError('REASON_REQUIRED');
     return this.transaction(async db=>{
       await assertManager(db,projectId,actor);await db.query('SELECT pg_advisory_xact_lock(hashtext($1))',['agent:'+projectId]);
-      const changed=await db.query("UPDATE proposal_versions SET state='invalidated' WHERE project_id=$1 AND proposal_id=$2 AND version=$3 AND state IN ('authorized','execution_failed') RETURNING version",[projectId,proposalId,version]);if(!changed.rowCount)throw new ExecutionError('CONFLICT');
+      const job=(await db.query<JobRow>("SELECT * FROM execution_jobs WHERE project_id=$1 AND proposal_id=$2 AND version=$3 AND status IN ('queued','running','reconciliation_required') FOR UPDATE",[projectId,proposalId,version])).rows[0];
+      if(job&&(job.write_started_at||job.status==='reconciliation_required'))throw new ExecutionError('CONFLICT');
+      if(job){await db.query("UPDATE execution_jobs SET status='blocked',error_code='AUTHORIZATION_WITHDRAWN',finished_at=clock_timestamp() WHERE id=$1",[job.id]);await this.event(db,job,'preflight','failed','AUTHORIZATION_WITHDRAWN');}
+      const changed=await db.query("UPDATE proposal_versions SET state='invalidated' WHERE project_id=$1 AND proposal_id=$2 AND version=$3 AND state IN ('authorized','execution_failed','executing') RETURNING version",[projectId,proposalId,version]);if(!changed.rowCount)throw new ExecutionError('CONFLICT');
       await db.query("INSERT INTO audit_events (project_id,actor_type,actor_id,action,resource_type,resource_id,outcome,details) VALUES ($1,'user',$2,'proposal.withdraw','proposal',$3,'succeeded',$4)",[projectId,actor.id,proposalId+':v'+version,JSON.stringify({reason})]);return {state:'invalidated' as const};
     });
   }
