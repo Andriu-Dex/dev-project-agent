@@ -424,17 +424,6 @@ export function ProposalPanel({
     return () => controller.abort();
   }, [prefix, selection?.id, selection?.version, revision]);
 
-  // Handle ESC key to close drawer
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && selection) {
-        setSelection(null);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selection]);
-
   // Reset pagination when search or filters change
   useEffect(() => {
     setCurrentPage(1);
@@ -451,6 +440,17 @@ export function ProposalPanel({
   const adjusting = Boolean(
     canAdjust && adjustment?.id === detail?.proposalId && adjustment?.version === detail?.version
   );
+
+  // Handle ESC key to close drawer
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && selection && !adjusting) {
+        setSelection(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selection, adjusting]);
   const selectedCard = sources?.trello.latest?.data.items.find(item => item.id === cardId);
   const isDate = family === 'due' || family === 'dates';
   const effectiveStart = family === 'dates' ? start : selectedCard?.start;
@@ -1277,7 +1277,8 @@ export function ProposalPanel({
       </section>
 
       {/* Slide-over Detail Drawer */}
-      {detail && (() => {
+      {/* The drawer stays selected but hidden while adjusting, so the new version keeps its proposal lineage. */}
+      {detail && !adjusting && (() => {
         const detailSt = getStateConfig(detail.state);
         const currentStepIndex = getProposalStepIndex(detail.state);
 
@@ -1727,7 +1728,6 @@ export function ProposalPanel({
                             }
                             setConsent(false);
                             setShowEditor(true);
-                            setSelection(null);
                           }}
                         >
                           <Icon path="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />

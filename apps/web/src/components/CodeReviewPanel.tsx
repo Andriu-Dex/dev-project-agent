@@ -290,6 +290,8 @@ export function CodeReviewPanel({
   // Proposal selection and detail modal/drawer
   const [selection, setSelection] = useState<{ id: string; version: number } | null>(null);
   const [detail, setDetail] = useState<CodeProposalView | null>(null);
+  // Hiding the drawer keeps the selected version, which a follow-up version needs as its base.
+  const [drawerHidden, setDrawerHidden] = useState(false);
 
   // Provider & AI settings
   const [provider, setProvider] = useState<ProviderOverview | null>(null);
@@ -404,6 +406,8 @@ export function CodeReviewPanel({
     setConsent(false);
   }, [analysisId]);
 
+  useEffect(() => setDrawerHidden(false), [selection]);
+
   useEffect(() => {
     const controller = new AbortController();
     if (!selection) {
@@ -443,13 +447,13 @@ export function CodeReviewPanel({
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
-        if (detail) setSelection(null);
+        if (detail && !drawerHidden) setSelection(null);
         else if (analysis) setAnalysisId('');
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [detail, analysis]);
+  }, [detail, drawerHidden, analysis]);
 
   async function action(operation: () => Promise<void>) {
     if (busy) return;
@@ -1920,7 +1924,7 @@ export function CodeReviewPanel({
       )}
 
       {/* Slide-over Inspection Drawer for Proposals matching proposals-detail-drawer */}
-      {detail && (
+      {detail && !drawerHidden && (
         <div
           className="proposals-drawer-backdrop"
           onClick={() => setSelection(null)}
@@ -2026,7 +2030,7 @@ export function CodeReviewPanel({
                       setAnalysisId(detail.analysisId);
                       setAnalysis(null);
                       setActiveTab('analyses');
-                      setSelection(null);
+                      setDrawerHidden(true);
                     }}
                     title="Ver análisis y hallazgos de origen"
                   >

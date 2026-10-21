@@ -884,6 +884,27 @@ export function OperationsPage({
               <p>El gestor puede pulsar en "Actualizar fuentes y analizar" para generar el primer corte de supervisión.</p>
             </div>
           )}
+
+          {!!data?.runs.length && (
+            <details className="proposal-editor-card" style={{ padding: '16px' }}>
+              <summary style={{ cursor: 'pointer', fontWeight: 600 }}>Análisis recientes ({data.runs.length})</summary>
+              <ul className="history-list">
+                {data.runs.map(run => (
+                  <li key={run.id}>
+                    {dates(run.createdAt)} · {statusNames[run.status]?.label ?? run.status}{' '}
+                    <button
+                      type="button"
+                      className="editor-cancel-btn"
+                      disabled={detailBusy}
+                      onClick={() => void openDetail('runs', run.id)}
+                    >
+                      Abrir análisis
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
         </div>
       )}
 
