@@ -2,7 +2,9 @@
 
 Local project supervision for a human manager: Trello planning, GitHub code review, sequential proposal agents, evidence-based reports and configurable manager email.
 
-Version **1.0.0**. Independent Node.js/TypeScript/Fastify service, React/TypeScript dashboard and PostgreSQL. Development uses `develop`; promotion to `main`, tags and remote publication require the manager's release decision. Temporary defense materials are excluded.
+Version **1.1.0**. Independent Node.js/TypeScript/Fastify service, React/TypeScript dashboard and PostgreSQL. Development uses `develop`; promotion to `main`, tags and remote publication require the manager's release decision. Temporary defense materials are excluded.
+
+Version 1.1 adds institutional reports with charts and frozen printable content, explicit responsibility-based email routing, execution feedback, guarded withdrawal/recovery and a conversational workspace. Read the [1.1 operator guide](docs/version-1.1-guide.md) and [validation limits](docs/validation/version-1.1-validation.md). New live recovery operations and natural-language model quality require their own acceptance; synthetic checks do not authorize real changes.
 
 ## Delivered scope
 
@@ -11,7 +13,7 @@ Version **1.0.0**. Independent Node.js/TypeScript/Fastify service, React/TypeScr
 - Sequential Executor, Reviewer and Approver for bounded, versioned proposals. The manager decides on exact content; external execution requires separate confirmation and fresh checks. Demonstrations remain non-executable.
 - Date, priority, member and state changes through separately gated Trello credentials; branch/draft-PR publication through separately gated GitHub credentials. No automatic merge.
 - Recent-change analysis and **progressive repository coverage**: inventory, durable batches, large-file fragments, dependency context, pause/resume, bounded retries, change invalidation, exclusions and immutable evidence.
-- Configurable source, code and report schedules; reports with historical cutoffs, coverage snapshots and A4 printing.
+- Configurable source, code and report schedules; reports with historical cutoffs, coverage snapshots and institutional Letter-format printing.
 - Consented SMTP notifications, selected events, daily digest, quiet hours, reminders and delivery history.
 - ChatGPT as validated primary provider, with encrypted renewable access and model/effort selection. Ollama is optional: discover compatible installed models on the configured server and evaluate them. Connection does not establish quality. No automatic provider fallback.
 
@@ -58,6 +60,7 @@ npm run typecheck
 npm run test:isolated
 npm run build
 npm run verify:install
+npm run verify:upgrade
 npm run db:backup
 ```
 

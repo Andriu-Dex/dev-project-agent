@@ -1,6 +1,6 @@
 # Especificación de la versión 1.1
 
-Fecha: 20 de octubre de 2026. Estado: especificación consolidada para implementación; no acredita funciones entregadas ni pruebas ejecutadas. La versión 1.0 conserva su alcance y evidencia. Esta ampliación no modifica retrospectivamente los 39 criterios académicos ni EX-01.
+Fecha: 20 de octubre de 2026. Estado: especificación consolidada. La [implementación y su evidencia](validation/version-1.1-validation.md) distinguen funciones entregadas y comprobaciones pendientes. Este documento por sí solo no acredita pruebas. La versión 1.0 conserva su alcance y evidencia. Esta ampliación no modifica retrospectivamente los 39 criterios académicos ni EX-01.
 
 ## 1. Objetivo y fuentes
 
@@ -117,7 +117,7 @@ Persistir conversaciones por proyecto/usuario con acceso autorizado y política 
 
 ## 9. Criterios de aceptación
 
-Todos están **pendientes de implementación y comprobación**. Cada resultado requiere fuente/commit, precondiciones, pasos, resultado esperado/real y evidencia. Los casos negativos no se sustituyen por una demostración feliz.
+El estado de cada criterio está en el [registro de comprobaciones](validation/version-1.1-validation.md); existir en esta tabla no implica haberlo superado. Cada resultado requiere fuente/commit, precondiciones, pasos, resultado esperado/real y evidencia. Los casos negativos no se sustituyen por una demostración feliz.
 
 | ID | Caso y resultado exigido |
 | --- | --- |

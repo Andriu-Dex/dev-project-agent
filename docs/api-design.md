@@ -34,3 +34,7 @@ Los nombres de familias descriptivas de la tabla no inventan endpoints: consulta
 [packages/contracts/src/index.ts](../packages/contracts/src/index.ts) comparte vistas/tipos; los esquemas de rutas y validadores del servidor aplican los controles en ejecución. No confiar en tipos TypeScript como autorización. El frontend oculta acciones de gestor a lectores, pero la decisión final siempre la toma el servidor.
 
 Las claves, versiones y estados se enlazan con proyecto, actor y contenido sellado. Fuente modificada, aprobación obsoleta, revocación o resultado incierto impiden un reintento ciego. Los límites y la paginación de cada listado son explícitos; el historial completo de la base no implica que todos sus registros estén en una sola respuesta.
+
+## Ampliación 1.1
+
+Se añaden `/projects/:projectId/assistant` (historial privado e interpretación sin ejecución implícita), `/work-progress` bajo proyecto, `/report-template`, filtros/paginación de reportes, vista previa de notificaciones y preparación de reversiones. El retiro de PR utiliza planes en `/code-review/recoveries`, con acciones distintas de aprobación, ejecución, retirada y reconciliación. Las mutaciones conservan sesión, ámbito de proyecto, CSRF y permisos del gestor. Las tarjetas del chat remiten a rutas de dominio; una respuesta del modelo no puede otorgar aprobación ni escoger una URL libre. Consulte la [guía 1.1](version-1.1-guide.md) y las rutas implementadas para sus esquemas exactos.

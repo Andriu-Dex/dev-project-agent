@@ -2,7 +2,7 @@
 
 ## Current scope
 
-Implementation was authorized by the user on October 7, 2026. The implemented 1.0.0 application is maintained on develop; consult current documentation before changing behavior. Dependency installation, local services, and necessary migrations are authorized within this scope. External changes in the supervised project still require specific approval. Commits, staging, pushes, and pull requests require user authorization. Authorization already granted in the conversation takes precedence over this default.
+Implementation was authorized by the user on October 7, 2026. The implemented 1.1.0 application is maintained on develop; consult current documentation before changing behavior. Dependency installation, local services, and necessary migrations are authorized within this scope. External changes in the supervised project still require specific approval. Commits, staging, pushes, and pull requests require user authorization. Authorization already granted in the conversation takes precedence over this default.
 
 ## Language policy
 
@@ -14,7 +14,7 @@ Preserve proper names, external identifiers, verbatim source values, and origina
 
 ## Sources and decisions
 
-Read README.md, docs/requirements.md, docs/architecture.md, docs/business-rules.md, and docs/index.md before changing project decisions. Archived planning and Trello reviews describe their original dates; current persisted configuration and dated validation evidence must be distinguished from those historical observations.
+Read README.md, docs/requirements.md, docs/architecture.md, docs/business-rules.md, and docs/index.md before changing project decisions. For 1.1 changes, also read docs/version-1.1-guide.md and docs/validation/version-1.1-validation.md; implementation is not equivalent to completed live acceptance. Archived planning and Trello reviews describe their original dates; current persisted configuration and dated validation evidence must be distinguished from those historical observations.
 
 Distinguish confirmed decisions, proposed defaults, and observed facts. Do not confuse the programming assistant developing this repository with the product's three agents.
 

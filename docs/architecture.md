@@ -1,6 +1,6 @@
 # Arquitectura implementada
 
-La versión local 1.0.0 es un monolito modular: React/TypeScript en el navegador, un servicio Node.js/TypeScript con Fastify y PostgreSQL. Los workers viven en el mismo proceso; no son microservicios. Docker Compose inicia únicamente PostgreSQL del agente, separado de UTAPED.
+La versión local 1.1.0 es un monolito modular: React/TypeScript en el navegador, un servicio Node.js/TypeScript con Fastify y PostgreSQL. Los workers viven en el mismo proceso; no son microservicios. Docker Compose inicia únicamente PostgreSQL del agente, separado de UTAPED.
 
 ## Componentes
 
@@ -40,3 +40,9 @@ La cobertura progresiva conserva inventario por commit, límites, estados, exclu
 ## Referencias
 
 [Modelo de datos](data-model.md), [API](api-design.md), [guía operativa](first-release-guide.md), [cobertura](repository-coverage.md), [proveedores](agent-providers.md), [respaldo](backup-and-recovery.md). El [diseño inicial](archive/planning/architecture.md) y las [herramientas previstas](archive/planning/technical-design.md) se conservan como antecedentes.
+
+## Ampliación 1.1
+
+El chat es otra interfaz de los mismos servicios: interpreta intenciones en un vocabulario permitido, devuelve tarjetas con claves persistidas y no ejecuta desde texto libre. Sesión, membresía, CSRF, versión/huella, motivos y confirmación permanecen en los módulos de dominio. Las conversaciones se aíslan por usuario/proyecto. El seguimiento usa estados y evidencias persistidas; no inventa porcentaje de inferencia.
+
+Los informes nuevos conservan HTML/huella e imagen junto al contenido. Correo resuelve destinatarios por evento/actividad/fase y crea entregas individuales. La revocación compite con la frontera persistida de escritura. Las reversiones enlazan la operación original y repiten revisión/autorización. El inverso de código fusionado se reconstruye determinísticamente dentro de límites, antes de las inferencias de Revisor y Aprobador. Véase [guía y límites](version-1.1-guide.md).
