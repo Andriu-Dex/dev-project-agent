@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { ProjectAccess, ProjectAlertFinding } from '@dev-project-agent/contracts';
 import { TrackingPanel } from './TrackingPanel';
 import { Icon, navigate } from './Workspace';
+import { Pagination } from './Pagination';
 import { localDate } from './OverviewPage';
 
 type Assessment = {
@@ -149,19 +150,6 @@ const eventActionLabels: Record<string, { label: string; icon: string; className
     className: 'resolved',
   },
 };
-
-function getPaginationRange(current: number, total: number): (number | 'ellipsis')[] {
-  if (total <= 7) {
-    return Array.from({ length: total }, (_, i) => i + 1);
-  }
-  if (current <= 4) {
-    return [1, 2, 3, 4, 5, 'ellipsis', total];
-  }
-  if (current >= total - 3) {
-    return [1, 'ellipsis', total - 4, total - 3, total - 2, total - 1, total];
-  }
-  return [1, 'ellipsis', current - 1, current, current + 1, 'ellipsis', total];
-}
 
 export function AlertsPage({
   project,
@@ -326,7 +314,6 @@ export function AlertsPage({
   const startIndex = visibleAlerts.length === 0 ? 0 : (safePage - 1) * pageSize;
   const endIndex = Math.min(startIndex + pageSize, visibleAlerts.length);
   const paginatedAlerts = visibleAlerts.slice(startIndex, endIndex);
-  const pageRange = getPaginationRange(safePage, totalPages);
 
   const detail = alerts.find(a => a.id === selected);
   const detailEvents = detail ? events.filter(e => e.alert_id === detail.id) : [];
@@ -687,72 +674,17 @@ export function AlertsPage({
               </div>
 
               {visibleAlerts.length > 0 && (
-                <footer className="planning-pagination-bar">
-                  <div className="pagination-summary">
-                    <span>{startIndex + 1}–{endIndex} de <strong>{visibleAlerts.length}</strong></span>
-                  </div>
-
-                  <nav className="pagination-pages-nav" aria-label="Páginas">
-                    <button
-                      type="button"
-                      className="pagination-arrow-btn"
-                      disabled={safePage <= 1}
-                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                      aria-label="Página anterior"
-                      title="Página anterior"
-                    >
-                      <Icon path="M15 19l-7-7 7-7" />
-                    </button>
-
-                    {pageRange.map((pageItem, idx) => {
-                      if (pageItem === 'ellipsis') {
-                        return (
-                          <span key={`ellipsis-${idx}`} className="pagination-ellipsis" aria-hidden="true">
-                            …
-                          </span>
-                        );
-                      }
-                      const isCurrent = pageItem === safePage;
-                      return (
-                        <button
-                          key={pageItem}
-                          type="button"
-                          className={'pagination-number-btn' + (isCurrent ? ' is-active' : '')}
-                          onClick={() => setCurrentPage(pageItem)}
-                          aria-label={`Página ${pageItem}`}
-                          aria-current={isCurrent ? 'page' : undefined}
-                        >
-                          {pageItem}
-                        </button>
-                      );
-                    })}
-
-                    <button
-                      type="button"
-                      className="pagination-arrow-btn"
-                      disabled={safePage >= totalPages}
-                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                      aria-label="Página siguiente"
-                      title="Página siguiente"
-                    >
-                      <Icon path="M9 5l7 7-7 7" />
-                    </button>
-                  </nav>
-
-                  <div className="pagination-size-container">
-                    <select
-                      id="alerts-page-size"
-                      className="pagination-pagesize-select"
-                      value={pageSize}
-                      onChange={e => setPageSize(Number(e.target.value))}
-                      aria-label="Cantidad de alertas por página"
-                    >
-                      <option value={10}>10 / pág</option>
-                      <option value={20}>20 / pág</option>
-                      <option value={50}>50 / pág</option>
-                    </select>
-                  </div>
-                </footer>
+                <Pagination
+                  page={safePage}
+                  totalPages={totalPages}
+                  totalItems={visibleAlerts.length}
+                  pageSize={pageSize}
+                  pageSizeOptions={[10, 20, 50]}
+                  sizeSelectId="alerts-page-size"
+                  sizeSelectLabel="Cantidad de alertas por página"
+                  onPageChange={setCurrentPage}
+                  onPageSizeChange={setPageSize}
+                />
               )}
             </>
           )}

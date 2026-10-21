@@ -15,6 +15,7 @@ import { AgentModelSelect } from './AgentModelSelect';
 import { readAgentProviders, providerDestination } from './agentProviders';
 import { ReasoningSelect, effortLabels } from './ReasoningSelect';
 import { Icon } from './Workspace';
+import { Pagination } from './Pagination';
 
 interface StateConfigItem {
   label: string;
@@ -219,19 +220,6 @@ function downloadPatch(detail: CodeProposalView) {
   link.download = `proposal-${detail.id}-v${detail.version}.patch`;
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 0);
-}
-
-function getPaginationRange(current: number, total: number): (number | 'ellipsis')[] {
-  if (total <= 7) {
-    return Array.from({ length: total }, (_, i) => i + 1);
-  }
-  if (current <= 4) {
-    return [1, 2, 3, 4, 5, 'ellipsis', total];
-  }
-  if (current >= total - 3) {
-    return [1, 'ellipsis', total - 4, total - 3, total - 2, total - 1, total];
-  }
-  return [1, 'ellipsis', current - 1, current, current + 1, 'ellipsis', total];
 }
 
 function splitGoal(goal: string): { title: string; description: string } {
@@ -1319,74 +1307,17 @@ export function CodeReviewPanel({
 
             {/* Pagination matching planning-pagination-bar */}
             {filteredProposals.length > 0 && (
-              <footer className="planning-pagination-bar">
-                <div className="pagination-summary">
-                  <span>
-                    {(safeProposalsPage - 1) * proposalsPageSize + 1}–
-                    {Math.min(safeProposalsPage * proposalsPageSize, filteredProposals.length)} de{' '}
-                    <strong>{filteredProposals.length}</strong>
-                  </span>
-                </div>
-
-                <nav className="pagination-pages-nav" aria-label="Páginas">
-                  <button
-                    type="button"
-                    className="pagination-arrow-btn"
-                    disabled={safeProposalsPage <= 1}
-                    onClick={() => setProposalsPage(p => Math.max(1, p - 1))}
-                    aria-label="Página anterior"
-                    title="Página anterior"
-                  >
-                    <Icon path="M15 19l-7-7 7-7" />
-                  </button>
-
-                  {getPaginationRange(safeProposalsPage, totalProposalsPages).map((p, idx) =>
-                    p === 'ellipsis' ? (
-                      <span key={`el-${idx}`} className="pagination-ellipsis" aria-hidden="true">
-                        …
-                      </span>
-                    ) : (
-                      <button
-                        key={p}
-                        type="button"
-                        className={'pagination-number-btn' + (p === safeProposalsPage ? ' is-active' : '')}
-                        onClick={() => setProposalsPage(p)}
-                        aria-current={p === safeProposalsPage ? 'page' : undefined}
-                      >
-                        {p}
-                      </button>
-                    )
-                  )}
-
-                  <button
-                    type="button"
-                    className="pagination-arrow-btn"
-                    disabled={safeProposalsPage >= totalProposalsPages}
-                    onClick={() => setProposalsPage(p => Math.min(totalProposalsPages, p + 1))}
-                    aria-label="Página siguiente"
-                    title="Página siguiente"
-                  >
-                    <Icon path="M9 5l7 7-7 7" />
-                  </button>
-                </nav>
-
-                <div className="pagination-size-container">
-                  <select
-                    id="code-proposals-page-size"
-                    className="pagination-pagesize-select"
-                    value={proposalsPageSize}
-                    onChange={e => {
-                      setProposalsPageSize(Number(e.target.value));
-                      setProposalsPage(1);
-                    }}
-                    aria-label="Cantidad de correcciones por página"
-                  >
-                    <option value={5}>5 / pág</option>
-                    <option value={10}>10 / pág</option>
-                    <option value={20}>20 / pág</option>
-                  </select>
-                </div>
-              </footer>
+              <Pagination
+                page={safeProposalsPage}
+                totalPages={totalProposalsPages}
+                totalItems={filteredProposals.length}
+                pageSize={proposalsPageSize}
+                pageSizeOptions={[5, 10, 20]}
+                sizeSelectId="code-proposals-page-size"
+                sizeSelectLabel="Cantidad de correcciones por página"
+                onPageChange={setProposalsPage}
+                onPageSizeChange={size => { setProposalsPageSize(size); setProposalsPage(1); }}
+              />
             )}
           </section>
         </>

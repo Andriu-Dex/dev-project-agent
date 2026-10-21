@@ -17,6 +17,7 @@ import { readAgentProviders, providerDestination } from './agentProviders';
 import { ExecutionPanel } from './ExecutionPanel';
 import { ReasoningSelect, effortLabels } from './ReasoningSelect';
 import { Icon } from './Workspace';
+import { Pagination } from './Pagination';
 
 interface StateConfigItem {
   label: string;
@@ -166,19 +167,6 @@ async function read<T>(url: string, signal?: AbortSignal): Promise<T> {
 
 function verdict(value: unknown): AgentVerdict | null {
   return value && typeof value === 'object' && 'verdict' in value ? (value as AgentVerdict) : null;
-}
-
-function getPaginationRange(current: number, total: number): (number | 'ellipsis')[] {
-  if (total <= 7) {
-    return Array.from({ length: total }, (_, i) => i + 1);
-  }
-  if (current <= 4) {
-    return [1, 2, 3, 4, 5, 'ellipsis', total];
-  }
-  if (current >= total - 3) {
-    return [1, 'ellipsis', total - 4, total - 3, total - 2, total - 1, total];
-  }
-  return [1, 'ellipsis', current - 1, current, current + 1, 'ellipsis', total];
 }
 
 function getProposalStepIndex(state: ProposalState): number {
@@ -628,7 +616,6 @@ export function ProposalPanel({
   const startIndex = totalProposalsCount === 0 ? 0 : (safePage - 1) * pageSize;
   const endIndex = Math.min(startIndex + pageSize, totalProposalsCount);
   const paginatedProposals = visibleProposals.slice(startIndex, endIndex);
-  const pageRange = getPaginationRange(safePage, totalPages);
 
   return (
     <div className="proposals-dashboard">
@@ -1273,74 +1260,17 @@ export function ProposalPanel({
             </div>
 
             {visibleProposals.length > 0 && (
-              <footer className="planning-pagination-bar">
-                <div className="pagination-summary">
-                  <span>
-                    {startIndex + 1}–{endIndex} de <strong>{visibleProposals.length}</strong>
-                  </span>
-                </div>
-
-                <nav className="pagination-pages-nav" aria-label="Páginas">
-                  <button
-                    type="button"
-                    className="pagination-arrow-btn"
-                    disabled={safePage <= 1}
-                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                    aria-label="Página anterior"
-                    title="Página anterior"
-                  >
-                    <Icon path="M15 19l-7-7 7-7" />
-                  </button>
-
-                  {pageRange.map((pageItem, idx) => {
-                    if (pageItem === 'ellipsis') {
-                      return (
-                        <span key={`ellipsis-${idx}`} className="pagination-ellipsis" aria-hidden="true">
-                          …
-                        </span>
-                      );
-                    }
-                    const isCurrent = pageItem === safePage;
-                    return (
-                      <button
-                        key={pageItem}
-                        type="button"
-                        className={'pagination-number-btn' + (isCurrent ? ' is-active' : '')}
-                        onClick={() => setCurrentPage(pageItem)}
-                        aria-label={`Página ${pageItem}`}
-                        aria-current={isCurrent ? 'page' : undefined}
-                      >
-                        {pageItem}
-                      </button>
-                    );
-                  })}
-
-                  <button
-                    type="button"
-                    className="pagination-arrow-btn"
-                    disabled={safePage >= totalPages}
-                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                    aria-label="Página siguiente"
-                    title="Página siguiente"
-                  >
-                    <Icon path="M9 5l7 7-7 7" />
-                  </button>
-                </nav>
-
-                <div className="pagination-size-container">
-                  <select
-                    id="proposals-page-size"
-                    className="pagination-pagesize-select"
-                    value={pageSize}
-                    onChange={e => setPageSize(Number(e.target.value))}
-                    aria-label="Cantidad de propuestas por página"
-                  >
-                    <option value={10}>10 / pág</option>
-                    <option value={20}>20 / pág</option>
-                    <option value={50}>50 / pág</option>
-                  </select>
-                </div>
-              </footer>
+              <Pagination
+                page={safePage}
+                totalPages={totalPages}
+                totalItems={visibleProposals.length}
+                pageSize={pageSize}
+                pageSizeOptions={[10, 20, 50]}
+                sizeSelectId="proposals-page-size"
+                sizeSelectLabel="Cantidad de propuestas por página"
+                onPageChange={setCurrentPage}
+                onPageSizeChange={setPageSize}
+              />
             )}
           </>
         )}
