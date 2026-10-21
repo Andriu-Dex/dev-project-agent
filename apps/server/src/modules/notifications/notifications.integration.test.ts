@@ -1,3 +1,5 @@
+import {boardFixture,boardId,listId} from '../../integrations/trello/fixtures.js';
+import {normalizeBoard} from '../../integrations/trello/normalize.js';
 import {randomBytes,randomUUID} from 'node:crypto';
 import pg from 'pg';
 import {beforeAll,afterAll,describe,it,expect} from 'vitest';
@@ -91,6 +93,19 @@ describe.skipIf(process.env.RUN_NOTIFICATIONS_DB_TESTS!=='true')('Durable notifi
     await save({...settings,events:['overdue'],reminderHours:1});const count=messages.length;
     await service.tick(projectId,new Date(Date.now()+2*3600000));expect(messages).toHaveLength(count);
     expect((await client.query('SELECT id FROM notification_events WHERE project_id=$1 AND source_id=$2',[projectId,id])).rows).toHaveLength(0);
+  });
+  it('previews and delivers individual notices to the configured owner and manager without duplicate recipients',async()=>{
+    const source=normalizeBoard(boardFixture(),boardId,[listId]);
+    await client.query('INSERT INTO trello_connections(project_id,board_id,operational_list_ids) VALUES($1,$2,$3)',[projectId,boardId,JSON.stringify([listId])]);
+    await client.query("INSERT INTO trello_snapshots(project_id,source,observed_at,imported_at,data,changes) VALUES($1,'api',clock_timestamp(),clock_timestamp(),$2,'[]')",[projectId,JSON.stringify(source)]);
+    const configured={...settings,audience:'both' as const,contacts:[{memberId:source.members[0]!.id,email:'owner@example.com'}],events:['overdue' as const]};await save(configured);
+    const alert=(await client.query("INSERT INTO project_alerts(project_id,item_id,code,first_seen,last_seen,payload) VALUES($1,$2,'overdue',clock_timestamp(),clock_timestamp(),$3) RETURNING id",[projectId,source.items[0]!.id,JSON.stringify({finding:{itemName:'Assigned activity',message:'Past due.'}})])).rows[0];
+    await client.query("INSERT INTO alert_events(project_id,alert_id,action) VALUES($1,$2,'opened')",[projectId,alert.id]);
+    const preview=await service.preview(projectId,configured);expect(preview.preview.find(item=>item.itemName==='Assigned activity')!.recipients).toEqual(['manager@example.com','owner@example.com']);
+    const count=messages.length;await service.tick(projectId);await service.tick(projectId);await service.tick(projectId);
+    expect(messages.slice(count).map(message=>message.to).sort()).toEqual(['manager@example.com','owner@example.com']);
+    for(const mail of messages.slice(count))expect(mail).not.toHaveProperty('cc');
+    expect((await client.query("SELECT id FROM notification_deliveries WHERE project_id=$1 AND configuration_version=$2",[projectId,version])).rows).toHaveLength(2);
   });
 
 });

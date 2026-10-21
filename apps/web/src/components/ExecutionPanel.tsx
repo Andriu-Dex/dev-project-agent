@@ -37,7 +37,7 @@ export function ExecutionPanel({project,csrfToken,proposal,isLatest,onChanged}:{
     {overview?.writesEnabled&&!overview.credentialsConfigured&&<p>Falta configurar una credencial de escritura independiente.</p>}
     {error&&<p role="alert" className="form-error">{error}</p>}
     {project.canManageProject&&isLatest&&['authorized','execution_failed'].includes(proposal.state)&&proposal.purpose==='live'&&<>
-      <label className="confirmation"><input type="checkbox" checked={confirmed} onChange={event=>setConfirmed(event.target.checked)} disabled={busy||pending||!overview?.writesEnabled||!overview.credentialsConfigured}/>Confirmo que quiero aplicar en Trello el vencimiento exacto de esta versión aprobada.</label>
+      <label className="confirmation"><input type="checkbox" checked={confirmed} onChange={event=>setConfirmed(event.target.checked)} disabled={busy||pending||!overview?.writesEnabled||!overview.credentialsConfigured}/>Confirmo que quiero aplicar en Trello el cambio exacto de esta versión aprobada.</label>
       <button disabled={busy||pending||!confirmed||!overview?.writesEnabled||!overview.credentialsConfigured} onClick={()=>{requestKey.current??=crypto.randomUUID();void mutate(path+'/execute',{contentHash:proposal.contentHash,confirmed:true,requestKey:requestKey.current});}}>Solicitar ejecución real</button>
     </>}
     {project.canManageProject&&isLatest&&['authorized','execution_failed','executing'].includes(proposal.state)&&<>

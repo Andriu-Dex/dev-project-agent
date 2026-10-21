@@ -151,6 +151,8 @@ describe.skipIf(process.env.RUN_CODE_DB_TESTS!=='true')('PostgreSQL pinned code 
     const job=await publication.request(projectId,actor,result.job.proposalId,1,result.detail.contentHash!,randomUUID(),true);await publication.waitForIdle();
     const plan=await publication.prepareRecovery(binding,actor,job.id,'Retirar PR de prueba.',randomUUID(),'gpt-6.1-sol','high',true);
     expect(plan.status).toBe('prepared');const count=transport.writes.length;
+    const revoked=await publication.prepareRecovery(binding,actor,job.id,'Plan alternativo que se retirará.',randomUUID(),'',null,false);await publication.recoveryAction(projectId,actor,revoked.id,revoked.content_hash,'approve','Aprobación de prueba.',true);expect(await publication.recoveryAction(projectId,actor,revoked.id,revoked.content_hash,'withdraw','Retirar sin ejecutar.',true)).toMatchObject({status:'withdrawn'});
+    await expect(publication.recoveryAction(projectId,actor,revoked.id,revoked.content_hash,'execute','No debe escribir.',true)).rejects.toHaveProperty('code','CONFLICT');
     await expect(publication.recoveryAction(projectId,actor,plan.id,plan.content_hash,'execute','Retiro revisado.',true)).rejects.toHaveProperty('code','CONFLICT');
     expect(transport.writes).toHaveLength(count);
     await publication.recoveryAction(projectId,actor,plan.id,plan.content_hash,'approve','Plan revisado.',true);

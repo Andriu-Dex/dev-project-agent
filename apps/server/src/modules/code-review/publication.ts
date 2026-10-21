@@ -62,9 +62,9 @@ export class PublicationService {
   async reconcile(projectId:string,actor:AuthUser,id:string){await assertManager(this.database,projectId,actor);const job=(await this.database.query<Job>('SELECT * FROM github_publication_jobs WHERE project_id=$1 AND id=$2',[projectId,id])).rows[0];if(!job||job.status!=='reconciliation_required'||!this.configuration.token)throw new PublicationError('CONFLICT');
     await this.transaction(async client=>{await this.validate(client,projectId,job.proposal_id,job.version,job.content_hash,actor,['reconciliation_required']);await this.event(client,job,'reconciliation','requested',{},actor);});
     const value=await this.validate(this.database,projectId,job.proposal_id,job.version,job.content_hash,actor,['reconciliation_required']),result=await publicationRemote(this.configuration.token,this.fetcher).verify(value.source,value.candidate,job.plan);if(!result)return {verified:false,message:'No se confirmó rama y PR. La reconciliación sigue pendiente; no se ha repetido ninguna escritura.'};await this.transaction(async client=>{await this.validate(client,projectId,job.proposal_id,job.version,job.content_hash,actor,['reconciliation_required']);await this.finish(client,job,'succeeded',null,result);});return {verified:true};}
-  private async recoveryEvent(projectId:string,id:string,actor:AuthUser,action:string,reason:string){
-    await this.database.query('INSERT INTO github_recovery_events(project_id,recovery_id,actor_id,action,reason) VALUES($1,$2,$3,$4,$5)',[projectId,id,actor.id,action,reason]);
-    await this.database.query("INSERT INTO audit_events(project_id,actor_type,actor_id,action,resource_type,resource_id,outcome) VALUES($1,'user',$2,$3,'github_recovery',$4,$5)",[projectId,actor.id,'github.recovery.'+action,id,action==='uncertain'?'failed':'succeeded']);
+  private async recoveryEvent(projectId:string,id:string,actor:AuthUser,action:string,reason:string,db:AuthDatabase=this.database){
+    await db.query('INSERT INTO github_recovery_events(project_id,recovery_id,actor_id,action,reason) VALUES($1,$2,$3,$4,$5)',[projectId,id,actor.id,action,reason]);
+    await db.query("INSERT INTO audit_events(project_id,actor_type,actor_id,action,resource_type,resource_id,outcome) VALUES($1,'user',$2,$3,'github_recovery',$4,$5)",[projectId,actor.id,'github.recovery.'+action,id,action==='uncertain'?'failed':'succeeded']);
   }
   async recoveries(projectId:string){return (await this.database.query('SELECT id,publication_id,plan,content_hash,status,reason,created_at FROM github_recovery_requests WHERE project_id=$1 ORDER BY created_at DESC LIMIT 100',[projectId])).rows;}
   async prepareRecovery(binding:ConnectionBinding,actor:AuthUser,publicationId:string,reason:string,key:string,model:string,effort:ReasoningEffort|null,consent:boolean){
@@ -78,32 +78,33 @@ export class PublicationService {
     if(pull.merged_at)return {kind:'code_proposal',...await this.code.prepareReversal(binding,actor,publicationId,reason,model,effort,consent,key)};
     if(pull.state!=='open')throw new PublicationError('CONFLICT');
     const plan={action:'close_pr',publicationId,connection,pullNumber:job.pull_number,pullUrl:job.pull_url,head:job.commit_sha,repository:job.plan.repository,reason,review:'Identidad, rama y HEAD coinciden con la publicación verificada. Solo se cerrará el PR; rama y commits se conservan.',policy:'Requiere decisión humana y confirmación de ejecución separadas. No se realizará merge.'};
-    const hash=fingerprint(plan);const result=(await this.database.query('INSERT INTO github_recovery_requests(project_id,publication_id,requested_by,auth_version,request_key,reason,plan,content_hash) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id,status,plan,content_hash',[binding.projectId,publicationId,actor.id,actor.auth_version,key,reason,JSON.stringify(plan),hash])).rows[0];await this.recoveryEvent(binding.projectId,result.id,actor,'prepared',reason);return result;
+    const hash=fingerprint(plan);return this.transaction(async client=>{await assertManager(client,binding.projectId,actor);const result=(await client.query('INSERT INTO github_recovery_requests(project_id,publication_id,requested_by,auth_version,request_key,reason,plan,content_hash) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id,status,plan,content_hash',[binding.projectId,publicationId,actor.id,actor.auth_version,key,reason,JSON.stringify(plan),hash])).rows[0];await this.recoveryEvent(binding.projectId,result.id,actor,'prepared',reason,client);return result;});
   }
-  async recoveryAction(projectId:string,actor:AuthUser,id:string,hash:string,action:'approve'|'execute'|'reconcile',reason:string,confirmed:boolean){
+  async recoveryAction(projectId:string,actor:AuthUser,id:string,hash:string,action:'approve'|'execute'|'reconcile'|'withdraw',reason:string,confirmed:boolean){
     await assertManager(this.database,projectId,actor);safeText(reason);if(!reason.trim()||!confirmed)throw new PublicationError('CONFIRMATION_REQUIRED');
     const saved=(await this.database.query('SELECT * FROM github_recovery_requests WHERE project_id=$1 AND id=$2',[projectId,id])).rows[0];
-    if(!saved||saved.requested_by!==actor.id||saved.auth_version!==actor.auth_version||saved.content_hash!==hash||fingerprint(saved.plan)!==hash)throw new PublicationError('CONFLICT');
-    if(action==='approve'){
-      const updated=await this.database.query("UPDATE github_recovery_requests SET status='approved' WHERE project_id=$1 AND id=$2 AND status='prepared'",[projectId,id]);if(!updated.rowCount)throw new PublicationError('CONFLICT');await this.recoveryEvent(projectId,id,actor,'approved',reason);return {status:'approved'};
-    }
-    if(!this.configuration.token)throw new PublicationError('WRITES_DISABLED');
+    if(!saved||(action!=='reconcile'&&(saved.requested_by!==actor.id||saved.auth_version!==actor.auth_version))||saved.content_hash!==hash||fingerprint(saved.plan)!==hash)throw new PublicationError('CONFLICT');
+    if(action==='approve'||action==='withdraw')return this.transaction(async client=>{
+      await assertManager(client,projectId,actor);
+      const result=await client.query(action==='approve'?"UPDATE github_recovery_requests SET status='approved' WHERE project_id=$1 AND id=$2 AND status='prepared'":"UPDATE github_recovery_requests SET status='withdrawn' WHERE project_id=$1 AND id=$2 AND status IN ('prepared','approved')",[projectId,id]);
+      if(!result.rowCount)throw new PublicationError('CONFLICT');await this.recoveryEvent(projectId,id,actor,action==='approve'?'approved':'withdrawn',reason,client);return {status:action==='approve'?'approved':'withdrawn'};
+    });
+    const credential=this.configuration.token??(action==='reconcile'?this.code.token:null);if(!credential)throw new PublicationError('WRITES_DISABLED');
     const configured=(await this.database.query('SELECT owner,repository,branch FROM github_connections WHERE project_id=$1',[projectId])).rows[0];if(fingerprint(configured)!==fingerprint(saved.plan.connection))throw new PublicationError('SOURCE_CHANGED');
-    const plan=saved.plan,api=githubApi(plan.connection,this.configuration.token,this.fetcher),path='/pulls/'+Number(plan.pullNumber);
+    const plan=saved.plan,api=githubApi(plan.connection,credential,this.fetcher),path='/pulls/'+Number(plan.pullNumber);
     const read=async()=>{const pull=await api.get(path) as {state:string;merged_at:string|null;head:{sha:string;repo:{full_name:string}};base:{ref:string;repo:{full_name:string}}};if(pull.merged_at||pull.head?.sha!==plan.head||pull.head.repo.full_name!==plan.repository||pull.base?.repo?.full_name!==plan.repository||pull.base.ref!==plan.connection.branch)throw new PublicationError('SOURCE_CHANGED');return pull;};
     if(action==='reconcile'){
-      if(!['running','reconciliation_required'].includes(saved.status))throw new PublicationError('CONFLICT');const pull=await read();if(pull.state!=='closed')return {status:'reconciliation_required'};await this.database.query("UPDATE github_recovery_requests SET status='succeeded' WHERE project_id=$1 AND id=$2 AND status IN ('running','reconciliation_required')",[projectId,id]);await this.recoveryEvent(projectId,id,actor,'verified',reason);return {status:'succeeded'};
+      if(!['running','reconciliation_required'].includes(saved.status))throw new PublicationError('CONFLICT');const pull=await read();if(pull.state!=='closed')return {status:'reconciliation_required'};await this.transaction(async client=>{await assertManager(client,projectId,actor);await client.query("UPDATE github_recovery_requests SET status='succeeded' WHERE project_id=$1 AND id=$2 AND status IN ('running','reconciliation_required')",[projectId,id]);await this.recoveryEvent(projectId,id,actor,'verified',reason,client);});return {status:'succeeded'};
     }
     if(!this.configuration.enabled)throw new PublicationError('WRITES_DISABLED');
     if(saved.status!=='approved'||(await read()).state!=='open')throw new PublicationError('CONFLICT');
     await assertManager(this.database,projectId,actor);
-    const claimed=await this.database.query("UPDATE github_recovery_requests SET status='running' WHERE project_id=$1 AND id=$2 AND status='approved'",[projectId,id]);if(!claimed.rowCount)throw new PublicationError('CONFLICT');
-    await this.recoveryEvent(projectId,id,actor,'write_started',reason);
+    await this.transaction(async client=>{await assertManager(client,projectId,actor);const claimed=await client.query("UPDATE github_recovery_requests SET status='running' WHERE project_id=$1 AND id=$2 AND status='approved'",[projectId,id]);if(!claimed.rowCount)throw new PublicationError('CONFLICT');await this.recoveryEvent(projectId,id,actor,'write_started',reason,client);});
     try{
       const response=await this.fetcher(`https://api.github.com/repos/${plan.connection.owner}/${plan.connection.repository}${path}`,{method:'PATCH',redirect:'error',signal:AbortSignal.timeout(15000),headers:{Authorization:'Bearer '+this.configuration.token,'Content-Type':'application/json',Accept:'application/vnd.github+json'},body:JSON.stringify({state:'closed'})});
       if(!response.ok||(await read()).state!=='closed')throw new PublicationError('REMOTE_UNCONFIRMED');
-      await this.database.query("UPDATE github_recovery_requests SET status='succeeded' WHERE project_id=$1 AND id=$2 AND status='running'",[projectId,id]);await this.recoveryEvent(projectId,id,actor,'verified',reason);return {status:'succeeded'};
-    }catch{await this.database.query("UPDATE github_recovery_requests SET status='reconciliation_required' WHERE project_id=$1 AND id=$2 AND status='running'",[projectId,id]);await this.recoveryEvent(projectId,id,actor,'uncertain',reason);return {status:'reconciliation_required'};}
+      await this.transaction(async client=>{await client.query("UPDATE github_recovery_requests SET status='succeeded' WHERE project_id=$1 AND id=$2 AND status='running'",[projectId,id]);await this.recoveryEvent(projectId,id,actor,'verified',reason,client);});return {status:'succeeded'};
+    }catch{await this.transaction(async client=>{await client.query("UPDATE github_recovery_requests SET status='reconciliation_required' WHERE project_id=$1 AND id=$2 AND status='running'",[projectId,id]);await this.recoveryEvent(projectId,id,actor,'uncertain',reason,client);});return {status:'reconciliation_required'};}
   }
   async close(){this.closed=true;await this.waitForIdle();}async waitForIdle(){while(this.tasks.size)await Promise.allSettled([...this.tasks]);}
 }

@@ -120,7 +120,7 @@ describe.skipIf(process.env.RUN_COVERAGE_DB_TESTS!=='true')('PostgreSQL progress
     await inventory();let release:()=>void=()=>{},started:()=>void=()=>{};
     const reached=new Promise<void>(resolve=>{started=resolve;}),wait=new Promise<void>(resolve=>{release=resolve;});
     const generate=provider.generate;provider.generate=async(...args)=>{started();await wait;return generate(...args);};
-    await configure({withAi:true,model:'gpt-6.1-sol',consent:true});await control('start');const batch=service.tick();await reached;
+    await configure({withAi:true,model:'gpt-6.1-sol',consent:true});await control('start');const batch=tick();await reached;
     try{await expect(configure({batchUnits:2})).rejects.toMatchObject({code:'CONFLICT'});await control('pause');}finally{release();await batch;}
     expect((await service.overview(projectId)).counts.reviewed).toBe(1);
     expect((await files()).some(file=>file.state==='reviewing')).toBe(false);

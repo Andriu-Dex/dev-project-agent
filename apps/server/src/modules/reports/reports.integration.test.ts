@@ -37,6 +37,7 @@ describe.skipIf(process.env.RUN_REPORTS_DB_TESTS!=='true')('PostgreSQL weekly re
     await snapshot();const template=await service.configureTemplate(projectId,actor,0,{organization:'Organización de prueba',process:'TIC',subprocess:'Seguimiento',title:'Informe institucional',codePrefix:'AP-TIC-INF'});
     expect(template.version).toBe(1);
     const first=await generate();const printed=renderReport(first);expect(printed).toContain('11. Anexos');expect(printed).toContain('Actividades por estado');expect(printed).toContain('size:letter');expect(printed).not.toContain('Firma digital válida');expect(first.data!.presentation!.code).toBe('AP-TIC-INF-001');expect(first.data!.presentation!.logoDataUrl).toMatch(/^data:image\/jpeg;base64,/);
+    const numerical=structuredClone(first);numerical.data!.tracking!.summary!.progress={...numerical.data!.tracking!.summary!.progress,numerator:13,denominator:29,percent:44.83};expect(renderReport(numerical)).toContain('13 / 29 × 100 = 44,83 %');
     await service.configureTemplate(projectId,actor,1,{...template.settings,organization:'Nueva organización'});
     await client.query('SET LOCAL ROLE dev_project_agent_app');
     const revised=await service.request(projectId,actor,randomUUID(),first.id,'Actualizar la identificación institucional.');while(await service.processNext()){}await client.query('RESET ROLE');
@@ -149,6 +150,7 @@ describe.skipIf(process.env.RUN_REPORTS_DB_TESTS!=='true')('PostgreSQL weekly re
     expect((await app.inject({method:'GET',url:path})).statusCode).toBe(401);const viewerHeaders=await login(viewer),managerHeaders=await login(actor);
     expect((await app.inject({method:'GET',url:path+'/'+report.id,headers:viewerHeaders})).statusCode).toBe(200);
     const printed=await app.inject({method:'GET',url:path+'/'+report.id+'/print',headers:viewerHeaders});expect(printed.statusCode).toBe(200);expect(printed.headers['cache-control']).toBe('no-store');expect(printed.headers['content-security-policy']).toContain("default-src 'none'");
+    await client.query("UPDATE report_results SET rendered_html=rendered_html||'x' WHERE report_id=$1",[report.id]);expect((await app.inject({method:'GET',url:path+'/'+report.id+'/print',headers:viewerHeaders})).statusCode).toBe(503);await client.query('UPDATE report_results SET rendered_html=$2 WHERE report_id=$1',[report.id,report.renderedHtml]);
     expect((await app.inject({method:'POST',url:path,headers:viewerHeaders,payload:{requestKey:randomUUID()}})).statusCode).toBe(403);
     expect((await app.inject({method:'POST',url:path,headers:{origin,cookie:managerHeaders.cookie},payload:{requestKey:randomUUID()}})).statusCode).toBe(403);
     expect((await app.inject({method:'POST',url:path,headers:{...managerHeaders,origin:'https://evil.example'},payload:{requestKey:randomUUID()}})).statusCode).toBe(403);
