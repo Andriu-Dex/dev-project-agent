@@ -24,7 +24,6 @@ La guía operativa reúne las pantallas y recorridos que antes estaban repartido
 - [Arquitectura implementada](architecture.md), [modelo de datos](data-model.md) y [API](api-design.md).
 - [Reglas de negocio](business-rules.md), [normas de referencia](standards-and-quality.md) y [catálogo de revisión de código](code-standard-catalog.md).
 - [Convenciones Git](git-conventions.md), [herramientas de mantenimiento](../scripts/README.md) y [notas de versión](release-notes.md).
-- [Diagrama de arquitectura](diagrams/agent-architecture.md).
 
 ## Requisitos y evidencia académica
 

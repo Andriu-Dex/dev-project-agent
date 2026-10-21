@@ -53,6 +53,7 @@
     "verify:install": "node --env-file=.env scripts/verify-install.mjs",
     "release:package": "node --env-file=.env scripts/package-release.mjs",
     "docs:check": "node scripts/check-docs.mjs",
+    "verify": "npm run typecheck && npm run test:isolated && npm run docs:check && npm run build",
     "verify:upgrade": "node --env-file=.env scripts/verify-upgrade.mjs"
   },
   "devDependencies": {

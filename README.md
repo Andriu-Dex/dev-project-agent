@@ -56,15 +56,13 @@ Fresh schedules, mail and writes start disabled. Existing installations retain s
 ## Verify, back up and package
 
 ```sh
-npm run typecheck
-npm run test:isolated
-npm run build
+npm run verify
 npm run verify:install
 npm run verify:upgrade
 npm run db:backup
 ```
 
-`test:isolated` creates/migrates a disposable database, uses the runtime role for permission checks, runs synthetic unit/integration tests and removes only that test database. No test workers initialize against operational data. `test:coverage-db` narrows this runner to coverage. Regular `npm test` omits opt-in PostgreSQL cases; omissions are not passes. Test discovery excludes local work packages, backups and temporary directories through `vitest.config.ts`. Run `npm run docs:check` to verify local documentation links.
+`test:isolated` creates/migrates a disposable database, uses the runtime role for permission checks, runs synthetic unit/integration tests and removes only that test database. No test workers initialize against operational data. `test:coverage-db` narrows this runner to coverage. Regular `npm test` omits opt-in PostgreSQL cases; omissions are not passes. Test discovery excludes local work packages, backups and temporary directories through `vitest.config.ts`. Run `npm run docs:check` to verify local documentation links. `npm run verify` chains typecheck, `test:isolated`, `docs:check` and build.
 
 `verify:install` starts compiled code on a free loopback port with another disposable database and no external credentials. It verifies dashboard delivery, health, authentication and safe defaults.
 
