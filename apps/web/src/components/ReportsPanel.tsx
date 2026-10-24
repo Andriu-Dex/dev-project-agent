@@ -3,6 +3,7 @@ import { useUnsavedChanges } from '../hooks/useUnsavedChanges';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ProjectAccess, ReportDetail, ReportsOverview, ReportSummary } from '@dev-project-agent/contracts';
 import { Icon } from './Workspace';
+import { Pagination } from './Pagination';
 
 interface StatusConfigItem {
   label: string;
@@ -56,19 +57,6 @@ const dates = (value: string | null) =>
         minute: '2-digit',
       })
     : 'Sin fecha';
-
-function getPaginationRange(current: number, total: number): (number | 'ellipsis')[] {
-  if (total <= 7) {
-    return Array.from({ length: total }, (_, i) => i + 1);
-  }
-  if (current <= 4) {
-    return [1, 2, 3, 4, 5, 'ellipsis', total];
-  }
-  if (current >= total - 3) {
-    return [1, 'ellipsis', total - 4, total - 3, total - 2, total - 1, total];
-  }
-  return [1, 'ellipsis', current - 1, current, current + 1, 'ellipsis', total];
-}
 
 export function ReportsPanel({
   project,
@@ -273,7 +261,6 @@ export function ReportsPanel({
   const totalPages = Math.max(1, Math.ceil(visibleReports.length / pageSize));
   const safePage = Math.min(Math.max(1, currentPage), totalPages);
   const paginatedReports = visibleReports.slice((safePage - 1) * pageSize, safePage * pageSize);
-  const pageRange = getPaginationRange(safePage, totalPages);
 
   // If inside Settings (configurationOnly), render just the schedule editor card
   if (configurationOnly) {
@@ -760,74 +747,17 @@ export function ReportsPanel({
 
         {/* Centered Pagination matching planning-pagination-bar */}
         {visibleReports.length > 0 && (
-          <footer className="planning-pagination-bar">
-            <div className="pagination-summary">
-              <span>
-                {(safePage - 1) * pageSize + 1}–
-                {Math.min(safePage * pageSize, visibleReports.length)} de{' '}
-                <strong>{visibleReports.length}</strong>
-              </span>
-            </div>
-
-            <nav className="pagination-pages-nav" aria-label="Páginas">
-              <button
-                type="button"
-                className="pagination-arrow-btn"
-                disabled={safePage <= 1}
-                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                aria-label="Página anterior"
-                title="Página anterior"
-              >
-                <Icon path="M15 19l-7-7 7-7" />
-              </button>
-
-              {pageRange.map((p, idx) =>
-                p === 'ellipsis' ? (
-                  <span key={`el-${idx}`} className="pagination-ellipsis" aria-hidden="true">
-                    …
-                  </span>
-                ) : (
-                  <button
-                    key={p}
-                    type="button"
-                    className={'pagination-number-btn' + (p === safePage ? ' is-active' : '')}
-                    onClick={() => setCurrentPage(p)}
-                    aria-current={p === safePage ? 'page' : undefined}
-                  >
-                    {p}
-                  </button>
-                )
-              )}
-
-              <button
-                type="button"
-                className="pagination-arrow-btn"
-                disabled={safePage >= totalPages}
-                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                aria-label="Página siguiente"
-                title="Página siguiente"
-              >
-                <Icon path="M9 5l7 7-7 7" />
-              </button>
-            </nav>
-
-            <div className="pagination-size-container">
-              <select
-                id="reports-page-size"
-                className="pagination-pagesize-select"
-                value={pageSize}
-                onChange={e => {
-                  setPageSize(Number(e.target.value));
-                  setCurrentPage(1);
-                }}
-                aria-label="Cantidad de reportes por página"
-              >
-                <option value={5}>5 / pág</option>
-                <option value={10}>10 / pág</option>
-                <option value={20}>20 / pág</option>
-              </select>
-            </div>
-          </footer>
+          <Pagination
+            page={safePage}
+            totalPages={totalPages}
+            totalItems={visibleReports.length}
+            pageSize={pageSize}
+            pageSizeOptions={[5, 10, 20]}
+            sizeSelectId="reports-page-size"
+            sizeSelectLabel="Cantidad de reportes por página"
+            onPageChange={setCurrentPage}
+            onPageSizeChange={size => { setPageSize(size); setCurrentPage(1); }}
+          />
         )}
       </section>
 

@@ -8,6 +8,7 @@ import type {
   SupervisionJobKind,
 } from '@dev-project-agent/contracts';
 import { Icon } from './Workspace';
+import { Pagination } from './Pagination';
 
 interface BaselineOverview {
   baseline: BaselineVersion | null;
@@ -185,19 +186,6 @@ function formatValue(val: unknown): string {
     );
   }
   return JSON.stringify(val);
-}
-
-function getPaginationRange(current: number, total: number): (number | 'ellipsis')[] {
-  if (total <= 7) {
-    return Array.from({ length: total }, (_, i) => i + 1);
-  }
-  if (current <= 4) {
-    return [1, 2, 3, 4, 5, 'ellipsis', total];
-  }
-  if (current >= total - 3) {
-    return [1, 'ellipsis', total - 4, total - 3, total - 2, total - 1, total];
-  }
-  return [1, 'ellipsis', current - 1, current, current + 1, 'ellipsis', total];
 }
 
 export function OperationsPage({
@@ -896,6 +884,27 @@ export function OperationsPage({
               <p>El gestor puede pulsar en "Actualizar fuentes y analizar" para generar el primer corte de supervisión.</p>
             </div>
           )}
+
+          {!!data?.runs.length && (
+            <details className="proposal-editor-card" style={{ padding: '16px' }}>
+              <summary style={{ cursor: 'pointer', fontWeight: 600 }}>Análisis recientes ({data.runs.length})</summary>
+              <ul className="history-list">
+                {data.runs.map(run => (
+                  <li key={run.id}>
+                    {dates(run.createdAt)} · {statusNames[run.status]?.label ?? run.status}{' '}
+                    <button
+                      type="button"
+                      className="editor-cancel-btn"
+                      disabled={detailBusy}
+                      onClick={() => void openDetail('runs', run.id)}
+                    >
+                      Abrir análisis
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
         </div>
       )}
 
@@ -1236,70 +1245,17 @@ export function OperationsPage({
 
             {/* Centered Pagination for History */}
             {filteredEvents.length > 0 && (
-              <footer className="planning-pagination-bar">
-                <div className="pagination-summary">
-                  <span>
-                    {(safeHistoryPage - 1) * historyPageSize + 1}–
-                    {Math.min(safeHistoryPage * historyPageSize, filteredEvents.length)} de{' '}
-                    <strong>{filteredEvents.length}</strong>
-                  </span>
-                </div>
-
-                <nav className="pagination-pages-nav" aria-label="Páginas">
-                  <button
-                    type="button"
-                    className="pagination-arrow-btn"
-                    disabled={safeHistoryPage <= 1}
-                    onClick={() => setHistoryPage(p => Math.max(1, p - 1))}
-                    aria-label="Página anterior"
-                  >
-                    <Icon path="M15 19l-7-7 7-7" />
-                  </button>
-
-                  {getPaginationRange(safeHistoryPage, totalHistoryPages).map((p, idx) =>
-                    p === 'ellipsis' ? (
-                      <span key={`el-${idx}`} className="pagination-ellipsis">
-                        …
-                      </span>
-                    ) : (
-                      <button
-                        key={p}
-                        type="button"
-                        className={'pagination-number-btn' + (p === safeHistoryPage ? ' is-active' : '')}
-                        onClick={() => setHistoryPage(p)}
-                        aria-current={p === safeHistoryPage ? 'page' : undefined}
-                      >
-                        {p}
-                      </button>
-                    )
-                  )}
-
-                  <button
-                    type="button"
-                    className="pagination-arrow-btn"
-                    disabled={safeHistoryPage >= totalHistoryPages}
-                    onClick={() => setHistoryPage(p => Math.min(totalHistoryPages, p + 1))}
-                    aria-label="Página siguiente"
-                  >
-                    <Icon path="M9 5l7 7-7 7" />
-                  </button>
-                </nav>
-
-                <div className="pagination-size-container">
-                  <select
-                    className="pagination-pagesize-select"
-                    value={historyPageSize}
-                    onChange={e => {
-                      setHistoryPageSize(Number(e.target.value));
-                      setHistoryPage(1);
-                    }}
-                  >
-                    <option value={10}>10 / pág</option>
-                    <option value={20}>20 / pág</option>
-                    <option value={50}>50 / pág</option>
-                  </select>
-                </div>
-              </footer>
+              <Pagination
+                page={safeHistoryPage}
+                totalPages={totalHistoryPages}
+                totalItems={filteredEvents.length}
+                pageSize={historyPageSize}
+                pageSizeOptions={[10, 20, 50]}
+                sizeSelectId="history-page-size"
+                sizeSelectLabel="Cantidad de eventos por página"
+                onPageChange={setHistoryPage}
+                onPageSizeChange={size => { setHistoryPageSize(size); setHistoryPage(1); }}
+              />
             )}
           </section>
         </div>

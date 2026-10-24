@@ -1982,6 +1982,8 @@ h3 { font-size: 15px; }
   grid-template-columns: 1.4fr 1fr;
   gap: 20px;
 }
+/* Grid items default to min-width:auto, which lets long card content widen the page on phones. */
+.dashboard-columns-grid > * { min-width: 0; }
 
 .dashboard-card {
   background: var(--color-bg-surface);
@@ -7820,6 +7822,12 @@ h3 { font-size: 15px; }
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  max-width: 100%;
+  overflow-x: auto;
+}
+.code-nav-tabs > * {
+  flex-shrink: 0;
+  white-space: nowrap;
   padding: 6px;
   background: var(--color-bg-surface);
   border: 1px solid var(--color-border);
